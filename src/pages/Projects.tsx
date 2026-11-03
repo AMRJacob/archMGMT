@@ -42,7 +42,7 @@ export default function Projects() {
       const p = await projects.add({ name: 'New project', status: 'active' })
       await insertMany<Phase>('phases', defaultPhaseRows(p.id, nextMonday()))
       projects.select(p.id)
-      navigate('/overview')
+      navigate('/overview?new=1')
     } finally {
       setBusy(false)
     }

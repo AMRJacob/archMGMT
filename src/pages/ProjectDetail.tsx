@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { DateField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { TaskControls } from '../components/TaskChips.tsx'
@@ -12,6 +12,8 @@ import { useProjectPlan } from '../lib/useProjectPlan.ts'
 
 export default function ProjectDetail() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const isNew = params.get('new') === '1'
   const projects = useProject()
   const project = projects.current
   const id = project?.id ?? ''
@@ -114,7 +116,7 @@ export default function ProjectDetail() {
             onChange={(c) => projects.patch(id, { color: c })} onScheme={(s) => projects.patch(id, { color_scheme: s })} />
           <TextField value={project.number} placeholder="Project no." className="mono number"
             onSave={(v) => projects.patch(id, { number: v })} />
-          <TextField value={project.name} className="title"
+          <TextField value={project.name} className="title" autoFocus={isNew}
             onSave={(v) => v && projects.patch(id, { name: v })} />
         </div>
         <div className="meta-grid">

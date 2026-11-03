@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { insertMany } from '../lib/data.ts'
+import { nextMonday } from '../lib/dates.ts'
+import { defaultPhaseRows } from '../lib/phases.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { PROJECT_STATUSES } from '../lib/types.ts'
+import { PROJECT_STATUSES, type Phase } from '../lib/types.ts'
 import { projectAccent } from '../lib/colors.ts'
 
 /** The current project; click it to switch to another. Same behaviour as CAzen's switcher. */
 export default function ProjectSwitcher() {
-  const { projects, current, select } = useProject()
+  const { projects, current, select, add } = useProject()
+  const [creating, setCreating] = useState(false)
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -21,6 +25,20 @@ export default function ProjectSwitcher() {
   }, [open])
 
   const pick = (id: string) => { select(id); setOpen(false) }
+
+  /** New project with the standard phases from next Monday; opens its Overview to name it. */
+  async function createProject() {
+    setCreating(true)
+    try {
+      const p = await add({ name: 'New project', status: 'active' })
+      await insertMany<Phase>('phases', defaultPhaseRows(p.id, nextMonday()))
+      select(p.id)
+      setOpen(false)
+      navigate('/overview?new=1')
+    } finally {
+      setCreating(false)
+    }
+  }
   const statusLabel = (s: string) => PROJECT_STATUSES.find((x) => x.value === s)?.label ?? s
 
   return (
@@ -51,9 +69,8 @@ export default function ProjectSwitcher() {
               <span className="ps-name"><span className="pdot" style={{ background: projectAccent(p.color).accent }} />{p.name}</span>
             </button>
           ))}
-          <button className="ps-all" onClick={() => { setOpen(false); navigate('/') }}>
-            {projects.length ? 'All projects' : 'Create a project'}
-          </button>
+          <button className="ps-new" onClick={createProject} disabled={creating}>+ New project</button>
+          {projects.length > 0 && <button className="ps-all" onClick={() => { setOpen(false); navigate('/') }}>All projects</button>}
         </div>
       )}
     </div>
