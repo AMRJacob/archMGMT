@@ -23,6 +23,7 @@ const flag = {
 type CapturedLink =
   | { kind: 'tokens'; access_token: string; refresh_token: string; type: string | null }
   | { kind: 'hash'; token_hash: string; type: EmailOtpType }
+  | { kind: 'code'; code: string }
   | { kind: 'error'; message: string }
   | null
 
@@ -33,8 +34,13 @@ const captured: CapturedLink = (() => {
   const frag = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
   const query = new URLSearchParams(window.location.search)
   let link: CapturedLink = null
-  if (frag.get('error_description')) {
-    link = { kind: 'error', message: frag.get('error_description')! }
+  if (frag.get('error_description') || query.get('error_description')) {
+    const msg = (frag.get('error_description') || query.get('error_description'))!
+    link = { kind: 'error', message: /signups? not allowed|not allowed for this instance/i.test(msg)
+      ? 'That Google account hasn’t been added to archMGMT yet. Ask an admin to add your email in Supabase.'
+      : msg }
+  } else if (query.get('code')) {
+    link = { kind: 'code', code: query.get('code')! } // Google sign-in (and email links) return here
   } else if (frag.get('access_token') && frag.get('refresh_token')) {
     link = { kind: 'tokens', access_token: frag.get('access_token')!, refresh_token: frag.get('refresh_token')!, type: frag.get('type') }
   } else if (query.get('token_hash') && query.get('type')) {
@@ -47,6 +53,10 @@ const captured: CapturedLink = (() => {
 async function consumeAuthLink(): Promise<{ type: string | null; error: string | null }> {
   if (!supabase || !captured) return { type: null, error: null }
   if (captured.kind === 'error') return { type: null, error: captured.message }
+  if (captured.kind === 'code') {
+    const { error } = await supabase.auth.exchangeCodeForSession(captured.code)
+    return { type: null, error: error ? `${error.message}. Try signing in again.` : null }
+  }
   if (captured.kind === 'tokens') {
     const { error } = await supabase.auth.setSession({ access_token: captured.access_token, refresh_token: captured.refresh_token })
     return { type: captured.type, error: error?.message ?? null }
@@ -99,8 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 type Mode = 'password' | 'link' | 'forgot'
 
+/** Whether Google sign-in is switched on for the project (Supabase → Authentication → Providers). */
+function useGoogleEnabled() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const url = (supabase as unknown as { supabaseUrl?: string })?.supabaseUrl
+    const key = (supabase as unknown as { supabaseKey?: string })?.supabaseKey
+    if (!url || !key) return
+    fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } })
+      .then((r) => r.json()).then((j) => setOn(Boolean(j?.external?.google))).catch(() => setOn(false))
+  }, [])
+  return on
+}
+
 export function SignIn() {
   const { linkError } = useAuth()
+  const google = useGoogleEnabled()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<Mode>('password')
@@ -137,6 +161,22 @@ export function SignIn() {
         <p className="muted">
           {mode === 'forgot' ? 'Enter your email and we’ll send a link to choose a new password.' : 'Sign in with the email you were invited with.'}
         </p>
+        {google && mode === 'password' && (
+          <>
+            <button type="button" className="btn google" disabled={busy} onClick={async () => {
+              setBusy(true); setError(null)
+              const { error } = await supabase!.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: appUrl(), queryParams: { hd: 'amr-architects.com', prompt: 'select_account' } },
+              })
+              if (error) { setError(error.message); setBusy(false) }
+            }}>
+              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6.1C12.3 13.6 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.4 0-11.7-4.1-13.6-9.9l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+              Continue with Google
+            </button>
+            <div className="or"><span>or with email</span></div>
+          </>
+        )}
         <label>Email<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         {mode === 'password' && (
           <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>

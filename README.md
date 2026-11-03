@@ -18,7 +18,13 @@ with Gantt charts that export ready to hand to a client.
   Consultants can be assigned tasks but aren't counted in staff workload.
 - **Projects**: number, name, client, PM, status, dates
 - **Phases**: Predesign / SD / DD / CD / Bidding / CA bars on the schedule; can be shown to the client or hidden
-- **Tasks**: work inside a phase, with assignee, dates and estimated hours; milestones show as diamonds
+- **Hierarchy** inside a phase: **sheet → view → task → item**. Sheets have a number and type; views sit under
+  sheets; tasks are scheduled work; items are checklist lines / info (never scheduled). Parents take their dates
+  from what's under them, and only the bottom scheduled level counts toward workload.
+- **Sheet types** (`src/lib/sheetTypes.ts`): adding a sheet creates its checklist. Most lists come from the
+  standard per-sheet subtasks in AMR's Asana projects (CAW Watershed Management, UARM Medical Sciences);
+  types with no Asana subtasks have short lists marked *suggested*.
+- **Milestones** show as diamonds
 
 Workload (no hours: those live in Monograph) = the size of each person's open tasks (light / medium / heavy) over the
 weekdays they run, against their availability less time off, shown as a heat map. A full-time person is treated as
@@ -37,6 +43,7 @@ carrying about three medium tasks at once.
   - *Calendar*: month grid; drag a task to another day.
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
     drag cards between columns.
+  - **Detail** slider on all three: Sheets / Views / Tasks.
   - Undo (button or Ctrl+Z) reverses drags and moves.
 - **Project colours**: each project picks one root colour and a scheme (swatch next to its number on Overview).
   Every phase gets a different hue that harmonises with the root (Balanced, Triad or Complementary), all at one
@@ -81,7 +88,8 @@ supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 4. Phase 3: Workload per person vs capacity, merged into Team ✓
 5. Phase 4: Presentation export, PDF / PNG ✓
 6. Shared database (Supabase) and invite-only sign-in ✓
-7. Sheets: per-project sheet list (number, name, discipline, assignee, status), import from a pasted
+7. Sheets ✓ (hierarchy, types with checklists from Asana). Next: editable templates, sheet list import from a pasted
+   sheet index / Revit schedule CSV / PDF set. Original note: per-project sheet list (number, name, discipline, assignee, status), import from a pasted
    sheet index / Revit schedule CSV / PDF set, counted in workload
 8. Revit add-in: push sheets and views from the model, pull assignments back into a sheet parameter
 9. Later: consultant logins with access limited to their projects
@@ -98,7 +106,9 @@ tried right away. **Reset sample data** in the sidebar restores the original set
   database rules: only signed-in **@amr-architects.com** addresses, or emails added to the `app_access`
   table, can read or change anything (migrations 0004, 0005).
 - Migrations 0001–0005 are applied. New database changes go in new numbered files (add-only).
-- People sign in with invite + password. To add someone: Supabase → Authentication → Users → **Invite user**.
+- People sign in with Google (once enabled in Supabase → Authentication → Providers → Google) or invite + password.
+  With "Allow new users to sign up" off, only users added under Authentication → Users can sign in.
+- (Previously) People sign in with invite + password. To add someone: Supabase → Authentication → Users → **Invite user**.
   For someone outside AMR (e.g. a consultant), also add their email to `app_access` (Table Editor).
 - Supabase → Authentication → URL Configuration: Site URL `https://amrjacob.github.io/archMGMT/`
   (so invite and reset links open the app).

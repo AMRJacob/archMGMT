@@ -77,12 +77,15 @@ export function SizeChip({ task, onPatch }: { task: Task; onPatch: (c: Partial<T
   )
 }
 
-export function DateChip({ task, onPatch }: { task: Task; onPatch: (c: Partial<Task>) => void }) {
+export function DateChip({ task, onPatch, locked = false }: { task: Task; onPatch: (c: Partial<Task>) => void; locked?: boolean }) {
   const late = task.due_date && task.due_date < today() && task.status !== 'done'
   const text = task.is_milestone
     ? (task.due_date ? shortDate(task.due_date) : 'Set date')
     : task.start_date && task.due_date ? `${shortDate(task.start_date)} – ${shortDate(task.due_date)}`
       : task.due_date ? `Due ${shortDate(task.due_date)}` : 'Set dates'
+  if (locked) {
+    return <span className="chip-btn static" title="Dates come from the views and tasks under it"><span className="date-chip rolled">{text}</span></span>
+  }
   return (
     <Pop title="Dates" align="right" label={<span className={`date-chip${late ? ' late' : ''}${task.due_date ? '' : ' empty'}`}>{text}</span>}>
       {() => (
@@ -157,14 +160,16 @@ export function MoreMenu({ task, phases, onPatch, onDelete }: {
 }
 
 /** The full set of chips for one task, in reading order. */
-export function TaskControls({ task, people, phases, onPatch, onDelete }: {
+export function TaskControls({ task, people, phases, onPatch, onDelete, isParent = false }: {
   task: Task; people: Person[]; phases: Phase[]; onPatch: (c: Partial<Task>) => void; onDelete: () => void
+  /** Has scheduled work under it: dates roll up and its size doesn't count. */
+  isParent?: boolean
 }) {
   return (
     <span className="task-controls">
       <StatusChip task={task} onPatch={onPatch} />
-      <SizeChip task={task} onPatch={onPatch} />
-      <DateChip task={task} onPatch={onPatch} />
+      {isParent ? <span className="chip-spacer" /> : <SizeChip task={task} onPatch={onPatch} />}
+      <DateChip task={task} onPatch={onPatch} locked={isParent} />
       <AssigneeChip task={task} people={people} onPatch={onPatch} />
       <MoreMenu task={task} phases={phases} onPatch={onPatch} onDelete={onDelete} />
     </span>

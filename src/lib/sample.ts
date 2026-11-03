@@ -1,5 +1,6 @@
 import { addDays, nextMonday, today } from './dates.ts'
 import { defaultPhaseRows } from './phases.ts'
+import { sheetRows } from './sheetTypes.ts'
 import type { TableName } from './types.ts'
 
 /**
@@ -200,4 +201,44 @@ export function seedV2(s: Store, tag: Tag) {
   }
   off('des', 14, 5, 'Sample vacation')
   off('arch', 42, 5, 'Sample time off')
+}
+
+/** Seed 5: example sheets (with their checklists) in the sample library project's CD phase. */
+export function seedSheets(s: Store, tag: Tag) {
+  const lib = s.projects.find((p) => p.name === 'Sample Library Renovation')
+  const cd = lib && s.phases.find((p) => p.project_id === lib.id && p.name === 'Construction Documents')
+  if (!lib || !cd) return
+  const who = (name: string) => (s.people.find((p) => p.name === name)?.id as string | undefined) ?? null
+  const cs = cd.start_date as string
+  const add = (rows: Row[]) => { for (const r of rows) { s.tasks.push(r); tag(r.id) } }
+  const sheet = (number: string, name: string, typeId: string, person: string, off: number, len: number, done = 0) => {
+    const { sheet: sh, items } = sheetRows({
+      projectId: lib.id, phaseId: cd.id, number, name, typeId, start: addDays(cs, off), due: addDays(cs, off + len),
+      assigneeId: who(person), sortOrder: 0,
+    })
+    items.forEach((it, i) => { if (i < done) it.status = 'done' })
+    add([sh as unknown as Row, ...(items as unknown as Row[])])
+    return sh.id
+  }
+  sheet('G000', 'Cover sheet', 'cover', 'Sample Junior Designer', 0, 10, 2)
+  sheet('A101', 'Architectural site plan', 'site', 'Sample Architect', 0, 28, 3)
+  sheet('A102', 'Floor plan: reference', 'plan-ref', 'Sample Project Architect', 7, 35, 4)
+  sheet('A104', 'Reflected ceiling plan', 'rcp', 'Sample Designer', 14, 28)
+  // A sheet with views, and tasks under a view, to show the full hierarchy.
+  const a401 = sheet('A401', 'Enlarged plans & interior elevations', 'enlarged', 'Sample Designer', 21, 35)
+  const view = (title: string, off: number, len: number, tasks: [string, string][]) => {
+    const v: Row = {
+      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: a401, kind: 'view', sheet_number: null, sheet_type: null,
+      title, assignee_id: who('Sample Designer'), start_date: addDays(cs, off), due_date: addDays(cs, off + len), estimated_hours: null,
+      effort: 1, status: 'todo', is_milestone: false, client_visible: false, sort_order: 0, notes: null,
+    }
+    add([v])
+    tasks.forEach(([t, person], i) => add([{
+      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: v.id, kind: 'task', sheet_number: null, sheet_type: null,
+      title: t, assignee_id: who(person), start_date: addDays(cs, off + i * 4), due_date: addDays(cs, off + i * 4 + 6), estimated_hours: null,
+      effort: 1, status: 'todo', is_milestone: false, client_visible: false, sort_order: i, notes: null,
+    }]))
+  }
+  view('Toilet rooms: enlarged plan and elevations', 21, 14, [['Draft enlarged plan', 'Sample Designer'], ['Interior elevations with mounting heights', 'Sample Intern']])
+  view('Check-in desk', 28, 14, [['Plan and elevations', 'Sample Designer'], ['Coordinate power and data', 'Sample Junior Designer']])
 }

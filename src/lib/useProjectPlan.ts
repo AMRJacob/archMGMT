@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRows } from './data.ts'
 import { addDays, daysBetween } from './dates.ts'
 import type { Person, Phase, Task } from './types.ts'
+import { buildTree, descendants, shiftTreeChanges } from './tree.ts'
 
 type Change = { table: 'tasks' | 'phases'; id: string; prev: Record<string, unknown>; next: Record<string, unknown> }
 
@@ -53,15 +54,25 @@ export function useProjectPlan(projectId: string) {
   const taskChange = (t: Task, next: Partial<Task>): Change =>
     ({ table: 'tasks', id: t.id, prev: pick(t, Object.keys(next)), next })
 
-  /** Edit a task. Pass record=false for plain field edits that don't need undo. */
+  /**
+   * Edit a task. Pass record=false for plain field edits that don't need undo.
+   * Moving something to another phase takes everything under it along.
+   */
   const patchTask = useCallback((t: Task, next: Partial<Task>, record = true) => {
-    if (record) apply([taskChange(t, next)])
-    else void tasks.patch(t.id, next)
+    const changes = [taskChange(t, next)]
+    if ('phase_id' in next) {
+      for (const d of descendants(buildTree(tasks.rows), t.id)) changes.push(taskChange(d, { phase_id: next.phase_id }))
+    }
+    if (record) apply(changes)
+    else for (const c of changes) void tasks.patch(c.id, c.next as Partial<Task>)
   }, [apply, tasks])
 
+  /** Move a task, sheet or view by some days; everything under it moves too. */
   const shiftTask = useCallback((t: Task, days: number) => {
-    if (days) apply([taskChange(t, shiftDates(t, days))])
-  }, [apply])
+    const tree = buildTree(tasks.rows)
+    const real = tree.byId.get(t.id) ?? t
+    apply(shiftTreeChanges(tree, real, days).map(({ task, next }) => taskChange(task, next)))
+  }, [apply, tasks.rows])
 
   /** Move or resize a phase. When the whole phase moves, its tasks move with it. */
   const movePhase = useCallback((p: Phase, start: string, end: string, withTasks: boolean) => {

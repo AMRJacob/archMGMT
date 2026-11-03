@@ -11,6 +11,7 @@ import { useProject } from '../lib/projectContext.ts'
 import type { Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
+import { asShown, buildTree, DETAIL_LEVELS, movedBy, visibleAtLevel, type DetailLevel, type ShownTask } from '../lib/tree.ts'
 
 type View = 'timeline' | 'calendar' | 'board'
 type Zoom = 'all' | '12' | '6' | '3'
@@ -40,6 +41,8 @@ export default function Schedule() {
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
   const [winStart, setWinStart] = useState(defaultWindowStart)
+  const [levelStr, setLevelStr] = useSaved<'1' | '2' | '3'>('archmgmt.detailLevel', '3')
+  const level = Number(levelStr) as DetailLevel
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
@@ -48,7 +51,35 @@ export default function Schedule() {
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
   const editing = tasks.rows.find((t) => t.id === editingId) ?? null
+
+  // What each view shows at the chosen detail level. Parents carry their children's dates.
+  const tree = buildTree(tasks.rows)
+  const shown = visibleAtLevel(tree, level)
+  const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
+  const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
+  const real = (t: Task) => tree.byId.get(t.id) ?? t
+  /** A drag on a shown copy: whole branches move together; plain tasks take the new dates. */
+  const moveShown = (t: ShownTask, s: string | null, d: string | null) => {
+    if (t._rolled) plan.shiftTask(real(t), movedBy(t, s, d))
+    else plan.patchTask(real(t), { start_date: s, due_date: d })
+  }
+  const patchShown = (t: ShownTask, c: Partial<Task>) => {
+    if (t._rolled && ('due_date' in c || 'start_date' in c)) {
+      const { start_date, due_date, ...rest } = c
+      plan.shiftTask(real(t), movedBy(t, start_date ?? t.start_date, due_date ?? t.due_date))
+      if (Object.keys(rest).length) plan.patchTask(real(t), rest)
+    } else plan.patchTask(real(t), c)
+  }
   const openTask = (t: Task) => { setEditingId(t.id); setNewTaskId(null) }
+
+  const levelControl = (
+    <div className="level-ctl" title="How much detail to show">
+      <span className="muted small">Detail</span>
+      <input type="range" min={1} max={3} step={1} value={level} aria-label="Detail level"
+        onChange={(e) => setLevelStr(e.target.value as '1' | '2' | '3')} />
+      <span className="level-name">{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
+    </div>
+  )
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 
   async function addTask(defaults: Partial<Task>) {
@@ -133,6 +164,7 @@ export default function Schedule() {
                 ? `Drag a bar to move it, drag its ends to change length. Moving a phase moves its tasks. Click a task to edit it.${months ? ' Click and hold empty space to pan.' : ''}`
                 : `Only phases and tasks marked “Show in presentation view”.${hiddenCount ? ` ${hiddenCount} item${hiddenCount === 1 ? ' is' : 's are'} hidden.` : ''}`}
             </span>
+            {levelControl}
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
             <button className="btn primary" onClick={() => window.print()}>Save as PDF</button>
           </div>
@@ -152,11 +184,11 @@ export default function Schedule() {
             )}
           </div>
           <div className="card chart-card no-print">
-            <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows} mode={mode}
-              firmName={FIRM_NAME} editable window={chartWindow} showHeader={false}
+            <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
+              firmName={FIRM_NAME} editable window={chartWindow} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
-              onMoveTask={(t, s, d) => plan.patchTask(t, { start_date: s, due_date: d })}
+              onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask} />
           </div>
           <p className="muted small no-print">
@@ -166,9 +198,12 @@ export default function Schedule() {
       )}
 
       {view === 'calendar' && (
+        <div className="subbar no-print"><span className="grow" />{levelControl}</div>
+      )}
+      {view === 'calendar' && (
         <div className="card pad no-print">
-          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows} palette={palette}
-            onShiftTask={plan.shiftTask} onOpenTask={openTask} />
+          <CalendarView phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
+            onShiftTask={(t, d) => plan.shiftTask(real(t), d)} onOpenTask={openTask} />
         </div>
       )}
 
@@ -185,16 +220,17 @@ export default function Schedule() {
                 ? 'Pull-plan board: notes are coloured by person. Drag a note to another week to move its dates.'
                 : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
             </span>
+            {levelControl}
           </div>
-          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows} palette={palette}
-            onPatch={(t, c) => plan.patchTask(t, c)} onOpenTask={openTask} onAdd={addTask} />
+          <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
+            onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
         </>
       )}
 
       {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
       <div className="print-area export-only" aria-hidden="true">
-        <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows} mode={mode}
-          firmName={FIRM_NAME} svgRef={exportSvg} />
+        <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
+          firmName={FIRM_NAME} svgRef={exportSvg} keepOrder />
       </div>
 
       {editing && (

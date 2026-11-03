@@ -5,6 +5,7 @@ import { projectAccent } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
+import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { EFFORTS, type Person, type Project, type Task, type TimeOff } from '../lib/types.ts'
 import {
   capacityForWeek, countsTowardWorkload, daysOff, LOAD_LEVELS, loadLevel, mondayOf, taskLoadByWeek, weekStarts,
@@ -40,8 +41,10 @@ export default function Team() {
       mw.set(w, [...(mw.get(w) ?? []), v])
       m.set(who, mw)
     }
+    const tree = buildTree(tasks.rows)
     for (const t of tasks.rows) {
-      if (!countsTowardWorkload(t, projectMap)) continue
+      // Only the bottom scheduled level carries load (a sheet with tasks under it isn't counted twice).
+      if (!countsTowardWorkload(t, projectMap) || !isWorkLeaf(tree, t)) continue
       const who = t.assignee_id ?? 'unassigned'
       if (t.due_date) push(due, who, mondayOf(t.due_date), t)
       for (const [w, l] of taskLoadByWeek(t)) {
@@ -85,7 +88,7 @@ export default function Team() {
 
   const openTasks = (id: string) =>
     tasks.rows
-      .filter((t) => t.assignee_id === id && t.status !== 'done')
+      .filter((t) => t.assignee_id === id && t.status !== 'done' && t.kind !== 'item')
       .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
 
   async function removePerson(p: Person) {

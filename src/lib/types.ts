@@ -44,6 +44,10 @@ export interface Phase {
   client_visible: boolean
 }
 
+export type TaskKind = 'sheet' | 'view' | 'task' | 'item'
+
+export const KIND_RANK: Record<TaskKind, number> = { sheet: 1, view: 2, task: 3, item: 4 }
+
 export type Effort = 1 | 2 | 3
 
 export const EFFORTS: { value: Effort; label: string; hint: string }[] = [
@@ -66,6 +70,15 @@ export interface Task {
   estimated_hours: number | null
   /** Task size for workload: 1 light, 2 medium, 3 heavy. */
   effort?: Effort | null
+  /** Hierarchy: the sheet, view or task this sits under (null = directly in the phase). */
+  parent_id?: string | null
+  /** sheet → view → task → item. Items are checklist lines / info and are never scheduled. */
+  kind?: TaskKind | null
+  /** Sheets: number (A101) and type (key into SHEET_TYPES). */
+  sheet_number?: string | null
+  sheet_type?: string | null
+  /** Extra info for anything in the tree. */
+  notes?: string | null
   status: TaskStatus
   is_milestone: boolean
   client_visible: boolean

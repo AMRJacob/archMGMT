@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { insertMany, useRows } from '../lib/data.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { projectAccent } from '../lib/colors.ts'
+import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { defaultPhaseRows } from '../lib/phases.ts'
 import { formatDate, maxDate, minDate, nextMonday, today as todayISO } from '../lib/dates.ts'
 import { PROJECT_STATUSES, type Person, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
@@ -18,12 +19,13 @@ export default function Projects() {
 
   const rows = useMemo(() => {
     const today = todayISO()
+    const tree = buildTree(tasks.rows)
     return projects.projects
       .filter((p) => filter === 'all' || p.status === filter)
       .map((p) => {
         const ph = phases.rows.filter((x) => x.project_id === p.id)
         const current = ph.find((x) => x.start_date <= today && today <= x.end_date)
-        const ts = tasks.rows.filter((t) => t.project_id === p.id && !t.is_milestone)
+        const ts = tasks.rows.filter((t) => t.project_id === p.id && !t.is_milestone && isWorkLeaf(tree, t))
         return {
           project: p,
           start: minDate(ph.map((x) => x.start_date)),

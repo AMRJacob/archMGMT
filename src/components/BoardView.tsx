@@ -152,6 +152,8 @@ export default function BoardView({
                       onClick={() => onOpenTask(t)}>
                       <div className="ct-title">
                         {t.is_milestone && <span className="diamond" />}
+                        {t.kind === 'sheet' && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
+                        {t.kind === 'view' && <span className="kind-tag">View</span>}
                         {t.title}
                       </div>
                       <div className="ct-meta">

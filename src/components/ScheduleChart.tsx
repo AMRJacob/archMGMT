@@ -2,6 +2,7 @@ import { useRef, useState, type PointerEvent as RPointerEvent, type RefObject } 
 import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { projectPalette } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
+import type { ShownTask } from '../lib/tree.ts'
 
 /**
  * The project schedule as one self-contained SVG: header, timeline, phases, tasks, milestones.
@@ -55,7 +56,7 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false,
 }: {
   project: Project
   phases: Phase[]
@@ -73,6 +74,8 @@ export default function ScheduleChart({
   /** Called while click-and-hold panning the timeline, with days to move the window by. */
   onPan?: (days: number) => void
   showHeader?: boolean
+  /** Tasks are already in tree order (with _depth / _rolled): don't re-sort them. */
+  keepOrder?: boolean
 }) {
   const HEADER = showHeader ? HEADER_FULL : HEADER_BARE
   const inner = useRef<SVGSVGElement | null>(null)
@@ -93,10 +96,10 @@ export default function ScheduleChart({
     rows.push({ kind: 'phase', phase, color })
     tasks
       .filter((t) => t.phase_id === phase.id && (!pres || t.client_visible))
-      .sort(byStart)
+      .sort(keepOrder ? () => 0 : byStart)
       .forEach((task) => rows.push({ kind: 'task', task, color }))
   })
-  const loose = tasks.filter((t) => !t.phase_id && (!pres || t.client_visible)).sort(byStart)
+  const loose = tasks.filter((t) => !t.phase_id && (!pres || t.client_visible)).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
     rows.push({ kind: 'group', label: 'No phase', color: '#8b8f94' })
     loose.forEach((task) => rows.push({ kind: 'task', task, color: '#8b8f94' }))
@@ -169,7 +172,7 @@ export default function ScheduleChart({
       if (!d.moved) { onOpenTask?.(t); return }
       if (!d.delta) return
       const s0 = t.start_date ?? t.due_date!, e0 = t.due_date ?? t.start_date!
-      const [s, e] = dragDates(s0, e0, t.is_milestone ? 'move' : d.mode, d.delta)
+      const [s, e] = dragDates(s0, e0, t.is_milestone || (t as ShownTask)._rolled ? 'move' : d.mode, d.delta)
       onMoveTask?.(t, t.start_date ? s : null, t.due_date ? e : null)
     } else {
       const p = phases.find((x) => x.id === d.id)
@@ -186,7 +189,7 @@ export default function ScheduleChart({
     const s0 = t.start_date ?? t.due_date, e0 = t.due_date ?? t.start_date
     if (!s0 || !e0) return [null, null]
     let d = 0, m: DragMode = 'move'
-    if (drag?.kind === 'task' && drag.id === t.id) { d = drag.delta; m = t.is_milestone ? 'move' : drag.mode }
+    if (drag?.kind === 'task' && drag.id === t.id) { d = drag.delta; m = t.is_milestone || (t as ShownTask)._rolled ? 'move' : drag.mode }
     else if (drag?.kind === 'phase' && drag.mode === 'move' && drag.id === t.phase_id) d = drag.delta
     return d ? dragDates(s0, e0, m, d) : [s0, e0]
   }
@@ -362,9 +365,10 @@ export default function ScheduleChart({
           : initials(task.assignee_id)
         return (
           <g key={i} opacity={task.status === 'done' && !pres ? 0.55 : 1}>
-            <text x={M + 30} y={cy + 4} fontSize={12.5} fill={INK}
+            <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={INK}
+              fontWeight={task.kind === 'sheet' ? 600 : 400}
               style={editable ? { cursor: 'pointer' } : undefined} onClick={editable ? () => onOpenTask?.(task) : undefined}>
-              {clip(task.title, pres ? 34 : 38)}
+              {clip(`${task.kind === 'sheet' && task.sheet_number ? `${task.sheet_number}  ` : ''}${task.title}`, (pres ? 34 : 38) - Math.min(4, (task as ShownTask)._depth ?? 0) * 2)}
             </text>
             <text x={x0 - 14} y={cy + 4} fontSize={11} fill={MUTED} textAnchor="end">{right}</text>
           </g>
@@ -418,6 +422,17 @@ export default function ScheduleChart({
           )
         }
         const bx = x(ts), bw = Math.max(3, xEnd(te) - bx)
+        if ((task as ShownTask)._rolled) {
+          // Spans what's under it: a summary bracket that moves the whole branch.
+          return (
+            <g key={`b${i}`} opacity={done ? 0.5 : 1}>
+              <rect x={bx} y={cy - 3} width={bw} height={6} rx={1} fill={r.color} stroke={active ? INK : 'none'} />
+              <path d={`M${bx} ${cy - 3} v10 l5 -4 z M${bx + bw} ${cy - 3} v10 l-5 -4 z`} fill={r.color} />
+              {handles('task', task.id, bx, bw, cy - 10, 20, false)}
+              {active && dragLabel(bx, bw, cy, `${shortDate(ts)} – ${shortDate(te)}`)}
+            </g>
+          )
+        }
         return (
           <g key={`b${i}`}>
             <rect x={bx} y={cy - 4} width={bw} height={8} rx={2} fill={r.color} opacity={active ? 0.9 : done ? 0.35 : 0.6}

@@ -3,6 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { DateField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { TaskControls } from '../components/TaskChips.tsx'
+import PlanTree from '../components/PlanTree.tsx'
+import { insertMany } from '../lib/data.ts'
+import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
 import ColorPicker from '../components/ColorPicker.tsx'
 import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
@@ -51,7 +54,9 @@ export default function ProjectDetail() {
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
   const staff = people.rows.filter((p) => p.kind === 'staff')
-  const openTaskRows = tasks.rows.filter((x) => x.status !== 'done' && !x.is_milestone)
+  const tree = buildTree(tasks.rows)
+  const work = (rows: Task[]) => rows.filter((x) => !x.is_milestone && isWorkLeaf(tree, x))
+  const openTaskRows = work(tasks.rows).filter((x) => x.status !== 'done')
   const start = minDate(phases.rows.map((p) => p.start_date))
   const end = maxDate(phases.rows.map((p) => p.end_date))
   const nextMilestone = tasks.rows.filter((x) => x.is_milestone && x.due_date && x.due_date >= t).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
@@ -61,16 +66,6 @@ export default function ProjectDetail() {
     const s = last ? addDays(last.end_date, 1) : nextMonday()
     const p = await phases.add({ project_id: id, name: 'New phase', sort_order: (last?.sort_order ?? -1) + 1, start_date: s, end_date: addDays(s, 27), client_visible: true })
     setOpenIds(new Set([...open, p.id]))
-  }
-
-  async function addTask(phase: Phase | null, milestone = false) {
-    const s = phase && phase.start_date > t ? phase.start_date : nextMonday()
-    const created = await tasks.add({
-      project_id: id, phase_id: phase?.id ?? null, title: milestone ? 'New milestone' : 'New task',
-      assignee_id: null, start_date: milestone ? null : s, due_date: milestone ? phase?.end_date ?? s : addDays(s, 13),
-      estimated_hours: null, effort: 2, status: 'todo', is_milestone: milestone, client_visible: milestone, sort_order: tasks.rows.length,
-    })
-    setNewId(created.id) // focus its title so it can be named straight away
   }
 
   async function deleteProject() {
@@ -163,10 +158,9 @@ export default function ProjectDetail() {
 
       <div className="phase-list">
         {sortedPhases.map((p, i) => {
-          const list = tasksFor(p.id)
-          const work = list.filter((x) => !x.is_milestone)
-          const done = work.filter((x) => x.status === 'done').length
-          const openCount = work.length - done
+          const leaves = work(tasksFor(p.id))
+          const done = leaves.filter((x) => x.status === 'done').length
+          const openCount = leaves.length - done
           const isOpen = open.has(p.id)
           const isNow = p.id === currentPhase?.id && p.start_date <= t
           return (
@@ -178,21 +172,18 @@ export default function ProjectDetail() {
                 {isNow && <span className="chip">Current</span>}
                 <span className="phase-sum">
                   <span className="muted">{shortDate(p.start_date)} – {shortDate(p.end_date)}</span>
-                  <span className="progress" title={`${done} of ${work.length} tasks done`}>
-                    <i style={{ width: work.length ? `${(done / work.length) * 100}%` : 0 }} />
+                  <span className="progress" title={`${done} of ${leaves.length} done`}>
+                    <i style={{ width: leaves.length ? `${(done / leaves.length) * 100}%` : 0 }} />
                   </span>
-                  <span className="muted sum-text">{work.length ? (openCount ? `${openCount} open` : 'All done') : 'No tasks'}</span>
+                  <span className="muted sum-text">{leaves.length ? (openCount ? `${openCount} open` : 'All done') : 'Nothing yet'}</span>
                 </span>
               </button>
               {isOpen && (
                 <div className="phase-body">
-                  <ul className="tlist">
-                    {list.map(taskRow)}
-                    {list.length === 0 && <li className="muted small empty-row">No tasks in this phase yet.</li>}
-                  </ul>
+                  <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
+                    onPatch={patchTask} onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
+                    onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
                   <div className="phase-actions">
-                    <button className="btn ghost" onClick={() => addTask(p)}>+ Task</button>
-                    <button className="btn ghost" onClick={() => addTask(p, true)}>+ Milestone</button>
                     <span className="phase-settings">
                       <TextField value={p.name} className="phase-name-edit" onSave={(v) => v && phases.patch(p.id, { name: v })} />
                       <DateField required value={p.start_date} onSave={(v) => v && phases.patch(p.id, { start_date: v })} />
@@ -214,7 +205,7 @@ export default function ProjectDetail() {
         {unphased.length > 0 && (
           <div className="phase-sec open">
             <div className="phase-row static"><span className="phase-title">No phase</span></div>
-            <div className="phase-body"><ul className="tlist">{unphased.map(taskRow)}</ul></div>
+            <div className="phase-body"><ul className="tlist">{unphased.filter((x) => !x.parent_id).map(taskRow)}</ul></div>
           </div>
         )}
       </div>

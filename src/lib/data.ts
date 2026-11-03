@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase.ts'
-import { seedV1, seedV2, type Row, type Store } from './sample.ts'
+import { seedSheets, seedV1, seedV2, type Row, type Store } from './sample.ts'
 import { TABLES, type TableName } from './types.ts'
 
 /**
@@ -69,6 +69,12 @@ const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
       const wh = typeof p.weekly_hours === 'number' ? p.weekly_hours : 40
       p.availability = p.kind === 'consultant' ? 100 : Math.max(10, Math.min(100, Math.round((wh / 40) * 10) * 10))
     }
+  },
+  // 4 → 5: hierarchy (sheet → view → task → item). Existing tasks become top-level tasks;
+  // the sample library project gets a few example sheets.
+  (s, meta) => {
+    for (const t of s.tasks) { t.kind ??= 'task'; t.parent_id ??= null }
+    seedSheets(s, (id) => meta.sampleIds.push(id))
   },
 ]
 
@@ -211,7 +217,7 @@ const onDelete: Record<TableName, { table: TableName; column: string; action: 'c
     { table: 'tasks', column: 'project_id', action: 'cascade' },
   ],
   phases: [{ table: 'tasks', column: 'phase_id', action: 'null' }],
-  tasks: [],
+  tasks: [{ table: 'tasks', column: 'parent_id', action: 'cascade' }],
   time_off: [],
 }
 
