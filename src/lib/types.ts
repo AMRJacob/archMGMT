@@ -79,3 +79,16 @@ export const DEFAULT_PHASES: { name: string; weeks: number }[] = [
   { name: 'Bidding', weeks: 4 },
   { name: 'Construction Administration', weeks: 40 },
 ]
+
+export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off'
+
+/** Tables in the order they can be restored (parents before children). */
+export const TABLES: TableName[] = ['people', 'projects', 'phases', 'tasks', 'time_off']
+
+export interface TimeOff {
+  id: string
+  person_id: string
+  start_date: string
+  end_date: string
+  note: string | null
+}

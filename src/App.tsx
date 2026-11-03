@@ -1,59 +1,61 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { resetSampleData, usingSampleData } from './lib/data.ts'
+import { useEffect } from 'react'
+import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import ProjectProvider from './components/ProjectProvider.tsx'
+import ProjectSwitcher from './components/ProjectSwitcher.tsx'
+import { usingSampleData } from './lib/data.ts'
+import { useProject } from './lib/projectContext.ts'
 import Projects from './pages/Projects.tsx'
 import ProjectDetail from './pages/ProjectDetail.tsx'
 import Schedule from './pages/Schedule.tsx'
-import Workload from './pages/Workload.tsx'
 import Team from './pages/Team.tsx'
-
-const nav = [
-  { to: '/projects', label: 'Projects' },
-  { to: '/schedule', label: 'Schedule' },
-  { to: '/workload', label: 'Workload' },
-  { to: '/team', label: 'Team' },
-]
+import Settings from './pages/Settings.tsx'
 
 export default function App() {
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          arch<span>MGMT</span>
-        </div>
-        <nav>
-          {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} className={({ isActive }) => (isActive ? 'active' : '')}>
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
-        {usingSampleData && (
-          <div className="notice">
-            <strong>Sample data</strong>
-            Not connected to the shared database yet. Changes are saved in this browser only.
-            <button
-              onClick={() => {
-                if (window.confirm('Reset to the original sample data? Your changes in this browser will be lost.')) {
-                  resetSampleData()
-                  window.location.reload()
-                }
-              }}
-            >
-              Reset sample data
-            </button>
+    <ProjectProvider>
+      <div className="shell">
+        <aside className="sidebar no-print">
+          <div className="brand">arch<span>MGMT</span></div>
+          <ProjectSwitcher />
+          <nav>
+            <span className="nav-label">Project</span>
+            <NavLink to="/overview">Overview</NavLink>
+            <NavLink to="/schedule">Schedule</NavLink>
+            <span className="nav-label">Office</span>
+            <NavLink to="/" end>All projects</NavLink>
+            <NavLink to="/team">Team &amp; workload</NavLink>
+          </nav>
+          <div className="sidebar-foot">
+            {usingSampleData && (
+              <p className="notice">
+                <strong>Browser storage</strong>
+                Data is saved in this browser only until the shared database is connected. Back it up from Settings.
+              </p>
+            )}
+            <NavLink to="/settings" className="settings-link">Settings &amp; data</NavLink>
           </div>
-        )}
-      </aside>
-      <main className="content">
-        <Routes>
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/:id" element={<ProjectDetail />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/workload" element={<Workload />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="*" element={<Navigate to="/projects" replace />} />
-        </Routes>
-      </main>
-    </div>
+        </aside>
+        <main className="content">
+          <Routes>
+            <Route path="/" element={<Projects />} />
+            <Route path="/overview" element={<ProjectDetail />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/projects/:id" element={<OpenProject />} />
+            <Route path="/workload" element={<Navigate to="/team" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </ProjectProvider>
   )
+}
+
+/** Old-style link to a project: make it current, then show its overview. */
+function OpenProject() {
+  const { id } = useParams()
+  const { select } = useProject()
+  useEffect(() => { if (id) select(id) }, [id, select])
+  return <Navigate to="/overview" replace />
 }

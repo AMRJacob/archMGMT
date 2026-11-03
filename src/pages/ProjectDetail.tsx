@@ -1,22 +1,23 @@
 import { useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Check, DateField, NumberField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
-import { remove, useRows } from '../lib/data.ts'
+import { useRows } from '../lib/data.ts'
+import { useProject } from '../lib/projectContext.ts'
 import { addDays, formatDate, maxDate, minDate, nextMonday } from '../lib/dates.ts'
 import {
   PROJECT_STATUSES, TASK_STATUSES,
-  type Person, type Phase, type Project, type ProjectStatus, type Task, type TaskStatus,
+  type Person, type Phase, type ProjectStatus, type Task, type TaskStatus,
 } from '../lib/types.ts'
 
 export default function ProjectDetail() {
-  const { id = '' } = useParams()
   const navigate = useNavigate()
-  const projects = useRows<Project>('projects', { id })
+  const projects = useProject()
+  const project = projects.current
+  const id = project?.id ?? ''
   const phases = useRows<Phase>('phases', { project_id: id })
   const tasks = useRows<Task>('tasks', { project_id: id })
   const people = useRows<Person>('people')
-  const project = projects.rows[0]
 
   const sortedPhases = useMemo(
     () => [...phases.rows].sort((a, b) => a.sort_order - b.sort_order || a.start_date.localeCompare(b.start_date)),
@@ -29,7 +30,7 @@ export default function ProjectDetail() {
   const unphased = tasksFor(null)
 
   if (projects.loading) return <p className="muted">Loading…</p>
-  if (!project) return <p>Project not found. <Link to="/projects">Back to projects</Link></p>
+  if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
   const staff = people.rows.filter((p) => p.kind === 'staff')
   const hours = tasks.rows.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0)
@@ -52,9 +53,9 @@ export default function ProjectDetail() {
   }
 
   async function deleteProject() {
-    if (!window.confirm(`Delete "${project.name}" with all its phases and tasks? This can't be undone.`)) return
-    await remove('projects', id)
-    navigate('/projects')
+    if (!window.confirm(`Delete "${project?.name}" with all its phases and tasks? This can't be undone.`)) return
+    await projects.drop(id)
+    navigate('/')
   }
 
   async function deletePhase(p: Phase) {
@@ -111,7 +112,7 @@ export default function ProjectDetail() {
 
   return (
     <section>
-      <Link to="/projects" className="back">← Projects</Link>
+      <Link to="/" className="back">← All projects</Link>
 
       <header className="project-head card">
         <div className="project-title">

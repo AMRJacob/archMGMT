@@ -1,35 +1,86 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase.ts'
-import { addDays, nextMonday } from './dates.ts'
-import { DEFAULT_PHASES } from './types.ts'
+import { seedV1, seedV2, type Row, type Store } from './sample.ts'
+import { TABLES, type TableName } from './types.ts'
 
 /**
  * One small data layer for every screen.
  * With Supabase keys set it reads and writes the shared database; without them it uses
- * sample data saved in this browser, so the app can be tried before the database exists.
+ * data saved in this browser (starting with tagged sample data), so the app can be tried first.
  */
 
-export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off'
-type Row = { id: string } & Record<string, unknown>
+export type { TableName }
 type Match = Record<string, string | number | boolean | null>
 
 export const usingSampleData = !supabase
 
-// ---------- browser (sample data) store ----------
+// ---------- browser store ----------
+//
+// Data here must survive every update to the app. Rules:
+//  - The storage key never changes (a new key would strand existing data).
+//  - When the shape of the data changes, add a step to UPGRADES below. Steps only add or
+//    convert; they never wipe. They run once, in order, and the version is recorded.
+//  - Sample rows are tagged so "Remove sample data" deletes only those.
 
-const KEY = 'archmgmt:sample-data:v1'
-type Store = Record<TableName, Row[]>
+const KEY = 'archmgmt:sample-data:v1' // historical name: this holds all browser data, sample or not
+const META_KEY = 'archmgmt:meta'
+interface Meta { version: number; sampleIds: string[] }
 
+const emptyStore = (): Store => ({ people: [], projects: [], phases: [], tasks: [], time_off: [] })
+
+const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
+  // 0 → 1: first visit, add the original sample project
+  (s, meta) => seedV1(s, (id) => meta.sampleIds.push(id)),
+  // 1 → 2: tag sample rows from before tagging existed, then add the full sample office
+  (s, meta) => {
+    const tagged = new Set(meta.sampleIds)
+    const tag = (id: string) => { if (!tagged.has(id)) { tagged.add(id); meta.sampleIds.push(id) } }
+    const lib = s.projects.find((p) => p.name === 'Sample Library Renovation')
+    if (lib) {
+      tag(lib.id)
+      s.phases.filter((p) => p.project_id === lib.id).forEach((p) => tag(p.id))
+      s.tasks.filter((t) => t.project_id === lib.id).forEach((t) => tag(t.id))
+    }
+    s.people.filter((p) => String(p.name).startsWith('Sample ')).forEach((p) => tag(p.id))
+    for (const p of s.people) p.kind ??= 'staff'
+    seedV2(s, tag)
+  },
+]
+
+// Read fresh every time (no cache), so two open tabs never overwrite each other's changes.
 function readStore(): Store {
+  let store: Store | null = null
+  let meta: Meta | null = null
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Store
+    if (raw) store = { ...emptyStore(), ...(JSON.parse(raw) as Partial<Store>) }
+    const m = localStorage.getItem(META_KEY)
+    if (m) meta = JSON.parse(m) as Meta
   } catch {
-    /* storage unavailable: fall through to fresh sample data */
+    /* storage unavailable: work in memory */
   }
-  const fresh = sampleData()
-  writeStore(fresh)
-  return fresh
+  if (!store) { store = emptyStore(); meta = { version: 0, sampleIds: [] } }
+  if (!meta) meta = { version: 1, sampleIds: [] } // data saved before versions were recorded
+  if (meta.version < UPGRADES.length) {
+    for (let v = meta.version; v < UPGRADES.length; v++) UPGRADES[v](store, meta)
+    meta.version = UPGRADES.length
+    writeStore(store) // data first, so a failed write never marks the upgrade as done
+    writeMeta(meta)
+  }
+  return store
+}
+
+function readMeta(): Meta {
+  readStore()
+  try {
+    const m = localStorage.getItem(META_KEY)
+    if (m) return JSON.parse(m) as Meta
+  } catch { /* fall through */ }
+  return { version: UPGRADES.length, sampleIds: [] }
+}
+
+function writeMeta(m: Meta) {
+  try { localStorage.setItem(META_KEY, JSON.stringify(m)) } catch { /* in memory only */ }
 }
 
 function writeStore(s: Store) {
@@ -40,8 +91,65 @@ function writeStore(s: Store) {
   }
 }
 
-export function resetSampleData() {
-  writeStore(sampleData())
+/** How many sample rows are still in the browser store. */
+export function sampleRowCount(): number {
+  if (supabase) return 0
+  const ids = new Set(readMeta().sampleIds)
+  const s = readStore()
+  return TABLES.reduce((n, t) => n + s[t].filter((r) => ids.has(r.id)).length, 0)
+}
+
+/** Delete only the tagged sample rows; anything you added stays. */
+export function removeSampleData() {
+  const meta = readMeta()
+  const s = readStore()
+  for (const t of TABLES) for (const id of meta.sampleIds) if (s[t].some((r) => r.id === id)) deleteLocal(s, t, id)
+  writeStore(s)
+  writeMeta({ ...meta, sampleIds: [] })
+}
+
+// ---------- backup / restore ----------
+
+export interface Backup {
+  format: 'archmgmt-backup'
+  exported_at: string
+  tables: Store
+}
+
+export async function exportAll(): Promise<Backup> {
+  const tables = emptyStore()
+  for (const t of TABLES) tables[t] = await list<Row>(t)
+  return { format: 'archmgmt-backup', exported_at: new Date().toISOString(), tables }
+}
+
+/**
+ * Restore a backup. Rows are matched by id: existing rows are updated, missing ones added.
+ * Nothing that isn't in the backup is deleted.
+ */
+export async function importAll(b: Backup): Promise<number> {
+  if (b?.format !== 'archmgmt-backup') throw new Error('This file is not an archMGMT backup.')
+  let n = 0
+  if (supabase) {
+    for (const t of TABLES) {
+      const rows = b.tables[t] ?? []
+      if (!rows.length) continue
+      const { error } = await supabase.from(t).upsert(rows as never)
+      if (error) throw error
+      n += rows.length
+    }
+    return n
+  }
+  const s = readStore()
+  for (const t of TABLES) {
+    for (const row of b.tables[t] ?? []) {
+      const i = s[t].findIndex((r) => r.id === row.id)
+      if (i >= 0) s[t][i] = row
+      else s[t].push(row)
+      n++
+    }
+  }
+  writeStore(s)
+  return n
 }
 
 /** Mirrors the database's foreign-key rules (cascade / set null) for the browser store. */
@@ -189,66 +297,4 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
   )
 
   return { rows, loading, error, reload, patch, add, drop }
-}
-
-/** Build a project's standard phases back to back from a start date. */
-export function defaultPhaseRows(projectId: string, start: string) {
-  let cursor = start
-  return DEFAULT_PHASES.map((p, i) => {
-    const row = {
-      project_id: projectId,
-      name: p.name,
-      sort_order: i,
-      start_date: cursor,
-      end_date: addDays(cursor, p.weeks * 7 - 1),
-      client_visible: true,
-    }
-    cursor = addDays(cursor, p.weeks * 7)
-    return row
-  })
-}
-
-// ---------- sample data (clearly placeholder; replaced by the real database) ----------
-
-function sampleData(): Store {
-  const id = () => crypto.randomUUID()
-  const people: Row[] = [
-    ['Sample Principal', 'SP', 'Principal', 40],
-    ['Sample Project Architect', 'PA', 'Project Architect', 40],
-    ['Sample Architect', 'SA', 'Architect', 40],
-    ['Sample Designer', 'SD', 'Designer', 40],
-    ['Sample Intern', 'SI', 'Intern', 20],
-  ].map(([name, initials, role, hours]) => ({
-    id: id(), name, initials, role, kind: 'staff', company: null, discipline: null,
-    weekly_hours: hours, color: null, active: true,
-  }))
-  people.push({
-    id: id(), name: 'Sample MEP Engineer', initials: 'ME', role: null, kind: 'consultant',
-    company: 'Sample MEP Consultants', discipline: 'MEP', weekly_hours: 0, color: null, active: true,
-  })
-
-  const start = addDays(nextMonday(), -7 * 10)
-  const project: Row = {
-    id: id(), number: '2026-001', name: 'Sample Library Renovation', client: 'Sample Client',
-    status: 'active', pm_id: people[1].id, color: null, start_date: null, end_date: null,
-    notes: 'Sample project. Edit or delete it freely.', created_at: new Date().toISOString(),
-  }
-  const phases = defaultPhaseRows(project.id, start).map((p) => ({ id: id(), ...p }) as Row)
-  const [pre, sd, dd] = phases
-  const t = (phase: Row, title: string, who: number, startOff: number, len: number, hours: number | null, extra: Partial<Row> = {}): Row => ({
-    id: id(), project_id: project.id, phase_id: phase.id, title, assignee_id: people[who].id,
-    start_date: addDays(phase.start_date as string, startOff), due_date: addDays(phase.start_date as string, startOff + len),
-    estimated_hours: hours, status: 'todo', is_milestone: false, client_visible: false, sort_order: 0, ...extra,
-  })
-  const tasks: Row[] = [
-    t(pre, 'Existing conditions survey', 2, 0, 9, 24, { status: 'done' }),
-    t(pre, 'Program verification with owner', 1, 7, 14, 16, { status: 'done' }),
-    t(sd, 'Floor plan options', 3, 0, 20, 60, { status: 'done' }),
-    t(sd, 'Owner SD review', 1, 41, 0, null, { is_milestone: true, client_visible: true, status: 'done' }),
-    t(dd, 'Enlarged plans and sections', 2, 0, 35, 80, { status: 'in_progress' }),
-    t(dd, 'MEP coordination set', 5, 14, 28, null, { status: 'in_progress' }),
-    t(dd, 'Outline specifications', 4, 21, 21, 30),
-    t(dd, 'Owner DD review', 1, 55, 0, null, { is_milestone: true, client_visible: true }),
-  ]
-  return { people, projects: [project], phases, tasks, time_off: [] }
 }

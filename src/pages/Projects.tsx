@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { defaultPhaseRows, insert, insertMany, useRows } from '../lib/data.ts'
+import { insertMany, useRows } from '../lib/data.ts'
+import { useProject } from '../lib/projectContext.ts'
+import { defaultPhaseRows } from '../lib/phases.ts'
 import { formatDate, maxDate, minDate, nextMonday, today as todayISO } from '../lib/dates.ts'
-import { PROJECT_STATUSES, type Person, type Phase, type Project, type ProjectStatus, type Task } from '../lib/types.ts'
+import { PROJECT_STATUSES, type Person, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 
 export default function Projects() {
   const navigate = useNavigate()
-  const projects = useRows<Project>('projects')
+  const projects = useProject()
   const phases = useRows<Phase>('phases')
   const tasks = useRows<Task>('tasks')
   const people = useRows<Person>('people')
@@ -15,7 +17,7 @@ export default function Projects() {
 
   const rows = useMemo(() => {
     const today = todayISO()
-    return projects.rows
+    return projects.projects
       .filter((p) => filter === 'all' || p.status === filter)
       .map((p) => {
         const ph = phases.rows.filter((x) => x.project_id === p.id)
@@ -31,15 +33,15 @@ export default function Projects() {
           total: ts.length,
         }
       })
-      .sort((a, b) => (a.project.number ?? '').localeCompare(b.project.number ?? '') || a.project.name.localeCompare(b.project.name))
-  }, [projects.rows, phases.rows, tasks.rows, people.rows, filter])
+  }, [projects.projects, phases.rows, tasks.rows, people.rows, filter])
 
   async function createProject() {
     setBusy(true)
     try {
-      const p = await insert<Project>('projects', { name: 'New project', status: 'active' })
+      const p = await projects.add({ name: 'New project', status: 'active' })
       await insertMany<Phase>('phases', defaultPhaseRows(p.id, nextMonday()))
-      navigate(`/projects/${p.id}`)
+      projects.select(p.id)
+      navigate('/overview')
     } finally {
       setBusy(false)
     }
@@ -51,7 +53,7 @@ export default function Projects() {
     <section>
       <header className="page-head">
         <div>
-          <h1>Projects</h1>
+          <h1>All projects</h1>
           <p className="muted">Every project, its PM, the phase it's in and its open tasks.</p>
         </div>
         <button className="btn primary" onClick={createProject} disabled={busy}>+ New project</button>
@@ -63,7 +65,7 @@ export default function Projects() {
             onClick={() => setFilter(s.value as ProjectStatus | 'all')}>
             {s.label}
             <span className="count">
-              {s.value === 'all' ? projects.rows.length : projects.rows.filter((p) => p.status === s.value).length}
+              {s.value === 'all' ? projects.projects.length : projects.projects.filter((p) => p.status === s.value).length}
             </span>
           </button>
         ))}
@@ -85,7 +87,8 @@ export default function Projects() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.project.id} onClick={() => navigate(`/projects/${r.project.id}`)}>
+              <tr key={r.project.id} className={r.project.id === projects.current?.id ? 'current' : ''}
+                onClick={() => { projects.select(r.project.id); navigate('/overview') }}>
                 <td className="mono">{r.project.number ?? '—'}</td>
                 <td>
                   <div className="strong">{r.project.name}</div>
