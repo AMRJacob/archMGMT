@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode } from '../components/ScheduleChart.tsx'
+import { chartColors, useTheme } from '../lib/theme.ts'
 import TaskEditor from '../components/TaskEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import { projectPalette } from '../lib/colors.ts'
@@ -34,6 +35,7 @@ function useSaved<T extends string>(key: string, initial: T): [T, (v: T) => void
 
 export default function Schedule() {
   const { current: project } = useProject()
+  const theme = useTheme()
   const plan = useProjectPlan(project?.id ?? '')
   const { phases, tasks, people } = plan
   const [view, setView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
@@ -185,7 +187,7 @@ export default function Schedule() {
           </div>
           <div className="card chart-card no-print">
             <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
-              firmName={FIRM_NAME} editable window={chartWindow} showHeader={false} keepOrder
+              firmName={FIRM_NAME} editable window={chartWindow} colors={chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}

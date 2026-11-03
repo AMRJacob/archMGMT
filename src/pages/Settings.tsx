@@ -1,3 +1,4 @@
+import ThemePicker from '../components/ThemePicker.tsx'
 import { useRef, useState } from 'react'
 import { ChangePassword } from '../auth/Auth.tsx'
 import AccessManager from '../components/AccessManager.tsx'
@@ -83,6 +84,8 @@ export default function Settings() {
       </header>
       {message && <p className="success">{message}</p>}
       {error && <p className="error">{error}</p>}
+
+      <ThemePicker />
 
       <div className="card pad">
         <h2>Where data is stored</h2>

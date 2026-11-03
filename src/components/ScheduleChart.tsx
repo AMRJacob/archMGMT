@@ -3,6 +3,7 @@ import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/d
 import { projectPalette } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
 import type { ShownTask } from '../lib/tree.ts'
+import { STUDIO_CHART, type ChartColors } from '../lib/theme.ts'
 
 /**
  * The project schedule as one self-contained SVG: header, timeline, phases, tasks, milestones.
@@ -22,12 +23,6 @@ const ROW_PHASE = 36
 const ROW_TASK = 26
 const FOOTER = 64
 const EDGE = 7 // grab width for resizing, in chart units
-const FONT = "Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
-
-const INK = '#1c1f23'
-const MUTED = '#6b7178'
-const LINE = '#e7e4de'
-const ACCENT = '#b5502d'
 
 type Row =
   | { kind: 'phase'; phase: Phase; color: string }
@@ -56,8 +51,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART,
 }: {
+  /** Theme colors for the on-screen chart; exports leave this out and get the neutral presentation look. */
+  colors?: ChartColors
   project: Project
   phases: Phase[]
   tasks: Task[]
@@ -255,8 +252,8 @@ export default function ScheduleChart({
   }
   const dragLabel = (bx: number, bw: number, cy: number, text: string) => (
     <g pointerEvents="none">
-      <rect x={bx + bw + 8} y={cy - 10} width={text.length * 6.6 + 14} height={20} rx={4} fill={INK} />
-      <text x={bx + bw + 15} y={cy + 4} fontSize={11.5} fontWeight={600} fill="#fff">{text}</text>
+      <rect x={bx + bw + 8} y={cy - 10} width={text.length * 6.6 + 14} height={20} rx={4} fill={C.ink} />
+      <text x={bx + bw + 15} y={cy + 4} fontSize={11.5} fontWeight={600} fill={C.bg}>{text}</text>
     </g>
   )
 
@@ -265,24 +262,24 @@ export default function ScheduleChart({
       ref={(el) => { inner.current = el; if (svgRef) svgRef.current = el }}
       xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
       style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'none' : undefined }}
-      fontFamily={FONT} role="img" aria-label={`${project.name} schedule`}
+      fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
       onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); pan.current = null; setPanning(false) }}
     >
-      <rect x={0} y={0} width={W} height={H} fill="#ffffff" />
+      <rect x={0} y={0} width={W} height={H} fill={C.bg} />
 
       {/* Header */}
       {showHeader && <>
-      <text x={M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={ACCENT}>{firmName.toUpperCase()}</text>
-      <text x={M} y={80} fontSize={28} fontWeight={600} fill={INK}>{clip(project.name, 60)}</text>
-      <text x={M} y={106} fontSize={14} fill={MUTED}>
+      <text x={M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.accent}>{firmName.toUpperCase()}</text>
+      <text x={M} y={80} fontSize={28} fontWeight={600} fill={C.ink}>{clip(project.name, 60)}</text>
+      <text x={M} y={106} fontSize={14} fill={C.muted}>
         {[project.number, project.client].filter(Boolean).join('  ·  ') || ' '}
       </text>
-      <text x={W - M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={MUTED} textAnchor="end">
+      <text x={W - M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.muted} textAnchor="end">
         {pres ? 'PROJECT SCHEDULE' : 'WORKING SCHEDULE'}
       </text>
-      <text x={W - M} y={80} fontSize={14} fill={INK} textAnchor="end">Prepared {formatDate(t)}</text>
-      {has && <text x={W - M} y={106} fontSize={14} fill={MUTED} textAnchor="end">{range(first, last)}</text>}
-      <line x1={M} x2={W - M} y1={HEADER - 8} y2={HEADER - 8} stroke={INK} strokeWidth={1.2} />
+      <text x={W - M} y={80} fontSize={14} fill={C.ink} textAnchor="end">Prepared {formatDate(t)}</text>
+      {has && <text x={W - M} y={106} fontSize={14} fill={C.muted} textAnchor="end">{range(first, last)}</text>}
+      <line x1={M} x2={W - M} y1={HEADER - 8} y2={HEADER - 8} stroke={C.ink} strokeWidth={1.2} />
       </>}
       <defs><clipPath id="chart-area"><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
 
@@ -290,12 +287,12 @@ export default function ScheduleChart({
       {scale === 'month' ? (
         <>
           {years.map((yr) => (
-            <text key={yr.year} x={Math.max(yr.x1, x0) + 6} y={axisTop + 16} fontSize={11} fontWeight={600} fill={INK}>{yr.year}</text>
+            <text key={yr.year} x={Math.max(yr.x1, x0) + 6} y={axisTop + 16} fontSize={11} fontWeight={600} fill={C.ink}>{yr.year}</text>
           ))}
           {months.map((m) => (
             <g key={`${m.year}-${m.month}`}>
-              <line x1={m.x1} x2={m.x1} y1={m.month === 0 || m.x1 === x0 ? axisTop + 2 : axisTop + 24} y2={rowsBottom} stroke={m.month === 0 ? '#d6d2ca' : LINE} strokeWidth={1} />
-              <text x={(m.x1 + m.x2) / 2} y={axisTop + 38} fontSize={11} fill={MUTED} textAnchor="middle">
+              <line x1={m.x1} x2={m.x1} y1={m.month === 0 || m.x1 === x0 ? axisTop + 2 : axisTop + 24} y2={rowsBottom} stroke={m.month === 0 ? C.lineStrong : C.line} strokeWidth={1} />
+              <text x={(m.x1 + m.x2) / 2} y={axisTop + 38} fontSize={11} fill={C.muted} textAnchor="middle">
                 {monthW >= 30 ? m.label : m.label[0]}
               </text>
             </g>
@@ -309,9 +306,9 @@ export default function ScheduleChart({
             const weekend = w === 0 || w === 6
             return (
               <g key={d}>
-                <line x1={x(d)} x2={x(d)} y1={w === 1 ? axisTop + 22 : axisTop + 42} y2={rowsBottom} stroke={w === 1 ? '#dcd8d0' : '#f0eee9'} />
-                {w === 1 && <text x={x(d) + 3} y={axisTop + 36} fontSize={10.5} fontWeight={500} fill={INK}>{parseISO(d).getUTCDate()}</text>}
-                <text x={x(d) + dayW / 2} y={axisTop + 54} fontSize={9} fill={weekend ? '#bcb9b2' : MUTED} textAnchor="middle">
+                <line x1={x(d)} x2={x(d)} y1={w === 1 ? axisTop + 22 : axisTop + 42} y2={rowsBottom} stroke={w === 1 ? C.lineStrong : C.lineFaint} />
+                {w === 1 && <text x={x(d) + 3} y={axisTop + 36} fontSize={10.5} fontWeight={500} fill={C.ink}>{parseISO(d).getUTCDate()}</text>}
+                <text x={x(d) + dayW / 2} y={axisTop + 54} fontSize={9} fill={weekend ? C.faint : C.muted} textAnchor="middle">
                   {'SMTWTFS'[w]}
                 </text>
               </g>
@@ -319,16 +316,16 @@ export default function ScheduleChart({
           })}
           {scale === 'week' && dayList.filter((d) => dow(d) === 1).map((d) => (
             <g key={d}>
-              <line x1={x(d)} x2={x(d)} y1={axisTop + 26} y2={rowsBottom} stroke={LINE} />
-              <text x={x(d) + 4} y={axisTop + 39} fontSize={10.5} fill={MUTED}>{parseISO(d).getUTCDate()}</text>
+              <line x1={x(d)} x2={x(d)} y1={axisTop + 26} y2={rowsBottom} stroke={C.line} />
+              <text x={x(d) + 4} y={axisTop + 39} fontSize={10.5} fill={C.muted}>{parseISO(d).getUTCDate()}</text>
             </g>
           ))}
           {months.map((m) => (
             <g key={`${m.year}-${m.month}`}>
-              <line x1={m.x1} x2={m.x1} y1={axisTop + 2} y2={rowsBottom} stroke="#d6d2ca" />
+              <line x1={m.x1} x2={m.x1} y1={axisTop + 2} y2={rowsBottom} stroke={C.lineStrong} />
               {m.x2 - m.x1 > 34 && (
                 <text x={showToday && x(t) >= m.x1 - 24 && x(t) < m.x1 + 90 ? Math.max(m.x1 + 6, x(t) + 28) : m.x1 + 6}
-                  y={axisTop + 16} fontSize={11} fontWeight={600} fill={INK}>
+                  y={axisTop + 16} fontSize={11} fontWeight={600} fill={C.ink}>
                   {m.x2 - m.x1 > 90 ? `${m.label} ${m.year}` : m.label}
                 </text>
               )}
@@ -336,8 +333,8 @@ export default function ScheduleChart({
           ))}
         </>
       )}
-      <line x1={x0 + cw} x2={x0 + cw} y1={axisTop + 2} y2={rowsBottom} stroke={LINE} />
-      <line x1={M} x2={W - M} y1={rowsTop} y2={rowsTop} stroke="#d6d2ca" />
+      <line x1={x0 + cw} x2={x0 + cw} y1={axisTop + 2} y2={rowsBottom} stroke={C.line} />
+      <line x1={M} x2={W - M} y1={rowsTop} y2={rowsTop} stroke={C.lineStrong} />
 
       {/* Rows: backgrounds and labels first, bars on top */}
       {rows.map((r, i) => {
@@ -347,12 +344,12 @@ export default function ScheduleChart({
           const [ps, pe] = r.kind === 'phase' ? phaseDates(r.phase) : ['', '']
           return (
             <g key={i}>
-              <rect x={M} y={ry} width={W - 2 * M} height={ROW_PHASE} fill="#f8f7f3" />
-              <line x1={M} x2={W - M} y1={ry} y2={ry} stroke={LINE} />
+              <rect x={M} y={ry} width={W - 2 * M} height={ROW_PHASE} fill={C.band} />
+              <line x1={M} x2={W - M} y1={ry} y2={ry} stroke={C.line} />
               <rect x={M} y={ry + 8} width={4} height={ROW_PHASE - 16} rx={2} fill={r.color} />
-              <text x={M + 14} y={ry + 23} fontSize={14} fontWeight={600} fill={INK}>{clip(label, 31)}</text>
+              <text x={M + 14} y={ry + 23} fontSize={14} fontWeight={600} fill={C.ink}>{clip(label, 31)}</text>
               {r.kind === 'phase' && (
-                <text x={x0 - 14} y={ry + 23} fontSize={11} fill={MUTED} textAnchor="end">{`${shortDate(ps)} – ${shortDate(pe)}`}</text>
+                <text x={x0 - 14} y={ry + 23} fontSize={11} fill={C.muted} textAnchor="end">{`${shortDate(ps)} – ${shortDate(pe)}`}</text>
               )}
             </g>
           )
@@ -365,12 +362,12 @@ export default function ScheduleChart({
           : initials(task.assignee_id)
         return (
           <g key={i} opacity={task.status === 'done' && !pres ? 0.55 : 1}>
-            <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={INK}
+            <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={C.ink}
               fontWeight={task.kind === 'sheet' ? 600 : 400}
               style={editable ? { cursor: 'pointer' } : undefined} onClick={editable ? () => onOpenTask?.(task) : undefined}>
               {clip(`${task.kind === 'sheet' && task.sheet_number ? `${task.sheet_number}  ` : ''}${task.title}`, (pres ? 34 : 38) - Math.min(4, (task as ShownTask)._depth ?? 0) * 2)}
             </text>
-            <text x={x0 - 14} y={cy + 4} fontSize={11} fill={MUTED} textAnchor="end">{right}</text>
+            <text x={x0 - 14} y={cy + 4} fontSize={11} fill={C.muted} textAnchor="end">{right}</text>
           </g>
         )
       })}
@@ -378,7 +375,7 @@ export default function ScheduleChart({
       {scale === 'day' && (
         <g pointerEvents="none">
           {dayList.filter((d) => dow(d) === 0 || dow(d) === 6).map((d) => (
-            <rect key={d} x={x(d)} y={rowsTop} width={dayW} height={rowsBottom - rowsTop} fill={INK} opacity={0.035} />
+            <rect key={d} x={x(d)} y={rowsTop} width={dayW} height={rowsBottom - rowsTop} fill={C.ink} opacity={0.035} />
           ))}
         </g>
       )}
@@ -395,7 +392,7 @@ export default function ScheduleChart({
           return (
             <g key={`b${i}`}>
               <rect x={bx} y={ry + 10} width={bw} height={16} rx={3} fill={r.color}
-                stroke={dragging('phase', r.phase.id) ? INK : 'none'} strokeWidth={1.5} />
+                stroke={dragging('phase', r.phase.id) ? C.ink : 'none'} strokeWidth={1.5} />
               {editable && <rect x={bx + 3} y={ry + 15} width={2} height={6} rx={1} fill="#fff" opacity={0.6} pointerEvents="none" />}
               {editable && <rect x={bx + bw - 5} y={ry + 15} width={2} height={6} rx={1} fill="#fff" opacity={0.6} pointerEvents="none" />}
               {handles('phase', r.phase.id, bx, bw, ry + 6, 24, true)}
@@ -414,8 +411,8 @@ export default function ScheduleChart({
           const cx = x(te) + dayW / 2
           return (
             <g key={`b${i}`} opacity={done && !pres ? 0.55 : 1}>
-              <rect x={cx - 5.5} y={cy - 5.5} width={11} height={11} fill={active ? ACCENT : INK} transform={`rotate(45 ${cx} ${cy})`} />
-              {!active && <text x={cx + 12} y={cy + 4} fontSize={11} fill={MUTED} pointerEvents="none">{shortDate(te)}</text>}
+              <rect x={cx - 5.5} y={cy - 5.5} width={11} height={11} fill={active ? C.accent : C.ink} transform={`rotate(45 ${cx} ${cy})`} />
+              {!active && <text x={cx + 12} y={cy + 4} fontSize={11} fill={C.muted} pointerEvents="none">{shortDate(te)}</text>}
               {handles('task', task.id, cx - 9, 18, cy - 10, 20, false)}
               {active && dragLabel(cx - 6, 12, cy, shortDate(te))}
             </g>
@@ -426,7 +423,7 @@ export default function ScheduleChart({
           // Spans what's under it: a summary bracket that moves the whole branch.
           return (
             <g key={`b${i}`} opacity={done ? 0.5 : 1}>
-              <rect x={bx} y={cy - 3} width={bw} height={6} rx={1} fill={r.color} stroke={active ? INK : 'none'} />
+              <rect x={bx} y={cy - 3} width={bw} height={6} rx={1} fill={r.color} stroke={active ? C.ink : 'none'} />
               <path d={`M${bx} ${cy - 3} v10 l5 -4 z M${bx + bw} ${cy - 3} v10 l-5 -4 z`} fill={r.color} />
               {handles('task', task.id, bx, bw, cy - 10, 20, false)}
               {active && dragLabel(bx, bw, cy, `${shortDate(ts)} – ${shortDate(te)}`)}
@@ -436,36 +433,36 @@ export default function ScheduleChart({
         return (
           <g key={`b${i}`}>
             <rect x={bx} y={cy - 4} width={bw} height={8} rx={2} fill={r.color} opacity={active ? 0.9 : done ? 0.35 : 0.6}
-              stroke={active ? INK : 'none'} strokeWidth={1} />
+              stroke={active ? C.ink : 'none'} strokeWidth={1} />
             {handles('task', task.id, bx, bw, cy - 10, 20, true)}
             {active && dragLabel(bx, bw, cy, `${shortDate(ts)} – ${shortDate(te)}`)}
           </g>
         )
       })}
       </g>
-      <line x1={M} x2={W - M} y1={rowsBottom} y2={rowsBottom} stroke="#d6d2ca" />
+      <line x1={M} x2={W - M} y1={rowsBottom} y2={rowsBottom} stroke={C.lineStrong} />
 
       {showToday && (
         <g pointerEvents="none">
-          <line x1={x(t)} x2={x(t)} y1={axisTop + 22} y2={rowsBottom} stroke={ACCENT} strokeWidth={1.4} strokeDasharray="4 3" />
-          <rect x={x(t) - 22} y={axisTop + 4} width={44} height={16} rx={8} fill={ACCENT} />
-          <text x={x(t)} y={axisTop + 16} fontSize={10} fontWeight={600} fill="#fff" textAnchor="middle">TODAY</text>
+          <line x1={x(t)} x2={x(t)} y1={axisTop + 22} y2={rowsBottom} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />
+          <rect x={x(t) - 22} y={axisTop + 4} width={44} height={16} rx={8} fill={C.accent} />
+          <text x={x(t)} y={axisTop + 16} fontSize={10} fontWeight={600} fill={C.onAccent} textAnchor="middle">TODAY</text>
         </g>
       )}
 
-      {!has && <text x={x0 + cw / 2} y={rowsTop + 40} fontSize={14} fill={MUTED} textAnchor="middle">Nothing to show yet.</text>}
+      {!has && <text x={x0 + cw / 2} y={rowsTop + 40} fontSize={14} fill={C.muted} textAnchor="middle">Nothing to show yet.</text>}
 
       {/* Legend and footer */}
-      <g transform={`translate(${M}, ${rowsBottom + 34})`} fontSize={11} fill={MUTED}>
+      <g transform={`translate(${M}, ${rowsBottom + 34})`} fontSize={11} fill={C.muted}>
         <rect x={0} y={-9} width={26} height={12} rx={3} fill={palette[Math.min(2, palette.length - 1)]} />
         <text x={34} y={1}>Phase</text>
         <rect x={86} y={-6} width={26} height={7} rx={2} fill={palette[Math.min(2, palette.length - 1)]} opacity={0.6} />
         <text x={120} y={1}>{pres ? 'Activity' : 'Task'}</text>
-        <rect x={172} y={-8} width={9} height={9} fill={INK} transform="rotate(45 176.5 -3.5)" />
+        <rect x={172} y={-8} width={9} height={9} fill={C.ink} transform="rotate(45 176.5 -3.5)" />
         <text x={190} y={1}>Milestone</text>
         {showToday && (
           <>
-            <line x1={262} x2={262} y1={-10} y2={4} stroke={ACCENT} strokeWidth={1.4} strokeDasharray="4 3" />
+            <line x1={262} x2={262} y1={-10} y2={4} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />
             <text x={272} y={1}>Today</text>
           </>
         )}
