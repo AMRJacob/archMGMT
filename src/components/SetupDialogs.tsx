@@ -201,13 +201,19 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
       const rows: Partial<Task>[] = []
       let order = startOrder
       for (const t of pickedTasks) {
+        const taskId = crypto.randomUUID()
         rows.push({
-          project_id: projectId, phase_id: phase.id, parent_id: null, kind: 'task', title: t.title,
+          id: taskId, project_id: projectId, phase_id: phase.id, parent_id: null, kind: 'task', title: t.title,
           ...datesIn(phase, t.at, Boolean(t.milestone)),
           effort: t.milestone ? null : t.effort ?? 2, status: 'todo', is_milestone: Boolean(t.milestone),
           milestone_type: t.milestone ? t.mtype ?? null : null, client_visible: Boolean(t.milestone),
           assignee_id: null, assignee_ids: [], estimated_hours: null, sort_order: order++,
         })
+        ;(t.checklist ?? []).forEach((c, i) => rows.push({
+          project_id: projectId, phase_id: phase.id, parent_id: taskId, kind: 'item', title: c, status: 'todo',
+          is_milestone: false, client_visible: false, sort_order: i, effort: null, start_date: null, due_date: null,
+          assignee_id: null, assignee_ids: [],
+        }))
       }
       const taken = new Set(takenNumbers)
       for (const s of pickedSheets) {
@@ -262,6 +268,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
                       <span>
                         {t.title}
                         {t.hint && <span className="pick-hint">{t.hint}</span>}
+                        {t.checklist && t.on && <span className="pick-hint">{t.checklist.length}-item checklist: {t.checklist.slice(0, 3).join(', ').toLowerCase()}…</span>}
                       </span>
                       <span className="pick-when muted small">{shortDate(datesIn(phase, t.at, Boolean(t.milestone)).due_date)}</span>
                     </label>

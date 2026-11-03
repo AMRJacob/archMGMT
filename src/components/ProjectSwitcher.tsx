@@ -45,7 +45,7 @@ export default function ProjectSwitcher() {
       </button>
       {open && (
         <div className="ps-menu" role="listbox" aria-label="Projects">
-          {projects.map((p) => (
+          {projects.filter((p) => !p.archived_at || p.id === current?.id).map((p) => (
             <button key={p.id} role="option" aria-selected={p.id === current?.id} className={p.id === current?.id ? 'on' : ''} onClick={() => pick(p.id)}>
               <span className="ps-number">
                 {p.number ?? '—'}

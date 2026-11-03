@@ -80,8 +80,12 @@ export default function ProjectDetail() {
     setOpenIds(new Set([...open, p.id]))
   }
 
+  async function archiveProject(on: boolean) {
+    await projects.patch(id, { archived_at: on ? new Date().toISOString() : null })
+  }
+
   async function deleteProject() {
-    if (!window.confirm(`Delete "${project?.name}" with all its phases and tasks? This can't be undone.`)) return
+    if (!window.confirm(`Permanently delete "${project?.name}" with all its phases and tasks? This can't be undone. Download a backup in Settings first if you might need it.`)) return
     await projects.drop(id)
     navigate('/')
   }
@@ -140,6 +144,14 @@ export default function ProjectDetail() {
     <section className="overview" style={{ ['--p-accent' as string]: accent, ['--p-soft' as string]: soft }}>
       <Link to="/" className="back">← All projects</Link>
 
+      {project.archived_at && (
+        <div className="archived-banner">
+          <span><strong>Archived</strong> on {formatDate(project.archived_at.slice(0, 10))}. It’s hidden from the project list, the switcher and workload; nothing has been deleted.</span>
+          <span className="grow" />
+          <button className="btn" onClick={() => void archiveProject(false)}>Restore</button>
+          <button className="btn danger" onClick={deleteProject}>Delete permanently</button>
+        </div>
+      )}
       <header className="project-head card">
         <div className="project-title">
           <ColorPicker value={project.color} scheme={project.color_scheme ?? null} phaseNames={sortedPhases.map((p) => p.name)}
@@ -267,7 +279,9 @@ export default function ProjectDetail() {
 
       <div className="footer-actions">
         <button className="btn" onClick={addPhase}>+ Add phase</button>
-        <button className="btn danger" onClick={deleteProject}>Delete project</button>
+        {project.archived_at
+          ? <button className="btn danger" onClick={deleteProject}>Delete permanently</button>
+          : <button className="btn" onClick={() => void archiveProject(true)} title="Hide it from lists and workload; everything is kept and it can be restored">Archive project</button>}
       </div>
 
       {phaseMenu && (

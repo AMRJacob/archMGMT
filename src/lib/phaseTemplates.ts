@@ -22,6 +22,8 @@ export interface TemplateTask {
   /** Shown under the title in the setup dialog. */
   hint?: string
   effort?: 1 | 2 | 3
+  /** Checklist lines created under the task. */
+  checklist?: string[]
 }
 
 export interface TemplateSheet {
@@ -43,10 +45,27 @@ export const PHASE_TEMPLATES: PhaseTemplate[] = [
   {
     key: 'predesign',
     match: /pre-?design|programming|feasib/i,
-    blurb: 'Learn what’s there and what’s needed: program, existing conditions, site and budget.',
+    blurb: 'Programming, existing conditions, site and budget: learn what’s needed and what’s there.',
     tasks: [
       { title: 'Owner kickoff meeting', at: [0, 0.05], on: true, effort: 1 },
-      { title: 'Programming / space needs', at: [0.05, 0.6], on: true, hint: 'Rooms, sizes, adjacencies and goals with the owner' },
+      {
+        title: 'Programming', at: [0.05, 0.65], on: true, effort: 3,
+        hint: 'Goals, users, rooms, sizes and adjacencies, with a checklist of the steps',
+        checklist: [
+          'Owner goals, vision and project requirements',
+          'Programming questionnaire / user group interviews',
+          'Existing space inventory and utilization',
+          'Staffing and growth projections',
+          'Space program: rooms, quantities and net areas',
+          'Net-to-gross factor and gross area target',
+          'Adjacency and bubble diagrams',
+          'Special requirements (equipment, security, IT, A/V)',
+          'Program vs budget check',
+          'Program document for owner review',
+        ],
+      },
+      { title: 'Programming workshop with owner and users', at: [0.15, 0.2], on: true, effort: 1 },
+      { title: 'Owner program approval', at: [0.65, 0.65], on: true, milestone: true, mtype: 'owner' },
       { title: 'Existing conditions survey and measured drawings', at: [0.05, 0.45], on: true, hint: 'Field verify and model what’s there' },
       { title: 'Site visit and photo documentation', at: [0.05, 0.15], on: true, effort: 1 },
       { title: 'Topographic and boundary survey', at: [0.05, 0.5], on: true, hint: 'Usually the owner’s surveyor or civil' },

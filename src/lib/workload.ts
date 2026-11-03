@@ -63,7 +63,7 @@ export function capacityForWeek(p: Person, week: string, timeOff: TimeOff[]): nu
 export function countsTowardWorkload(t: Task, projects: Map<string, Project>): boolean {
   if (t.status === 'done') return false
   const p = projects.get(t.project_id)
-  return !!p && p.status !== 'complete' && p.status !== 'on_hold'
+  return !!p && !p.archived_at && p.status !== 'complete' && p.status !== 'on_hold'
 }
 
 export type LoadLevel = 'none' | 'light' | 'steady' | 'busy' | 'over'

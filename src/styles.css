@@ -853,3 +853,6 @@ th.num .th-sort { width: 100%; text-align: right; }
 .list-filters .grow { flex: 1; }
 .table-scroll td .mono, .table-scroll td .small { white-space: nowrap; }
 .table-scroll .chip { white-space: nowrap; }
+.archived-banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border-radius: 10px; background: var(--warn-soft); color: var(--ink); font-size: 13.5px; }
+.archived-banner .grow { flex: 1; }
+.tab-archived { margin-left: auto; }

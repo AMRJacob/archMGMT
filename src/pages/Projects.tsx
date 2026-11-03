@@ -67,7 +67,7 @@ export default function Projects() {
   const phases = useRows<Phase>('phases')
   const tasks = useRows<Task>('tasks')
   const people = useRows<Person>('people')
-  const [status, setStatus] = useState<ProjectStatus | 'all'>('active')
+  const [status, setStatus] = useState<ProjectStatus | 'all' | 'archived'>('active')
   const [search, setSearch] = useState('')
   const [types, setTypes] = useState<string[]>([])
   const [pms, setPms] = useState<string[]>([])
@@ -111,7 +111,8 @@ export default function Projects() {
   const q = search.trim().toLowerCase()
   const filtered = all.filter((r) => {
     const p = r.project
-    if (status !== 'all' && p.status !== status) return false
+    if (status === 'archived' ? !p.archived_at : p.archived_at) return false
+    if (status !== 'all' && status !== 'archived' && p.status !== status) return false
     if (q && ![p.name, p.number, p.client, p.building_type, r.pm].some((v) => (v ?? '').toLowerCase().includes(q))) return false
     if (types.length && !types.includes(p.building_type ?? '')) return false
     if (pms.length && !pms.includes(r.pm ?? '')) return false
@@ -191,15 +192,18 @@ export default function Projects() {
       </header>
 
       <div className="tabs">
-        {[{ value: 'all', label: 'All' }, ...PROJECT_STATUSES].map((s) => (
-          <button key={s.value} className={status === s.value ? 'tab active' : 'tab'}
-            onClick={() => setStatus(s.value as ProjectStatus | 'all')}>
-            {s.label}
-            <span className="count">
-              {s.value === 'all' ? projects.projects.length : projects.projects.filter((p) => p.status === s.value).length}
-            </span>
-          </button>
-        ))}
+        {[{ value: 'all', label: 'All' }, ...PROJECT_STATUSES, { value: 'archived', label: 'Archived' }].map((s) => {
+          const live = projects.projects.filter((p) => !p.archived_at)
+          const n = s.value === 'all' ? live.length : s.value === 'archived' ? projects.projects.length - live.length : live.filter((p) => p.status === s.value).length
+          if (s.value === 'archived' && n === 0) return null
+          return (
+            <button key={s.value} className={`${status === s.value ? 'tab active' : 'tab'}${s.value === 'archived' ? ' tab-archived' : ''}`}
+              onClick={() => setStatus(s.value as ProjectStatus | 'all' | 'archived')}>
+              {s.label}
+              <span className="count">{n}</span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="list-filters">
@@ -219,7 +223,7 @@ export default function Projects() {
         </Pop>
         {filtersOn && <button className="linkbtn" onClick={clear}>Clear filters</button>}
         <span className="grow" />
-        <span className="muted small">{rows.length} of {projects.projects.length}</span>
+        <span className="muted small">{rows.length} of {projects.projects.filter((p) => !p.archived_at).length}</span>
         <Pop className="filter-pop" align="right" title="Choose columns" label={<span className="filter-chip">Columns ▾</span>}>
           {() => (
             <>

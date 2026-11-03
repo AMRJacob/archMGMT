@@ -41,6 +41,8 @@ export interface Project {
   gross_area?: number | null
   /** Education, office, healthcare… (see BUILDING_TYPES). */
   building_type?: string | null
+  /** Set when archived: hidden from lists and workload, data kept, can be restored. */
+  archived_at?: string | null
   created_at?: string
 }
 

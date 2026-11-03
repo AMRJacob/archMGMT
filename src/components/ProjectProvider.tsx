@@ -26,7 +26,8 @@ export default function ProjectProvider({ children }: { children: ReactNode }) {
   // Remembered project if it still exists; otherwise the newest active one.
   const current =
     projects.find((p) => p.id === currentId) ??
-    projects.find((p) => p.status === 'active') ??
+    projects.find((p) => p.status === 'active' && !p.archived_at) ??
+    projects.find((p) => !p.archived_at) ??
     projects[0] ??
     null
 
