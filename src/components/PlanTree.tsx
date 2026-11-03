@@ -13,6 +13,9 @@ import { childrenOf, descendants, isItem, kindOf, progressOf, rolledDates, sched
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
+const ghostName = (t: Task) =>
+  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', task: 'Task name', item: 'Checklist item' } as const)[kindOf(t)]
+
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
 
@@ -81,7 +84,7 @@ export default function PlanTree({
     const dated = k !== 'item'
     const created = await onAdd({
       id: crypto.randomUUID(), project_id: projectId, phase_id: ph.id, parent_id: parent?.id ?? null, kind: k,
-      title: milestone ? 'New milestone' : k === 'item' ? 'New item' : k === 'view' ? 'New view' : k === 'sheet' ? 'New sheet' : 'New task',
+      title: '',
       sheet_number: null, sheet_type: k === 'sheet' ? 'other' : null,
       ...assignPatch(parent ? assigneesOf(parent) : []),
       start_date: dated && !milestone ? (k === 'sheet' ? ph.start_date : s) : null,
@@ -210,12 +213,24 @@ export default function PlanTree({
     ...dragProps(t),
   })
 
-  /** Title field with "new row" behaviour: focused on creation, Esc removes it if it wasn't named. */
-  const title = (t: Task, className = '') => (
-    <TextField value={t.title} className={className} autoFocus={t.id === newId}
-      onSave={(v) => { if (v) onPatch(t, { title: v }, false); if (t.id === newId) setNewId(null) }}
-      onEscape={t.id === newId ? () => { setNewId(null); onDrop(t.id) } : undefined} />
-  )
+  /**
+   * Title field. New rows start empty with a ghosted name: Enter keeps it and starts another of the same
+   * kind right below (like Asana); Esc, or leaving it empty, takes the new row away again.
+   */
+  const title = (t: Task, className = '') => {
+    const isNew = t.id === newId
+    const k = kindOf(t)
+    return (
+      <TextField value={t.title} className={className} autoFocus={isNew} placeholder={ghostName(t)}
+        onSave={(v) => {
+          if (v) onPatch(t, { title: v }, false)
+          else if (isNew || !t.title) { onDrop(t.id) }
+          if (isNew) setNewId(null)
+        }}
+        onEnter={(v) => { if (v) void addAt(t, 'after', k === 'sheet' ? 'sheet' : k, t.is_milestone) }}
+        onEscape={isNew ? () => { setNewId(null); onDrop(t.id) } : undefined} />
+    )
+  }
 
   const node = (t: Task, depth: number): ReactNode[] => {
     const kind = kindOf(t)

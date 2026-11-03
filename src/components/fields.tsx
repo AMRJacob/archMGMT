@@ -3,8 +3,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 /** Inline fields: look like plain text until focused, save when you leave the field. */
 
 export function TextField({
-  value, onSave, placeholder, className = '', multiline = false, autoFocus = false, onEscape,
+  value, onSave, placeholder, className = '', multiline = false, autoFocus = false, onEscape, onEnter,
 }: {
+  /** Enter in the field: save, then do this (e.g. start the next row, like Asana). Gets what was typed. */
+  onEnter?: (v: string) => void
   value: string | null
   onSave: (v: string | null) => void
   placeholder?: string
@@ -35,7 +37,11 @@ export function TextField({
     <input ref={input} className={`field ${className}`} value={draft} placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)} onBlur={commit}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        if (e.key === 'Enter') {
+          const v = (e.target as HTMLInputElement).value.trim()
+          ;(e.target as HTMLInputElement).blur()
+          onEnter?.(v)
+        }
         if (e.key === 'Escape') {
           e.stopPropagation()
           if (onEscape) { cancelled.current = true; onEscape(); return }
