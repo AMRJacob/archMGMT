@@ -24,7 +24,7 @@ type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside
 /**
  * One phase's work as a tree: sheets → views → tasks → items (checklist lines / info).
  * Every row is edited in place. Right-click anywhere to add at that spot, move rows by dragging the grip,
- * promote/demote with the arrows (or Tab / Shift+Tab), and cut/copy/paste with the menu or Ctrl+X/C/V.
+ * promote/demote from the menu (or Ctrl+[ / Ctrl+]), and cut/copy/paste with the menu or Ctrl+X/C/V.
  */
 export default function PlanTree({
   phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented,
@@ -140,12 +140,13 @@ export default function PlanTree({
   const promoteRow = (t: Task) => { const c = promote(tree, t); if (c.length) onPatchMany(c) }
   const demoteRow = (t: Task) => { const c = demote(tree, t); if (c.length) { onPatchMany(c); expand(c[0].next.parent_id) } }
 
-  /** Keys on a selected row. Tab / Shift+Tab also work while editing its title, like Asana. */
+  /** Keys on a selected row. Ctrl+[ / Ctrl+] (promote / demote) also work while editing its title. */
   const rowKeys = (t: Task) => (e: KeyboardEvent) => {
     const typing = (e.target as HTMLElement).closest('input, textarea, select')
-    if (e.key === 'Tab') { e.preventDefault(); if (e.shiftKey) promoteRow(t); else demoteRow(t); return }
-    if (typing) return
     const mod = e.ctrlKey || e.metaKey
+    if (mod && (e.code === 'BracketLeft' || e.key === '[')) { e.preventDefault(); promoteRow(t); return }
+    if (mod && (e.code === 'BracketRight' || e.key === ']')) { e.preventDefault(); demoteRow(t); return }
+    if (typing) return
     const k = e.key.toLowerCase()
     if (mod && k === 'c') { e.preventDefault(); copy(t, 'copy') }
     else if (mod && k === 'x') { e.preventDefault(); copy(t, 'cut') }
@@ -481,8 +482,8 @@ export default function PlanTree({
     return [
       ...add,
       'sep',
-      { label: 'Promote', keys: 'Shift+Tab', disabled: !canPromote(t), run: () => promoteRow(t) },
-      { label: 'Demote', keys: 'Tab', disabled: !canDemote(tree, t), run: () => demoteRow(t) },
+      { label: 'Promote', keys: 'Ctrl+[', disabled: !canPromote(t), run: () => promoteRow(t) },
+      { label: 'Demote', keys: 'Ctrl+]', disabled: !canDemote(tree, t), run: () => demoteRow(t) },
       'sep',
       { label: 'Cut', keys: 'Ctrl+X', run: () => copy(t, 'cut') },
       { label: 'Copy', keys: 'Ctrl+C', run: () => copy(t, 'copy') },

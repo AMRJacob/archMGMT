@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { accessCall, createSignInLink, type AccountRow } from '../lib/access.ts'
 import { insert, list, useRows } from '../lib/data.ts'
 import { TextField } from './fields.tsx'
-import { formatDate } from '../lib/dates.ts'
 import type { Person } from '../lib/types.ts'
 
 /**
@@ -10,6 +9,17 @@ import type { Person } from '../lib/types.ts'
  * send them yourself; no email is sent by the app. Existing people can get a new link (password reset)
  * or lose access.
  */
+/** "Today, 2:41 PM", "Yesterday, 9:05 AM" or "Nov 3, 2026, 2:41 PM", in this computer's time zone. */
+function signedIn(iso: string): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const day = (x: Date) => x.toDateString()
+  const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1)
+  if (day(d) === day(now)) return `today, ${time}`
+  if (day(d) === day(y)) return `yesterday, ${time}`
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${time}`
+}
+
 export default function AccessManager({ myEmail }: { myEmail: string | undefined }) {
   const [rows, setRows] = useState<AccountRow[] | null>(null)
   const [denied, setDenied] = useState<string | null>(null)
@@ -160,7 +170,7 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
                 </select>
               </td>
               <td className="small">
-                {u.last_sign_in_at ? <span className="muted">Last signed in {formatDate(u.last_sign_in_at.slice(0, 10))}</span> : <span className="pending">Link sent, not signed in yet</span>}
+                {u.last_sign_in_at ? <span className="muted" title={new Date(u.last_sign_in_at).toString()}>Last signed in {signedIn(u.last_sign_in_at)}</span> : <span className="pending">Link sent, not signed in yet</span>}
               </td>
               <td className="right-actions">
                 <button className="btn ghost" disabled={busy} onClick={() => makeLink(u.email, u.email)}>{u.last_sign_in_at ? 'Password reset link' : 'New link'}</button>
