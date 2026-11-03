@@ -14,9 +14,10 @@ with Gantt charts that export ready to hand to a client.
 
 ## Data model
 
-- **People**: staff, role, weekly capacity hours, time off
+- **People**: staff (role, weekly capacity hours, time off) and consultants (company, discipline).
+  Consultants can be assigned tasks but aren't counted in staff workload.
 - **Projects**: number, name, client, PM, status, dates
-- **Phases**: SD / DD / CD / Bidding / CA bars on the schedule; can be shown to the client or hidden
+- **Phases**: Predesign / SD / DD / CD / Bidding / CA bars on the schedule; can be shown to the client or hidden
 - **Tasks**: work inside a phase, with assignee, dates and estimated hours; milestones show as diamonds
 
 Workload = each person's task hours spread over the weeks they run, compared with their capacity less time off.
@@ -26,18 +27,27 @@ Workload = each person's task hours spread over the weeks they run, compared wit
 ```
 src/
   lib/supabase.ts       Supabase client (reads .env)
-  pages/                Projects, Schedule, Workload, Team
+  lib/data.ts           Data layer: Supabase when configured, otherwise sample data in the browser
+  lib/types.ts          Record types, statuses, default phases
+  components/           Inline edit fields, assignee picker
+  pages/                Projects, ProjectDetail, Schedule, Workload, Team
 supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 .github/workflows/      CI build + GitHub Pages deploy
 ```
 
 ## Roadmap
 
-1. Phase 0: Setup (repo, shell, schema)
-2. Phase 1: Projects, phases and tasks (create, edit, assign)
+1. Phase 0: Setup (repo, shell, schema) ✓
+2. Phase 1: Projects, phases and tasks (create, edit, assign) ✓ (runs on sample data until Supabase is connected)
 3. Phase 2: Schedule (interactive Gantt, drag to reschedule)
 4. Phase 3: Workload (per-person weekly hours vs capacity, over-allocation flags)
 5. Phase 4: Client export (branded PDF / PNG Gantt, client-visible phases and milestones only)
+6. Later: consultant logins with access limited to their projects
+
+## Sample data
+
+Without Supabase keys the app runs on clearly-labelled sample data saved in the browser, so it can be
+tried right away. **Reset sample data** in the sidebar restores the original set.
 
 ## Setup
 

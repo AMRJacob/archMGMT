@@ -8,6 +8,10 @@ create table people (
   name            text not null,
   initials        text,
   role            text,                       -- Principal, PM, Architect, Designer, Intern…
+  kind            text not null default 'staff'
+                  check (kind in ('staff','consultant')), -- consultants can be assigned tasks but aren't in staff workload
+  company         text,                       -- consultants: firm name
+  discipline      text,                       -- consultants: Structural, MEP, Civil, Landscape…
   weekly_hours    numeric not null default 40, -- capacity used by the workload view
   color           text,
   active          boolean not null default true,
@@ -29,7 +33,7 @@ create table projects (
   created_at      timestamptz not null default now()
 );
 
--- Phases: SD, DD, CD, Bidding, CA… The bars a client sees on the Gantt chart.
+-- Phases: Predesign, SD, DD, CD, Bidding, CA… The bars a client sees on the Gantt chart.
 create table phases (
   id              uuid primary key default gen_random_uuid(),
   project_id      uuid not null references projects(id) on delete cascade,
