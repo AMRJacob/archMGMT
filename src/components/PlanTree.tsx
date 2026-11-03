@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import { TextField } from './fields.tsx'
 import { Pop, TaskControls } from './TaskChips.tsx'
 import { addDays, nextMonday } from '../lib/dates.ts'
-import { guessSheetType, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
+import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { childrenOf, isItem, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
 import type { Person, Phase, Task, TaskKind } from '../lib/types.ts'
 
@@ -26,6 +26,7 @@ export default function PlanTree({
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [newId, setNewId] = useState<string | null>(null)
   const [addingSheet, setAddingSheet] = useState(false)
+  const [planning, setPlanning] = useState(false)
 
   const top = childrenOf(tree, null).filter((t) => t.phase_id === phase.id)
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -134,6 +135,29 @@ export default function PlanTree({
 
   return (
     <>
+      {planning && (
+        <SheetPlanner
+          onCancel={() => setPlanning(false)}
+          onCreate={async (counts, autoNumber) => {
+            const taken = new Set([...tree.byId.values()].filter((t) => t.kind === 'sheet' && t.sheet_number).map((t) => t.sheet_number!.toUpperCase()))
+            const rows: Partial<Task>[] = []
+            let order = top.length
+            for (const st of SHEET_TYPES) {
+              const n = counts[st.id] ?? 0
+              if (!n) continue
+              const numbers = autoNumber && st.series ? nextSheetNumbers(st.series, n, taken) : []
+              for (let i = 0; i < n; i++) {
+                const { sheet, items } = sheetRows({
+                  projectId, phaseId: phase.id, number: numbers[i] ?? '', name: n > 1 ? `${st.name} ${i + 1}` : st.name,
+                  typeId: st.id, start: phase.start_date, due: phase.end_date, assigneeId: null, sortOrder: order++,
+                })
+                rows.push(sheet, ...items)
+              }
+            }
+            if (rows.length) await onAddMany(rows)
+            setPlanning(false)
+          }} />
+      )}
       <ul className="tlist">
         {top.flatMap((t) => node(t, 0))}
         {top.length === 0 && !addingSheet && <li className="muted small empty-row">Nothing in this phase yet. Add sheets for production, or tasks and milestones.</li>}
@@ -151,6 +175,7 @@ export default function PlanTree({
       </ul>
       <div className="phase-actions-left">
         <button className="btn ghost" onClick={() => setAddingSheet(true)}>+ Sheet</button>
+        <button className="btn ghost" onClick={() => setPlanning(true)}>+ Sheets by type</button>
         <button className="btn ghost" onClick={() => addChild(null, 'task')}>+ Task</button>
         <button className="btn ghost" onClick={() => addChild(null, 'task', true)}>+ Milestone</button>
       </div>
@@ -195,5 +220,60 @@ function AddSheetRow({ onAdd, onCancel }: { onAdd: (number: string, name: string
         Enter adds and starts the next; Esc closes.
       </span>
     </li>
+  )
+}
+
+/** Plan a phase's sheet set by type: how many of each, then create them all with their checklists. */
+function SheetPlanner({ onCreate, onCancel }: {
+  onCreate: (counts: Record<string, number>, autoNumber: boolean) => Promise<void>
+  onCancel: () => void
+}) {
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [autoNumber, setAutoNumber] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  const set = (id: string, n: number) => setCounts((c) => ({ ...c, [id]: Math.max(0, Math.min(50, n)) }))
+
+  return (
+    <div className="sheet-planner" onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancel() } }}>
+      <div className="sp-head">
+        <div>
+          <strong>Add sheets by type</strong>
+          <span className="muted small"> · How many of each do you expect? Each sheet gets its type’s checklist.</span>
+        </div>
+        <button className="icon-btn" title="Close (Esc)" onClick={onCancel}>×</button>
+      </div>
+      <div className="sp-grid">
+        {SHEET_TYPES.filter((t) => t.id !== 'other').map((t) => {
+          const n = counts[t.id] ?? 0
+          return (
+            <div key={t.id} className={`sp-type${n ? ' on' : ''}`}>
+              <span className="sp-name">
+                {t.name}
+                <span className="pm-hint">{t.checklist.length ? `${t.checklist.length} checks${t.source === 'suggested' ? ' · suggested' : ''}` : 'no checklist'}{t.series ? ` · ${t.series}xx` : ''}</span>
+              </span>
+              <span className="stepper">
+                <button type="button" onClick={() => set(t.id, n - 1)} disabled={n === 0} aria-label={`Fewer ${t.name}`}>−</button>
+                <input type="number" min={0} max={50} value={n || ''} placeholder="0" aria-label={`${t.name} count`}
+                  onChange={(e) => set(t.id, Number(e.target.value) || 0)} />
+                <button type="button" onClick={() => set(t.id, n + 1)} aria-label={`More ${t.name}`}>+</button>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="sp-foot">
+        <label className="inline-check">
+          <input type="checkbox" checked={autoNumber} onChange={(e) => setAutoNumber(e.target.checked)} />
+          Number them in the usual series (A101, A501…), skipping numbers already used
+        </label>
+        <span className="grow" />
+        <button className="btn ghost" onClick={onCancel}>Cancel</button>
+        <button className="btn primary" disabled={!total || busy}
+          onClick={async () => { setBusy(true); await onCreate(counts, autoNumber); setBusy(false) }}>
+          {total ? `Add ${total} sheet${total === 1 ? '' : 's'}` : 'Add sheets'}
+        </button>
+      </div>
+    </div>
   )
 }

@@ -570,3 +570,19 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .level-ctl { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); }
 .level-ctl input[type=range] { width: 90px; accent-color: var(--sidebar); }
 .level-name { font-size: 13px; font-weight: 600; min-width: 46px; }
+
+/* sheets-by-type planner */
+.sheet-planner { margin: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fcfbf8; }
+.sp-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; padding: 10px 12px; }
+.sp-type { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; }
+.sp-type.on { background: var(--panel); border-color: var(--line); }
+.sp-name { font-size: 13px; line-height: 1.25; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--panel); flex: none; }
+.stepper button { width: 26px; height: 26px; border: none; background: none; cursor: pointer; font-size: 15px; color: var(--muted); }
+.stepper button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.stepper button:disabled { opacity: 0.3; cursor: default; }
+.stepper input { width: 34px; height: 26px; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font-variant-numeric: tabular-nums; -moz-appearance: textfield; outline: none; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sp-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.sp-foot .grow { flex: 1; }
