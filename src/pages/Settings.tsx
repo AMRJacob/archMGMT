@@ -1,12 +1,24 @@
 import { useRef, useState } from 'react'
-import { exportAll, importAll, removeSampleData, sampleRowCount, usingSampleData, type Backup } from '../lib/data.ts'
+import { ChangePassword } from '../auth/Auth.tsx'
+import { useAuth } from '../auth/authContext.ts'
+import {
+  browserSnapshot, exportAll, importAll, list, remove, removeSampleData, sampleRowCount, usingSampleData, type Backup,
+} from '../lib/data.ts'
 import { today } from '../lib/dates.ts'
+import type { Person, Project } from '../lib/types.ts'
 
 export default function Settings() {
+  const { session } = useAuth()
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const [samples, setSamples] = useState(() => sampleRowCount())
+  const [withSamples, setWithSamples] = useState(true)
   const file = useRef<HTMLInputElement>(null)
+  const local = usingSampleData ? null : browserSnapshot(withSamples)
+
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
+  const done = (m: string, reload = false) => { setMessage(m); if (reload) setTimeout(() => window.location.reload(), 900) }
 
   async function backup() {
     setError(null)
@@ -17,11 +29,8 @@ export default function Settings() {
       a.download = `archmgmt-backup-${today()}.json`
       a.click()
       setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-      const n = Object.values(b.tables).reduce((s, rows) => s + rows.length, 0)
-      setMessage(`Backup downloaded (${n} records).`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
+      done(`Backup downloaded (${Object.values(b.tables).reduce((s, rows) => s + rows.length, 0)} records).`)
+    } catch (e) { fail(e) }
   }
 
   async function restore(f: File) {
@@ -29,22 +38,38 @@ export default function Settings() {
     try {
       const b = JSON.parse(await f.text()) as Backup
       if (!window.confirm(`Restore from ${f.name}? Records in the file are added or updated; nothing else is deleted.`)) return
-      const n = await importAll(b)
-      setMessage(`Restored ${n} records. Reloading…`)
-      setTimeout(() => window.location.reload(), 800)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      if (file.current) file.current.value = ''
-    }
+      setBusy(true)
+      done(`Restored ${await importAll(b)} records. Reloading…`, true)
+    } catch (e) { fail(e) } finally { setBusy(false); if (file.current) file.current.value = '' }
   }
 
-  function clearSamples() {
-    if (!window.confirm(`Remove all ${samples} sample records (the "Sample …" people and projects)? Anything you added yourself stays. Consider downloading a backup first.`)) return
-    removeSampleData()
-    setSamples(sampleRowCount())
-    setMessage('Sample data removed. Reloading…')
-    setTimeout(() => window.location.reload(), 800)
+  async function copyBrowserData() {
+    if (!local) return
+    if (!window.confirm(`Copy ${local.count} records saved in this browser into the shared database? Records already there are updated, nothing is deleted.`)) return
+    setBusy(true); setError(null)
+    try { done(`Copied ${await importAll(local.backup)} records into the shared database. Reloading…`, true) }
+    catch (e) { fail(e) } finally { setBusy(false) }
+  }
+
+  async function clearSamples() {
+    if (usingSampleData) {
+      if (!window.confirm(`Remove all ${samples} sample records? Anything you added yourself stays. Consider downloading a backup first.`)) return
+      removeSampleData()
+      setSamples(sampleRowCount())
+      done('Sample data removed. Reloading…', true)
+      return
+    }
+    // Shared database: sample projects and people are the ones named "Sample …".
+    try {
+      const ps = (await list<Project>('projects')).filter((p) => p.name.startsWith('Sample '))
+      const people = (await list<Person>('people')).filter((p) => p.name.startsWith('Sample '))
+      if (!ps.length && !people.length) { done('No sample projects or people in the shared database.'); return }
+      if (!window.confirm(`Remove ${ps.length} sample project(s) with their phases and tasks, and ${people.length} sample people, from the shared database? Download a backup first if unsure.`)) return
+      setBusy(true)
+      for (const p of ps) await remove('projects', p.id)
+      for (const p of people) await remove('people', p.id)
+      done('Sample data removed. Reloading…', true)
+    } catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   return (
@@ -52,7 +77,7 @@ export default function Settings() {
       <header className="page-head">
         <div>
           <h1>Settings &amp; data</h1>
-          <p className="muted">Keep your data safe while the app is being built.</p>
+          <p className="muted">Account, backups and moving data.</p>
         </div>
       </header>
       {message && <p className="success">{message}</p>}
@@ -61,38 +86,57 @@ export default function Settings() {
       <div className="card pad">
         <h2>Where data is stored</h2>
         {usingSampleData ? (
-          <p>
-            <strong>In this browser only.</strong> Updates to the app keep your data, but clearing browser data, a different
-            browser or another computer won't have it. Download a backup regularly until the shared database is connected.
-            The backup file is also how this data moves into the shared database.
-          </p>
+          <p><strong>In this browser only.</strong> Download a backup regularly; the backup file is also how this data moves into the shared database.</p>
         ) : (
-          <p><strong>In the shared database.</strong> Everyone signed in sees the same data.</p>
+          <p><strong>In the shared database.</strong> Everyone signed in with an @amr-architects.com address (or added to the access list) sees the same data.</p>
         )}
       </div>
+
+      {session && (
+        <div className="card pad">
+          <h2>Your account</h2>
+          <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
+          <ChangePassword />
+        </div>
+      )}
+
+      {local && local.count + (withSamples ? 0 : local.samples) > 0 && (
+        <div className="card pad">
+          <h2>Bring over data from this browser</h2>
+          <p className="muted">
+            This browser still has data from before the shared database: {local.count} records
+            {local.samples ? ` (${local.samples} of them sample data)` : ''}. Copy it in so everyone can see it.
+          </p>
+          {local.samples > 0 && (
+            <label className="inline-check" style={{ marginTop: 8 }}>
+              <input type="checkbox" checked={withSamples} onChange={(e) => setWithSamples(e.target.checked)} />
+              Include the sample projects and people (handy for trying the app out; removable later)
+            </label>
+          )}
+          <div className="row-gap"><button className="btn primary" disabled={busy || local.count === 0} onClick={copyBrowserData}>Copy into shared database</button></div>
+        </div>
+      )}
 
       <div className="card pad">
         <h2>Backup and restore</h2>
         <p className="muted">A backup is one file with every person, project, phase, task and time-off entry.</p>
         <div className="row-gap">
-          <button className="btn primary" onClick={backup}>Download backup</button>
-          <button className="btn" onClick={() => file.current?.click()}>Restore from backup…</button>
+          <button className="btn primary" onClick={backup} disabled={busy}>Download backup</button>
+          <button className="btn" onClick={() => file.current?.click()} disabled={busy}>Restore from backup…</button>
           <input ref={file} type="file" accept="application/json,.json" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void restore(f) }} />
         </div>
       </div>
 
-      {usingSampleData && (
-        <div className="card pad">
-          <h2>Sample data</h2>
-          <p className="muted">
-            {samples > 0
-              ? `${samples} sample records are mixed in with your data. Remove them when you're ready to work with real projects only.`
-              : 'No sample records left.'}
-          </p>
-          {samples > 0 && <div className="row-gap"><button className="btn danger" onClick={clearSamples}>Remove sample data</button></div>}
-        </div>
-      )}
+      <div className="card pad">
+        <h2>Sample data</h2>
+        <p className="muted">
+          {usingSampleData
+            ? (samples > 0 ? `${samples} sample records are mixed in with your data.` : 'No sample records left.')
+            : 'Remove the “Sample …” projects and people once you’re working with real projects only.'}
+        </p>
+        {(!usingSampleData || samples > 0) && <div className="row-gap"><button className="btn danger" onClick={clearSamples} disabled={busy}>Remove sample data</button></div>}
+      </div>
     </section>
   )
 }

@@ -500,3 +500,22 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .qp-title { font-size: 16px; font-weight: 600; }
 .qp-sub { padding-left: 7px; margin-bottom: 4px; }
 .quick-panel .task-controls { flex-wrap: wrap; }
+
+/* ---------- sign-in ---------- */
+.signin { min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--sidebar); }
+.signin form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; padding: 32px; background: var(--panel); border-radius: 14px; border: none; }
+.signin > p { color: #aab3b5; }
+.signin-brand { font-size: 26px; font-weight: 300; letter-spacing: 0.02em; color: var(--ink); }
+.signin-brand span { font-weight: 700; color: var(--accent); }
+.signin label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500; }
+.signin input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); outline: none; }
+.signin input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.signin .btn.primary { padding: 10px; margin-top: 4px; }
+.signin .notice { color: var(--ink); border-color: var(--line); background: #faf9f6; }
+.signin .notice.error { color: var(--danger); background: #fdecea; border-color: #f5c9c3; }
+.signin-links { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.linkbtn { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 13px; }
+.bad-text { color: var(--danger); }
+.signout { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; font-size: 12px; color: #8f9b9e; word-break: break-all; }
+.signout .linkbtn { align-self: flex-start; color: #d9dedf; font-size: 12px; }
+.field.boxed { border-color: var(--line-strong); background: var(--panel); width: 260px; }

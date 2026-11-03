@@ -80,7 +80,7 @@ supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 3. Phase 2: Schedule: timeline with drag + zoom, calendar, board; working / presentation views ✓
 4. Phase 3: Workload per person vs capacity, merged into Team ✓
 5. Phase 4: Presentation export, PDF / PNG ✓
-6. Next: shared database (Supabase) and sign-in for the office
+6. Shared database (Supabase) and invite-only sign-in ✓
 7. Sheets: per-project sheet list (number, name, discipline, assignee, status), import from a pasted
    sheet index / Revit schedule CSV / PDF set, counted in workload
 8. Revit add-in: push sheets and views from the model, pull assignments back into a sheet parameter
@@ -91,13 +91,19 @@ supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 Without Supabase keys the app runs on clearly-labelled sample data saved in the browser, so it can be
 tried right away. **Reset sample data** in the sidebar restores the original set.
 
-## Setup
+## Shared database (live)
 
-1. Create a Supabase project, run `supabase/migrations/0001_schema.sql` in the SQL Editor,
-   and turn off public sign-ups (invite firm members instead).
-2. Copy `.env.example` to `.env` and fill in the project URL and anon key.
-3. On GitHub: Settings → Pages → Source: GitHub Actions; add `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY` under Settings → Secrets and variables → Actions.
+- Supabase project **archMGMT** (AMR organization), `https://foaehycyfaosjipzdvxe.supabase.co`.
+  The publishable key is in `src/lib/supabase.ts`; it is meant for browser code. Access is decided by the
+  database rules: only signed-in **@amr-architects.com** addresses, or emails added to the `app_access`
+  table, can read or change anything (migrations 0004, 0005).
+- Migrations 0001–0005 are applied. New database changes go in new numbered files (add-only).
+- People sign in with invite + password. To add someone: Supabase → Authentication → Users → **Invite user**.
+  For someone outside AMR (e.g. a consultant), also add their email to `app_access` (Table Editor).
+- Supabase → Authentication → URL Configuration: Site URL `https://amrjacob.github.io/archMGMT/`
+  (so invite and reset links open the app).
+- Data from before the database: Settings → **Copy into shared database** (in the browser that has it).
+- To work on a local copy without the database, set `VITE_SUPABASE_URL=off` in `.env`.
 
 ## Commands
 

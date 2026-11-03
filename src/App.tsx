@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { AuthProvider, CreatePassword, SignIn } from './auth/Auth.tsx'
+import { useAuth } from './auth/authContext.ts'
 import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import ProjectProvider from './components/ProjectProvider.tsx'
 import ProjectSwitcher from './components/ProjectSwitcher.tsx'
@@ -11,6 +13,26 @@ import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
+  )
+}
+
+/** Shared database: sign in first. Browser-only mode: straight in. */
+function Gate() {
+  const { session, loading, needsPassword } = useAuth()
+  if (!usingSampleData) {
+    if (loading) return <div className="signin"><p className="muted">Loading…</p></div>
+    if (!session) return <SignIn />
+    if (needsPassword) return <CreatePassword />
+  }
+  return <Shell />
+}
+
+function Shell() {
+  const { session, signOut } = useAuth()
   return (
     <ProjectProvider>
       <div className="shell">
@@ -33,6 +55,12 @@ export default function App() {
               </p>
             )}
             <NavLink to="/settings" className="settings-link">Settings &amp; data</NavLink>
+            {session && (
+              <div className="signout">
+                <span>{session.user.email}</span>
+                <button className="linkbtn" onClick={signOut}>Sign out</button>
+              </div>
+            )}
           </div>
         </aside>
         <main className="content">

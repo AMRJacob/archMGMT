@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+// The shared archMGMT database. The publishable key is meant to live in browser code: what anyone
+// can see or change is decided by the database's access rules (supabase/migrations/0004, 0005).
+// .env (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY) can point a local copy somewhere else;
+// set VITE_SUPABASE_URL=off to run on browser-only sample data.
+const DEFAULT_URL = 'https://foaehycyfaosjipzdvxe.supabase.co'
+const DEFAULT_KEY = 'sb_publishable_B9s1YsQrXOEOUTcB8-KCVw_gVdKK3S9'
+const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || DEFAULT_URL
+const url = envUrl === 'off' ? undefined : envUrl
+const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_KEY
 
 /** True once .env / GitHub secrets have real Supabase keys. */
 export const isConfigured = Boolean(url && anonKey)
