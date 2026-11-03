@@ -5,6 +5,8 @@ import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode, type ChartSpot } from '../components/ScheduleChart.tsx'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import { kindUnder } from '../lib/treeEdit.ts'
+import { isPresented, ruleMatch, rulesOf, togglePresented, type PresentationRules } from '../lib/presentation.ts'
+import PresentationFilter from '../components/PresentationFilter.tsx'
 import { chartColors, useTheme } from '../lib/theme.ts'
 import TaskEditor from '../components/TaskEditor.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
@@ -37,7 +39,7 @@ function useSaved<T extends string>(key: string, initial: T): [T, (v: T) => void
 }
 
 export default function Schedule() {
-  const { current: project } = useProject()
+  const { current: project, patch: patchProject } = useProject()
   const theme = useTheme()
   const plan = useProjectPlan(project?.id ?? '')
   const { phases, tasks, people } = plan
@@ -65,6 +67,19 @@ export default function Schedule() {
   const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
   const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
   const real = (t: Task) => tree.byId.get(t.id) ?? t
+
+  // Presentation view: rules (milestones, sheets, top-level tasks) plus hand-picked items, minus hidden ones.
+  const rules = rulesOf(project)
+  const setRules = (r: PresentationRules) => void patchProject(project.id, { presentation: r })
+  const presented = (t: Task) => isPresented(rules, real(t))
+  const togglePres = (t: Task) => {
+    const c = togglePresented(rules, real(t))
+    if (c.task) plan.patchTask(real(t), c.task)
+    if (c.rules) setRules(c.rules)
+  }
+  const chartRows: ShownTask[] = mode === 'presentation'
+    ? visibleAtLevel(tree, 3).map((v) => asShown(tree, v.task, 0))
+    : treeRows
   /** A drag on a shown copy: whole branches move together; plain tasks take the new dates. */
   const moveShown = (t: ShownTask, s: string | null, d: string | null) => {
     if (t._rolled) plan.shiftTask(real(t), movedBy(t, s, d))
@@ -137,10 +152,15 @@ export default function Schedule() {
       { label: day ? `Add task on ${day}` : `Add task${where}`, run: () => void addHere(sp.phase, sp.date) },
       { label: day ? `Add milestone on ${day}` : `Add milestone${where}`, run: () => void addHere(sp.phase, sp.date, { milestone: true }) },
       ...(holds ? [{ label: `Add task under “${task.title.slice(0, 28)}”`, run: () => void addHere(sp.phase, sp.date, { parent: task }) }] : []),
-      ...(!task && sp.phase ? ['sep' as const, { label: `Rename or change dates of ${sp.phase.name}…`, run: () => setPhaseEdit(sp.phase!.id) }] : []),
+      ...(!task && sp.phase ? [
+        'sep' as const,
+        { label: sp.phase.client_visible ? 'Hide phase from presentation' : 'Show phase in presentation', run: () => void phases.patch(sp.phase!.id, { client_visible: !sp.phase!.client_visible }) },
+        { label: `Rename or change dates of ${sp.phase.name}…`, run: () => setPhaseEdit(sp.phase!.id) },
+      ] : []),
       ...(task ? [
         'sep' as const,
         { label: `Open “${task.title.slice(0, 30)}”`, run: () => openTask(task) },
+        { label: presented(task) ? 'Hide from presentation' : 'Show in presentation', run: () => togglePres(task) },
         { label: task.status === 'done' ? 'Mark not done' : 'Mark done', run: () => plan.patchTask(task, { status: task.status === 'done' ? 'todo' : 'done' }) },
         { label: 'Delete', danger: true, run: () => { if (window.confirm(`Delete "${task.title}"?`)) void tasks.drop(task.id) } },
       ] : []),
@@ -185,7 +205,6 @@ export default function Schedule() {
 
   const palette = projectPalette(project.color, phases.rows.length, project.color_scheme)
 
-  const hiddenCount = tasks.rows.filter((t) => !t.client_visible).length + phases.rows.filter((p) => !p.client_visible).length
 
   return (
     <section className="schedule-page">
@@ -211,11 +230,15 @@ export default function Schedule() {
               <button className={mode === 'working' ? 'on' : ''} onClick={() => setMode('working')}>Working view</button>
               <button className={mode === 'presentation' ? 'on' : ''} onClick={() => setMode('presentation')}>Presentation view</button>
             </div>
-            <span className="muted small grow">
-              {mode === 'working'
-                ? `Right-click or double-click a spot to add a task there. Drag bars to move them, their ends to change length.${months ? ' Click and hold empty space to pan.' : ''}`
-                : `Only phases and tasks marked “Show in presentation view”.${hiddenCount ? ` ${hiddenCount} item${hiddenCount === 1 ? ' is' : 's are'} hidden.` : ''}`}
-            </span>
+            {mode === 'working' ? (
+              <span className="muted small grow">
+                {`Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars to move them.${months ? ' Click and hold empty space to pan.' : ''}`}
+              </span>
+            ) : (
+              <PresentationFilter rules={rules} onChange={setRules}
+                picked={tasks.rows.filter((t) => t.client_visible && !ruleMatch(rules, t)).length}
+                hiddenPhases={phases.rows.filter((p) => !p.client_visible).length} />
+            )}
             {levelControl}
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
             <button className="btn primary" onClick={() => window.print()}>Save as PDF</button>
@@ -236,7 +259,7 @@ export default function Schedule() {
             )}
           </div>
           <div className="card chart-card no-print">
-            <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
+            <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
               firmName={FIRM_NAME} editable window={chartWindow} colors={chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
@@ -285,7 +308,7 @@ export default function Schedule() {
 
       {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
       <div className="print-area export-only" aria-hidden="true">
-        <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
+        <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
           firmName={FIRM_NAME} svgRef={exportSvg} keepOrder />
       </div>
 

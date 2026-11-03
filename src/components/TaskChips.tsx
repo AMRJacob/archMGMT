@@ -162,10 +162,6 @@ export function MoreMenu({ task, phases, onPatch, onDelete }: {
       {(close) => (
         <>
           <label className="pm-item check">
-            <input type="checkbox" checked={task.client_visible} onChange={(e) => onPatch({ client_visible: e.target.checked })} />
-            Show in presentation view
-          </label>
-          <label className="pm-item check">
             <input type="checkbox" checked={task.is_milestone}
               onChange={(e) => onPatch(e.target.checked ? { is_milestone: true, start_date: null } : { is_milestone: false, start_date: task.due_date })} />
             Milestone (a single date)

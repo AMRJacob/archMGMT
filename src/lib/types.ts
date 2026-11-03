@@ -30,6 +30,8 @@ export interface Project {
   color: string | null
   /** How phase colours are built from `color`: balanced | triad | complementary. */
   color_scheme?: string | null
+  /** Presentation view rules (see presentation.ts). */
+  presentation?: unknown
   start_date: string | null
   end_date: string | null
   notes: string | null

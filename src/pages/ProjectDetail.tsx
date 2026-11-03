@@ -15,6 +15,7 @@ import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
+import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
 
 export default function ProjectDetail() {
   const navigate = useNavigate()
@@ -231,7 +232,10 @@ export default function ProjectDetail() {
                     </div>
                   )}
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
-                    onPatch={patchTask} onPatchMany={patchMany} onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
+                    onPatch={patchTask} onPatchMany={patchMany}
+                    presented={(x) => isPresented(rulesOf(project), x)}
+                    onTogglePresented={(x) => { const c = togglePresented(rulesOf(project), x); if (c.task) patchTask(x, c.task); if (c.rules) void projects.patch(id, { presentation: c.rules }) }}
+                    onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
                 </div>
               )}

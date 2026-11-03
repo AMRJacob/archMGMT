@@ -27,8 +27,11 @@ type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside
  * promote/demote with the arrows (or Tab / Shift+Tab), and cut/copy/paste with the menu or Ctrl+X/C/V.
  */
 export default function PlanTree({
-  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany,
+  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented,
 }: {
+  /** Whether a row is in the presentation view, and flipping it (right-click menu). */
+  presented?: (t: Task) => boolean
+  onTogglePresented?: (t: Task) => void
   phase: Phase
   tree: Tree
   phases: Phase[]
@@ -419,6 +422,9 @@ export default function PlanTree({
       { label: `${pasteLabel} below`, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(t, 'after') },
       ...(holds ? [{ label: `${pasteLabel} inside`, disabled: !hasClip, run: () => paste(t, 'inside') }] : []),
       { label: 'Duplicate', keys: 'Ctrl+D', run: () => duplicate(t) },
+      ...(presented && onTogglePresented && k !== 'item'
+        ? ['sep' as const, { label: presented(t) ? 'Hide from presentation' : 'Show in presentation', run: () => onTogglePresented(t) }]
+        : []),
       'sep',
       { label: 'Delete', keys: 'Del', danger: true, run: () => del(t) },
     ]

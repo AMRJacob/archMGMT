@@ -827,3 +827,9 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 .chart-add:hover text { fill: var(--accent); }
 .chart-add:hover rect { fill: var(--hover); }
 .phase-title .phase-name-edit { width: 280px; font-size: 16px; font-weight: 600; }
+
+/* presentation view filters */
+.pres-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.filter-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.filter-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.filter-pop .chip-btn { padding: 0; min-height: 0; }

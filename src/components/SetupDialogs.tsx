@@ -9,7 +9,21 @@ import { DEFAULT_PHASES, type Phase, type Project, type Task } from '../lib/type
 
 // ---------- new project ----------
 
-type DraftPhase = { key: string; name: string; weeks: number; on: boolean }
+type DraftPhase = { key: string; name: string; weeks: number; on: boolean; alongside?: string }
+
+/** Phases offered but not ticked by default. `alongside` runs it in parallel with another phase instead of after it. */
+const OPTIONAL_PHASES: { name: string; weeks: number; after: string; alongside?: string }[] = [
+  { name: 'FF&E', weeks: 16, after: 'Construction Documents', alongside: 'Construction Documents' },
+]
+
+function startingPhases(): DraftPhase[] {
+  const out: DraftPhase[] = DEFAULT_PHASES.map((p, i) => ({ key: String(i), name: p.name, weeks: p.weeks, on: true }))
+  for (const o of OPTIONAL_PHASES) {
+    const i = out.findIndex((p) => p.name === o.after)
+    out.splice(i < 0 ? out.length : i + 1, 0, { key: `opt-${o.name}`, name: o.name, weeks: o.weeks, on: false, alongside: o.alongside })
+  }
+  return out
+}
 
 /**
  * Start a project: name it, pick its phases and their lengths. Only overall phase dates are needed to
@@ -24,18 +38,21 @@ export function NewProjectDialog({ onCreate, onClose }: {
   const [client, setClient] = useState('')
   const [color, setColor] = useState(ROOT_PRESETS[0]?.hex ?? '#4d8a86')
   const [start, setStart] = useState(nextMonday())
-  const [phases, setPhases] = useState<DraftPhase[]>(DEFAULT_PHASES.map((p, i) => ({ key: String(i), name: p.name, weeks: p.weeks, on: true })))
+  const [phases, setPhases] = useState<DraftPhase[]>(startingPhases)
   const [setupFirst, setSetupFirst] = useState(true)
   const [busy, setBusy] = useState(false)
 
   const chosen = phases.filter((p) => p.on && p.name.trim())
   const dated = new Map<string, { s: string; e: string }>()
   chosen.reduce((from, p) => {
-    const e = addDays(from, Math.max(1, p.weeks) * 7 - 1)
-    dated.set(p.key, { s: from, e })
-    return addDays(e, 1)
+    // A phase that runs alongside another starts with it and doesn't push later phases back.
+    const with_ = p.alongside ? chosen.find((x) => x.name === p.alongside && !x.alongside) : undefined
+    const s = with_ ? dated.get(with_.key)?.s ?? from : from
+    const e = addDays(s, Math.max(1, p.weeks) * 7 - 1)
+    dated.set(p.key, { s, e })
+    return with_ ? from : addDays(e, 1)
   }, start)
-  const finish = chosen.length ? dated.get(chosen[chosen.length - 1].key)!.e : null
+  const finish = chosen.length ? [...dated.values()].map((d) => d.e).sort().pop()! : null
   const set = (key: string, c: Partial<DraftPhase>) => setPhases((ps) => ps.map((p) => (p.key === key ? { ...p, ...c } : p)))
 
   async function create() {
@@ -97,7 +114,7 @@ export function NewProjectDialog({ onCreate, onClose }: {
                     onChange={(e) => set(p.key, { weeks: Math.max(1, Math.min(260, Number(e.target.value) || 1)) })} />
                   <span className="muted small">weeks</span>
                 </span>
-                <span className="muted small np-dates">{d ? `${shortDate(d.s)} – ${shortDate(d.e)}` : ''}</span>
+                <span className="muted small np-dates">{d ? `${shortDate(d.s)} – ${shortDate(d.e)}` : p.alongside ? `alongside ${p.alongside}` : ''}</span>
               </li>
             )
           })}
@@ -285,7 +302,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
   )
 }
 
-const LABELS: Record<string, string> = { predesign: 'Predesign', sd: 'Schematic Design', dd: 'Design Development', cd: 'Construction Documents', bidding: 'Bidding', ca: 'Construction Administration' }
+const LABELS: Record<string, string> = { predesign: 'Predesign', sd: 'Schematic Design', dd: 'Design Development', cd: 'Construction Documents', ffe: 'FF&E', bidding: 'Bidding', ca: 'Construction Administration' }
 const labelOf = (k: string) => LABELS[k] ?? k
 
 /** Every sheet type, with the template's picks ticked and counted. */

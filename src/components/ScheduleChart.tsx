@@ -58,8 +58,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible,
 }: {
+  /** In presentation mode, whether a task is shown (rules plus hand-picked items). */
+  presented?: (t: Task) => boolean
   /** Add a task in a phase, starting on a date (from the "+ Add task" rows and double-clicks on empty space). */
   onAddAt?: (phase: Phase, date: string | null) => void
   /** Right-click on the chart: the date and row under the pointer. */
@@ -103,12 +105,12 @@ export default function ScheduleChart({
     const color = palette[i]
     rows.push({ kind: 'phase', phase, color })
     tasks
-      .filter((t) => t.phase_id === phase.id && (!pres || t.client_visible))
+      .filter((t) => t.phase_id === phase.id && (!pres || presented(t)))
       .sort(keepOrder ? () => 0 : byStart)
       .forEach((task) => rows.push({ kind: 'task', task, color }))
     if (editable && onAddAt && !pres) rows.push({ kind: 'add', phase, color })
   })
-  const loose = tasks.filter((t) => !t.phase_id && (!pres || t.client_visible)).sort(keepOrder ? () => 0 : byStart)
+  const loose = tasks.filter((t) => !t.phase_id && (!pres || presented(t))).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
     rows.push({ kind: 'group', label: 'No phase', color: '#8b8f94' })
     loose.forEach((task) => rows.push({ kind: 'task', task, color: '#8b8f94' }))
