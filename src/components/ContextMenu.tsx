@@ -19,13 +19,17 @@ export default function ContextMenu({ x, y, items, onClose }: { x: number; y: nu
   useEffect(() => {
     const away = (e: Event) => { if (!box.current?.contains(e.target as Node)) onClose() }
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }
-    document.addEventListener('mousedown', away)
-    document.addEventListener('contextmenu', away)
+    // Listen from the next tick, so the right-click that opened the menu doesn't close it again.
+    const start = window.setTimeout(() => {
+      document.addEventListener('mousedown', away)
+      document.addEventListener('contextmenu', away)
+      window.addEventListener('scroll', onClose, true)
+      window.addEventListener('resize', onClose)
+    }, 0)
     document.addEventListener('keydown', esc)
-    window.addEventListener('scroll', onClose, true)
-    window.addEventListener('resize', onClose)
-    box.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+    box.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
     return () => {
+      window.clearTimeout(start)
       document.removeEventListener('mousedown', away)
       document.removeEventListener('contextmenu', away)
       document.removeEventListener('keydown', esc)

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 
-export default function Modal({ title, onClose, children, footer }: {
+export default function Modal({ title, onClose, children, footer, size }: {
+  size?: 'wide'
   title: ReactNode
   onClose: () => void
   children: ReactNode
@@ -13,7 +14,7 @@ export default function Modal({ title, onClose, children, footer }: {
   }, [onClose])
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className={`modal${size ? ` ${size}` : ''}`} role="dialog" aria-modal="true">
         <div className="modal-head">
           <div className="modal-title">{title}</div>
           <button className="icon-btn plain" onClick={onClose} title="Close">×</button>

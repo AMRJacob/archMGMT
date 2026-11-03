@@ -4,7 +4,7 @@ import { TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } fr
 import { shiftDates } from '../lib/useProjectPlan.ts'
 import { mondayOf, weekStarts } from '../lib/workload.ts'
 import { assigneesOf, isAssigned } from '../lib/assignees.ts'
-import { AvatarStack } from './TaskChips.tsx'
+import { AvatarStack, MilestoneMark } from './TaskChips.tsx'
 
 /**
  * Task board. Columns by status (kanban), by phase, or by week (a post-it pull-plan, cards
@@ -153,7 +153,7 @@ export default function BoardView({
                       onDragEnd={() => { setDragId(null); setOver(null) }}
                       onClick={() => onOpenTask(t)}>
                       <div className="ct-title">
-                        {t.is_milestone && <span className="diamond" />}
+                        {t.is_milestone && <MilestoneMark task={t} />}
                         {t.kind === 'sheet' && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
                         {t.kind === 'view' && <span className="kind-tag">View</span>}
                         {t.title}

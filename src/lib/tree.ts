@@ -34,11 +34,20 @@ export const MANUAL = 1000
 export const isArranged = (list: Task[]) => list.some((t) => t.sort_order >= MANUAL)
 const arrangedOrder = (a: Task, b: Task) => a.sort_order - b.sort_order || treeOrder(a, b)
 
-/** Sheets by number, then everything by date, then creation order. */
+/** National CAD Standard discipline order, so G-sheets come before A-sheets and so on. */
+const DISCIPLINES = 'G H V B C L S A I Q F P D M E W T R X Z O'.split(' ')
+function sheetKey(n: string | null | undefined): [number, string] {
+  const s = (n ?? '').trim().toUpperCase()
+  const i = DISCIPLINES.indexOf(s[0] ?? '')
+  return [s ? (i < 0 ? DISCIPLINES.length : i) : DISCIPLINES.length + 1, s]
+}
+
+/** Sheets by number (in discipline order), then everything by date, then creation order. */
 export function treeOrder(a: Task, b: Task): number {
   const ra = KIND_RANK[kindOf(a)], rb = KIND_RANK[kindOf(b)]
   if (kindOf(a) === 'sheet' && kindOf(b) === 'sheet') {
-    return (a.sheet_number ?? '').localeCompare(b.sheet_number ?? '', undefined, { numeric: true }) || a.title.localeCompare(b.title)
+    const [da, na] = sheetKey(a.sheet_number), [db, nb] = sheetKey(b.sheet_number)
+    return da - db || na.localeCompare(nb, undefined, { numeric: true }) || a.title.localeCompare(b.title)
   }
   // Sheets first (by number), then other scheduled work by date; checklist items last, in their order.
   if ((ra === 1) !== (rb === 1)) return ra === 1 ? -1 : 1
@@ -92,9 +101,10 @@ export function shiftTreeChanges(tree: Tree, t: Task, days: number): { task: Tas
 
 // ---------- detail level (the slider on schedule views) ----------
 
-export type DetailLevel = 1 | 2 | 3 // 1 sheets, 2 views, 3 tasks (items are never scheduled)
+export type DetailLevel = 0 | 1 | 2 | 3 // 0 phases (and milestones), 1 sheets, 2 views, 3 tasks (items are never scheduled)
 
 export const DETAIL_LEVELS: { value: DetailLevel; label: string }[] = [
+  { value: 0, label: 'Phases' },
   { value: 1, label: 'Sheets' },
   { value: 2, label: 'Views' },
   { value: 3, label: 'Tasks' },
@@ -107,6 +117,11 @@ export const DETAIL_LEVELS: { value: DetailLevel; label: string }[] = [
  */
 export function visibleAtLevel(tree: Tree, level: DetailLevel): { task: Task; depth: number; frontier: boolean }[] {
   const out: { task: Task; depth: number; frontier: boolean }[] = []
+  if (level === 0) {
+    // Phases only: the phase bars themselves, plus every milestone (they mark the dates that matter).
+    for (const t of tree.byId.values()) if (t.is_milestone && !isItem(t)) out.push({ task: t, depth: 0, frontier: true })
+    return out.sort((a, b) => (a.task.due_date ?? '').localeCompare(b.task.due_date ?? ''))
+  }
   const shows = (t: Task, parentShown: boolean, top: boolean) =>
     !isItem(t) && (top || (parentShown && (t.is_milestone || KIND_RANK[kindOf(t)] <= level)))
   const walk = (pid: string | null, depth: number) => {

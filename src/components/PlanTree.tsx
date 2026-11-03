@@ -6,7 +6,7 @@ import {
   branchOf, canDemote, canHold, canPromote, clearClip, CLIP_EVENT, cloneRows, demote, isWithin, kindUnder, moveTo,
   placeAmong, promote, readClip, saveClip, slotFor, type Change, type Clip, type Place,
 } from '../lib/treeEdit.ts'
-import { Pop, TaskControls } from './TaskChips.tsx'
+import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
 import { addDays, nextMonday } from '../lib/dates.ts'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { childrenOf, descendants, isItem, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
@@ -263,7 +263,7 @@ export default function PlanTree({
           onClick={() => onPatch(t, { status: t.status === 'done' ? 'todo' : 'done' })}>
           {t.status === 'done' ? '✓' : ''}
         </button>
-        {t.is_milestone && <span className="diamond" title="Milestone" />}
+        {t.is_milestone && <MilestoneMark task={t} onPatch={(c) => onPatch(t, c)} />}
         {kind === 'sheet' && (
           <TextField value={t.sheet_number ?? null} placeholder="No." className="sheet-no mono" onSave={(v) => onPatch(t, { sheet_number: v }, false)} />
         )}

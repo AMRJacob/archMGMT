@@ -5,6 +5,7 @@ import type { Person, Phase, Project, Task } from '../lib/types.ts'
 import type { ShownTask } from '../lib/tree.ts'
 import { STUDIO_CHART, type ChartColors } from '../lib/theme.ts'
 import { whoLabel } from '../lib/assignees.ts'
+import { MILESTONE_TYPES, milestoneColor, milestoneType } from '../lib/milestones.ts'
 
 /**
  * The project schedule as one self-contained SVG: header, timeline, phases, tasks, milestones.
@@ -228,6 +229,22 @@ export default function ScheduleChart({
   const t = today()
   const showToday = has && t >= start && t <= end
 
+  // Legend: one diamond per kind of milestone actually on the chart, then Today.
+  const shownMilestones = rows.filter((r): r is Extract<Row, { kind: 'task' }> => r.kind === 'task' && r.task.is_milestone)
+  const usedTypes = MILESTONE_TYPES.filter((m) => shownMilestones.some((r) => r.task.milestone_type === m.value))
+  const untyped = shownMilestones.some((r) => !milestoneType(r.task.milestone_type))
+  const legendMarks: { key: string; kind: 'diamond' | 'today'; color: string; label: string; x: number }[] = []
+  {
+    let lx = 172
+    const push = (key: string, kind: 'diamond' | 'today', color: string, label: string) => {
+      legendMarks.push({ key, kind, color, label, x: lx })
+      lx += 18 + label.length * 6.3 + 20
+    }
+    if (untyped) push('ms', 'diamond', C.ink, usedTypes.length ? 'Other milestone' : 'Milestone')
+    for (const m of usedTypes) push(m.value, 'diamond', m.color, m.label)
+    if (showToday) push('today', 'today', C.accent, 'Today')
+  }
+
   /** Invisible grab areas over a bar: middle moves, ends resize. */
   const handles = (kind: Drag['kind'], id: string, bx: number, bw: number, top: number, h: number, resizable: boolean) => {
     if (!editable) return null
@@ -408,7 +425,7 @@ export default function ScheduleChart({
           const cx = x(te) + dayW / 2
           return (
             <g key={`b${i}`} opacity={done && !pres ? 0.55 : 1}>
-              <rect x={cx - 5.5} y={cy - 5.5} width={11} height={11} fill={active ? C.accent : C.ink} transform={`rotate(45 ${cx} ${cy})`} />
+              <rect x={cx - 5.5} y={cy - 5.5} width={11} height={11} fill={active ? C.accent : milestoneColor(task.milestone_type, C.ink)} transform={`rotate(45 ${cx} ${cy})`} />
               {!active && <text x={cx + 12} y={cy + 4} fontSize={11} fill={C.muted} pointerEvents="none">{shortDate(te)}</text>}
               {handles('task', task.id, cx - 9, 18, cy - 10, 20, false)}
               {active && dragLabel(cx - 6, 12, cy, shortDate(te))}
@@ -455,14 +472,14 @@ export default function ScheduleChart({
         <text x={34} y={1}>Phase</text>
         <rect x={86} y={-6} width={26} height={7} rx={2} fill={palette[Math.min(2, palette.length - 1)]} opacity={0.6} />
         <text x={120} y={1}>{pres ? 'Activity' : 'Task'}</text>
-        <rect x={172} y={-8} width={9} height={9} fill={C.ink} transform="rotate(45 176.5 -3.5)" />
-        <text x={190} y={1}>Milestone</text>
-        {showToday && (
-          <>
-            <line x1={262} x2={262} y1={-10} y2={4} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />
-            <text x={272} y={1}>Today</text>
-          </>
-        )}
+        {legendMarks.map((m) => (
+          <g key={m.key}>
+            {m.kind === 'diamond'
+              ? <rect x={m.x} y={-8} width={9} height={9} fill={m.color} transform={`rotate(45 ${m.x + 4.5} -3.5)`} />
+              : <line x1={m.x + 4} x2={m.x + 4} y1={-10} y2={4} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />}
+            <text x={m.x + 18} y={1}>{m.label}</text>
+          </g>
+        ))}
         <text x={W - 2 * M} y={1} textAnchor="end">
           {pres ? 'Schedule is preliminary and subject to change.' : 'Working schedule. Initials show who is assigned.'}
         </text>

@@ -43,7 +43,7 @@ export default function Schedule() {
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
   const [winStart, setWinStart] = useState(defaultWindowStart)
-  const [levelStr, setLevelStr] = useSaved<'1' | '2' | '3'>('archmgmt.detailLevel', '3')
+  const [levelStr, setLevelStr] = useSaved<'0' | '1' | '2' | '3'>('archmgmt.detailLevel', '3')
   const level = Number(levelStr) as DetailLevel
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
@@ -77,8 +77,8 @@ export default function Schedule() {
   const levelControl = (
     <div className="level-ctl" title="How much detail to show">
       <span className="muted small">Detail</span>
-      <input type="range" min={1} max={3} step={1} value={level} aria-label="Detail level"
-        onChange={(e) => setLevelStr(e.target.value as '1' | '2' | '3')} />
+      <input type="range" min={0} max={3} step={1} value={level} aria-label="Detail level"
+        onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
       <span className="level-name">{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
     </div>
   )

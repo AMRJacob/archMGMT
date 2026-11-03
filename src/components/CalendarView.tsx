@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { addDays, daysBetween, parseISO, toISO, today } from '../lib/dates.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 import { whoLabel } from '../lib/assignees.ts'
+import { MilestoneMark } from './TaskChips.tsx'
 
 /**
  * Month calendar. Tasks show as bars across the days they run, milestones on their date,
@@ -151,7 +152,7 @@ export default function CalendarView({
                       const grab = dayAt(e.clientX, e.clientY)
                       if (grab) { const d = { id: p.id, grab, over: grab, moved: false }; dragRef.current = d; setDrag(d) }
                     }}>
-                    {p.milestone && <span className="diamond" />}
+                    {p.milestone && p.task && <MilestoneMark task={p.task} />}
                     <span className="cal-title">{p.title}</span>
                     {!p.milestone && p.task && whoLabel(p.task, people) && <span className="cal-who">{whoLabel(p.task, people)}</span>}
                   </button>

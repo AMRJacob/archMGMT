@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { accessCall, createSignInLink, type AccountRow } from '../lib/access.ts'
-import { insert, list } from '../lib/data.ts'
+import { insert, list, useRows } from '../lib/data.ts'
+import { TextField } from './fields.tsx'
 import { formatDate } from '../lib/dates.ts'
 import type { Person } from '../lib/types.ts'
 
@@ -19,6 +20,8 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
   const [busy, setBusy] = useState(false)
   const [link, setLink] = useState<{ email: string; url: string; note: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const people = useRows<Person>('people')
+  const personFor = (e: string) => people.rows.find((p) => (p.email ?? '').toLowerCase() === e.toLowerCase())
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +68,27 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
     }
     await makeLink(target, who)
     setEmail(''); setName('')
+  }
+
+  /** A name for an account lives on its Team entry; one is created if there isn't one yet. */
+  async function saveName(target: string, n: string | null) {
+    const name = (n ?? '').trim()
+    if (!name) return
+    const p = personFor(target)
+    const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase()
+    try {
+      if (p) await people.patch(p.id, { name, initials: p.initials && p.name !== p.email ? p.initials : initials })
+      else await people.add({ name, email: target, initials, kind: 'staff', weekly_hours: 40, availability: 100, active: true })
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+
+  async function setTeamKind(target: string, kind: 'staff' | 'consultant' | 'none') {
+    const p = personFor(target)
+    try {
+      if (kind === 'none') { if (p) await people.patch(p.id, { active: false }); return }
+      if (p) await people.patch(p.id, { kind, active: true })
+      else await people.add({ name: target.split('@')[0], email: target, kind, weekly_hours: kind === 'staff' ? 40 : 0, availability: 100, active: true })
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
   }
 
   async function removeAccess(target: string) {
@@ -120,12 +144,21 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
 
       <table className="table access-table">
         <thead>
-          <tr><th>Email</th><th style={{ width: 180 }}>Status</th><th style={{ width: 260 }} /></tr>
+          <tr><th style={{ width: 210 }}>Name</th><th>Email</th><th style={{ width: 150 }}>On Team</th><th style={{ width: 180 }}>Status</th><th style={{ width: 250 }} /></tr>
         </thead>
         <tbody>
           {(rows ?? []).map((u) => (
             <tr key={u.email}>
+              <td><AccountName email={u.email} person={personFor(u.email)} onSave={(n) => saveName(u.email, n)} /></td>
               <td>{u.email}{u.admin && <span className="chip admin-chip">Admin</span>}{u.email === myEmail && <span className="muted small"> (you)</span>}</td>
+              <td>
+                <select className="field" value={personFor(u.email)?.active ? personFor(u.email)!.kind : 'none'} title="Whether they're on the Team list (to be assigned work)"
+                  onChange={(e) => void setTeamKind(u.email, e.target.value as 'staff' | 'consultant' | 'none')}>
+                  <option value="staff">Staff</option>
+                  <option value="consultant">Consultant</option>
+                  <option value="none">Not on Team</option>
+                </select>
+              </td>
               <td className="small">
                 {u.last_sign_in_at ? <span className="muted">Last signed in {formatDate(u.last_sign_in_at.slice(0, 10))}</span> : <span className="pending">Link sent, not signed in yet</span>}
               </td>
@@ -135,9 +168,34 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
               </td>
             </tr>
           ))}
-          {rows === null && !error && <tr><td colSpan={3} className="empty small">Loading…</td></tr>}
+          {rows === null && !error && <tr><td colSpan={5} className="empty small">Loading…</td></tr>}
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** The editable name for one account. */
+function AccountName({ email, person, onSave }: { email: string; person: Person | undefined; onSave: (n: string | null) => void }) {
+  const name = person && person.name !== email ? person.name : null
+  return <TextField value={name} placeholder="Add name" onSave={onSave} />
+}
+
+/** "Your name" in Settings → Your account: kept on your Team entry (created if needed). */
+export function MyName({ email }: { email: string }) {
+  const people = useRows<Person>('people')
+  const me = people.rows.find((p) => (p.email ?? '').toLowerCase() === email.toLowerCase())
+  return (
+    <label className="my-name">
+      <span className="muted small">Your name</span>
+      <TextField value={me && me.name !== email ? me.name : null} placeholder="Add your name"
+        onSave={(n) => {
+          const name = (n ?? '').trim()
+          if (!name) return
+          const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase()
+          if (me) void people.patch(me.id, { name, initials })
+          else void people.add({ name, email, initials, kind: 'staff', weekly_hours: 40, availability: 100, active: true })
+        }} />
+    </label>
   )
 }

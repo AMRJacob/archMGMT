@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { insertMany, useRows } from '../lib/data.ts'
+import { useRows } from '../lib/data.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { projectAccent } from '../lib/colors.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
-import { defaultPhaseRows } from '../lib/phases.ts'
-import { formatDate, maxDate, minDate, nextMonday, today as todayISO } from '../lib/dates.ts'
+import NewProjectFlow from '../components/NewProjectFlow.tsx'
+import { formatDate, maxDate, minDate, today as todayISO } from '../lib/dates.ts'
 import { PROJECT_STATUSES, type Person, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 
 export default function Projects() {
@@ -15,7 +15,6 @@ export default function Projects() {
   const tasks = useRows<Task>('tasks')
   const people = useRows<Person>('people')
   const [filter, setFilter] = useState<ProjectStatus | 'all'>('active')
-  const [busy, setBusy] = useState(false)
 
   const rows = useMemo(() => {
     const today = todayISO()
@@ -38,17 +37,7 @@ export default function Projects() {
       })
   }, [projects.projects, phases.rows, tasks.rows, people.rows, filter])
 
-  async function createProject() {
-    setBusy(true)
-    try {
-      const p = await projects.add({ name: 'New project', status: 'active' })
-      await insertMany<Phase>('phases', defaultPhaseRows(p.id, nextMonday()))
-      projects.select(p.id)
-      navigate('/overview?new=1')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const [creating, setCreating] = useState(false)
 
   const error = projects.error ?? phases.error ?? tasks.error ?? people.error
 
@@ -59,7 +48,7 @@ export default function Projects() {
           <h1>All projects</h1>
           <p className="muted">Every project, its PM, the phase it's in and its open tasks.</p>
         </div>
-        <button className="btn primary" onClick={createProject} disabled={busy}>+ New project</button>
+        <button className="btn primary" onClick={() => setCreating(true)}>+ New project</button>
       </header>
 
       <div className="tabs">
@@ -109,6 +98,7 @@ export default function Projects() {
           </tbody>
         </table>
       </div>
+      {creating && <NewProjectFlow onClose={() => setCreating(false)} />}
     </section>
   )
 }

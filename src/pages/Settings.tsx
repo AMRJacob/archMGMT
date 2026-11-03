@@ -1,4 +1,5 @@
 import ThemePicker from '../components/ThemePicker.tsx'
+import { MyName } from '../components/AccessManager.tsx'
 import { useRef, useState } from 'react'
 import { ChangePassword } from '../auth/Auth.tsx'
 import AccessManager from '../components/AccessManager.tsx'
@@ -100,6 +101,7 @@ export default function Settings() {
         <div className="card pad">
           <h2>Your account</h2>
           <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
+          {session.user.email && <MyName email={session.user.email} />}
           <ChangePassword />
         </div>
       )}

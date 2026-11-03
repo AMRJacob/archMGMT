@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { DateField, SelectField, TextField } from '../components/fields.tsx'
+import { SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
-import { TaskControls } from '../components/TaskChips.tsx'
+import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree from '../components/PlanTree.tsx'
+import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
+import PhaseEditor from '../components/PhaseEditor.tsx'
+import { PhaseSetupDialog } from '../components/SetupDialogs.tsx'
 import { insertMany } from '../lib/data.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
@@ -15,7 +18,7 @@ import { useProjectPlan } from '../lib/useProjectPlan.ts'
 
 export default function ProjectDetail() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const isNew = params.get('new') === '1'
   const projects = useProject()
   const project = projects.current
@@ -24,6 +27,12 @@ export default function ProjectDetail() {
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
+  const [phaseMenu, setPhaseMenu] = useState<{ x: number; y: number; phase: Phase } | null>(null)
+  const [editingPhase, setEditingPhase] = useState<string | null>(null)
+  const [setupLocal, setSetupLocal] = useState<string | null>(null)
+  // ?setup=<phase id> (from the New project dialog) opens that phase's setup.
+  const setupId = setupLocal ?? params.get('setup')
+  const closeSetup = () => { setSetupLocal(null); if (params.get('setup')) { params.delete('setup'); setParams(params, { replace: true }) } }
 
   const sortedPhases = useMemo(
     () => [...phases.rows].sort((a, b) => a.sort_order - b.sort_order || a.start_date.localeCompare(b.start_date)),
@@ -81,6 +90,27 @@ export default function ProjectDetail() {
     void tasks.reload()
   }
 
+  function phaseItems(p: Phase): MenuItem[] {
+    const filled = tasksFor(p.id).length > 0
+    return [
+      { label: filled ? `Add suggested work to ${p.name}…` : `Set up ${p.name}…`, run: () => setSetupLocal(p.id) },
+      { label: 'Edit name and dates…', run: () => setEditingPhase(p.id) },
+      { label: p.client_visible ? 'Hide from presentation view' : 'Show in presentation view', run: () => void phases.patch(p.id, { client_visible: !p.client_visible }) },
+      'sep',
+      { label: 'Add phase after', run: () => void addPhaseAfter(p) },
+      'sep',
+      { label: 'Delete phase', danger: true, run: () => void deletePhase(p) },
+    ]
+  }
+
+  async function addPhaseAfter(p: Phase) {
+    const later = sortedPhases.filter((x) => x.sort_order > p.sort_order)
+    for (const x of later) void phases.patch(x.id, { sort_order: x.sort_order + 1 })
+    const s = addDays(p.end_date, 1)
+    const n = await phases.add({ project_id: id, name: 'New phase', sort_order: p.sort_order + 1, start_date: s, end_date: addDays(s, 27), client_visible: true })
+    setEditingPhase(n.id)
+  }
+
   const palette = projectPalette(project.color, sortedPhases.length, project.color_scheme)
   const phaseColor = (i: number) => palette[i]
   const { accent, soft } = projectAccent(project.color)
@@ -92,7 +122,7 @@ export default function ProjectDetail() {
         onClick={() => patchTask(x, { status: x.status === 'done' ? 'todo' : 'done' })}>
         {x.status === 'done' ? '✓' : ''}
       </button>
-      {x.is_milestone && <span className="diamond" title="Milestone" />}
+      {x.is_milestone && <MilestoneMark task={x} />}
       <div className="trow-title">
         <TextField value={x.title} autoFocus={x.id === newId} onSave={(v) => { if (v) patchTask(x, { title: v }, false); if (x.id === newId) setNewId(null) }}
           onEscape={x.id === newId ? () => { setNewId(null); void tasks.drop(x.id) } : undefined} />
@@ -165,7 +195,8 @@ export default function ProjectDetail() {
           const isNow = p.id === currentPhase?.id && p.start_date <= t
           return (
             <div key={p.id} id={`phase-${p.id}`} className={`phase-sec${isOpen ? ' open' : ''}${p.end_date < t ? ' past' : ''}`}>
-              <button className="phase-row" onClick={() => toggle(p.id)} aria-expanded={isOpen}>
+              <button className="phase-row" onClick={() => toggle(p.id)} aria-expanded={isOpen}
+                onContextMenu={(e) => { e.preventDefault(); setPhaseMenu({ x: e.clientX, y: e.clientY, phase: p }) }}>
                 <svg className="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 <span className="dot" style={{ background: phaseColor(i) }} />
                 <span className="phase-title">{p.name}</span>
@@ -177,25 +208,20 @@ export default function ProjectDetail() {
                   </span>
                   <span className="muted sum-text">{leaves.length ? (openCount ? `${openCount} open` : 'All done') : 'Nothing yet'}</span>
                 </span>
+                <span className="phase-more" role="button" tabIndex={0} title="Phase options" aria-label="Phase options"
+                  onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPhaseMenu({ x: r.right - 220, y: r.bottom + 4, phase: p }) }}>⋯</span>
               </button>
               {isOpen && (
                 <div className="phase-body">
+                  {tasksFor(p.id).length === 0 && (
+                    <div className="phase-empty">
+                      <button className="btn primary" onClick={() => setSetupLocal(p.id)}>Set up {p.name}</button>
+                      <span className="muted small">Pick the usual tasks, milestones and sheets for this phase in one go, or right-click below to add one thing at a time.</span>
+                    </div>
+                  )}
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
                     onPatch={patchTask} onPatchMany={patchMany} onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
-                  <div className="phase-actions">
-                    <span className="phase-settings">
-                      <TextField value={p.name} className="phase-name-edit" onSave={(v) => v && phases.patch(p.id, { name: v })} />
-                      <DateField required value={p.start_date} onSave={(v) => v && phases.patch(p.id, { start_date: v })} />
-                      <span className="muted">to</span>
-                      <DateField required value={p.end_date} onSave={(v) => v && phases.patch(p.id, { end_date: v })} />
-                      <label className="inline-check" title="Show this phase in the presentation view of the schedule">
-                        <input type="checkbox" checked={p.client_visible} onChange={(e) => phases.patch(p.id, { client_visible: e.target.checked })} />
-                        In presentation
-                      </label>
-                      <button className="icon-btn" title="Delete phase" onClick={() => deletePhase(p)}>×</button>
-                    </span>
-                  </div>
                 </div>
               )}
             </div>
@@ -215,6 +241,28 @@ export default function ProjectDetail() {
         <button className="btn danger" onClick={deleteProject}>Delete project</button>
       </div>
 
+      {phaseMenu && (
+        <ContextMenu x={phaseMenu.x} y={phaseMenu.y} onClose={() => setPhaseMenu(null)} items={phaseItems(phaseMenu.phase)} />
+      )}
+      {editingPhase && (() => {
+        const ph = phases.rows.find((x) => x.id === editingPhase)
+        return ph ? (
+          <PhaseEditor phase={ph} taskCount={tasksFor(ph.id).length} onPatch={(c) => void phases.patch(ph.id, c)}
+            onDelete={() => { void phases.drop(ph.id).then(() => tasks.reload()) }} onClose={() => setEditingPhase(null)} />
+        ) : null
+      })()}
+      {setupId && (() => {
+        const ph = phases.rows.find((x) => x.id === setupId)
+        if (!ph) return null
+        const taken = new Set(tasks.rows.filter((x) => x.kind === 'sheet' && x.sheet_number).map((x) => x.sheet_number!.toUpperCase()))
+        const top = tasks.rows.filter((x) => x.phase_id === ph.id && !x.parent_id)
+        return (
+          <PhaseSetupDialog phase={ph} projectId={id} takenNumbers={taken}
+            startOrder={top.reduce((m, x) => Math.max(m, x.sort_order), top.length - 1) + 1}
+            onCreate={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload(); setOpenIds(new Set([...open, ph.id])) }}
+            onClose={closeSetup} />
+        )
+      })()}
     </section>
   )
 }

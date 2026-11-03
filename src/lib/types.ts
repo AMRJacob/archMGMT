@@ -69,6 +69,8 @@ export interface Task {
   assignee_id: string | null
   /** Everyone on it. Older rows may only have assignee_id: read through assigneesOf(). */
   assignee_ids?: string[]
+  /** Milestones only: owner | internal | coordination | agency | contract (see milestones.ts). */
+  milestone_type?: string | null
   start_date: string | null
   due_date: string | null
   /** Kept from earlier versions; not shown (hours live in Monograph). */

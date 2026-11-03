@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { shortDate, today } from '../lib/dates.ts'
 import { assigneesOf, assignPatch, initialsOf } from '../lib/assignees.ts'
+import { MILESTONE_TYPES, milestoneType } from '../lib/milestones.ts'
 import { EFFORTS, TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 
 /**
@@ -176,6 +177,29 @@ export function MoreMenu({ task, phases, onPatch, onDelete }: {
           ))}
           <div className="pm-sep" />
           <button className="pm-item danger" onClick={() => { if (window.confirm(`Delete "${task.title}"?`)) { onDelete(); close() } }}>Delete task</button>
+        </>
+      )}
+    </Pop>
+  )
+}
+
+/** A milestone's diamond, coloured by its type. With onPatch it opens a menu to pick the type. */
+export function MilestoneMark({ task, onPatch }: { task: Task; onPatch?: (c: Partial<Task>) => void }) {
+  const mt = milestoneType(task.milestone_type)
+  const mark = <span className="diamond" style={mt ? { background: mt.color } : undefined} title={mt ? `${mt.label} milestone` : 'Milestone'} />
+  if (!onPatch) return mark
+  return (
+    <Pop className="ms-pop" title={mt ? `${mt.label} milestone: change type` : 'Milestone: set a type'} label={mark}>
+      {(close) => (
+        <>
+          <div className="pm-label">Milestone type</div>
+          {MILESTONE_TYPES.map((m) => (
+            <button key={m.value} className={`pm-item${task.milestone_type === m.value ? ' on' : ''}`} onClick={() => { onPatch({ milestone_type: m.value }); close() }}>
+              <span className="diamond" style={{ background: m.color }} />
+              <span>{m.label}<span className="pm-hint">{m.hint}</span></span>
+            </button>
+          ))}
+          {mt && <><div className="pm-sep" /><button className="pm-item muted" onClick={() => { onPatch({ milestone_type: null }); close() }}>No type</button></>}
         </>
       )}
     </Pop>
