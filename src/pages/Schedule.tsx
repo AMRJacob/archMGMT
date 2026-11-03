@@ -41,13 +41,14 @@ export default function Schedule() {
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
   const [winStart, setWinStart] = useState(defaultWindowStart)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [newTaskId, setNewTaskId] = useState<string | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
 
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
   const editing = tasks.rows.find((t) => t.id === editingId) ?? null
-  const openTask = (t: Task) => setEditingId(t.id)
+  const openTask = (t: Task) => { setEditingId(t.id); setNewTaskId(null) }
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 
   async function addTask(defaults: Partial<Task>) {
@@ -60,6 +61,7 @@ export default function Schedule() {
       is_milestone: false, client_visible: false, sort_order: tasks.rows.length, ...defaults,
     })
     setEditingId(created.id)
+    setNewTaskId(created.id)
   }
 
   async function downloadPng() {
@@ -197,9 +199,10 @@ export default function Schedule() {
 
       {editing && (
         <TaskEditor task={editing} phases={phases.rows} people={people.rows}
-          onPatch={(c) => plan.patchTask(editing, c, false)}
+          onPatch={(c) => { plan.patchTask(editing, c, false); setNewTaskId(null) }}
           onDelete={() => void tasks.drop(editing.id)}
-          onClose={() => setEditingId(null)} />
+          isNew={editing.id === newTaskId}
+          onClose={() => { setEditingId(null); setNewTaskId(null) }} />
       )}
     </section>
   )

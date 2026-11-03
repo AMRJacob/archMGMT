@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 /** Inline fields: look like plain text until focused, save when you leave the field. */
 
 export function TextField({
-  value, onSave, placeholder, className = '', multiline = false, autoFocus = false,
+  value, onSave, placeholder, className = '', multiline = false, autoFocus = false, onEscape,
 }: {
   value: string | null
   onSave: (v: string | null) => void
@@ -11,13 +11,17 @@ export function TextField({
   className?: string
   multiline?: boolean
   autoFocus?: boolean
+  /** Esc in the field: undo the edit, or (when given) do this instead, e.g. cancel a just-added task. */
+  onEscape?: () => void
 }) {
   const [draft, setDraft] = useState(value ?? '')
   const [shown, setShown] = useState(value)
   if (shown !== value) { setShown(value); setDraft(value ?? '') } // value changed elsewhere
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => { if (autoFocus) { input.current?.focus(); input.current?.select() } }, [autoFocus])
+  const cancelled = useRef(false)
   const commit = () => {
+    if (cancelled.current) return
     const next = draft.trim() === '' ? null : draft.trim()
     if (next !== (value ?? null)) onSave(next)
   }
@@ -30,7 +34,17 @@ export function TextField({
   return (
     <input ref={input} className={`field ${className}`} value={draft} placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)} onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          if (onEscape) { cancelled.current = true; onEscape(); return }
+          setDraft(value ?? '') // put back what was there
+          cancelled.current = true
+          ;(e.target as HTMLInputElement).blur()
+          cancelled.current = false
+        }
+      }} />
   )
 }
 

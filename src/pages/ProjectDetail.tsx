@@ -99,7 +99,8 @@ export default function ProjectDetail() {
       </button>
       {x.is_milestone && <span className="diamond" title="Milestone" />}
       <div className="trow-title">
-        <TextField value={x.title} autoFocus={x.id === newId} onSave={(v) => v && patchTask(x, { title: v }, false)} />
+        <TextField value={x.title} autoFocus={x.id === newId} onSave={(v) => { if (v) patchTask(x, { title: v }, false); if (x.id === newId) setNewId(null) }}
+          onEscape={x.id === newId ? () => { setNewId(null); void tasks.drop(x.id) } : undefined} />
       </div>
       <TaskControls task={x} people={people.rows} phases={phases.rows}
         onPatch={(c) => patchTask(x, c)} onDelete={() => void tasks.drop(x.id)} />
