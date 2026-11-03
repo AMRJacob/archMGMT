@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ChangePassword } from '../auth/Auth.tsx'
+import AccessManager from '../components/AccessManager.tsx'
 import { useAuth } from '../auth/authContext.ts'
 import {
   browserSnapshot, exportAll, importAll, list, remove, removeSampleData, sampleRowCount, usingSampleData, type Backup,
@@ -99,6 +100,8 @@ export default function Settings() {
           <ChangePassword />
         </div>
       )}
+
+      {session && <AccessManager myEmail={session.user.email} />}
 
       {local && local.count + (withSamples ? 0 : local.samples) > 0 && (
         <div className="card pad">

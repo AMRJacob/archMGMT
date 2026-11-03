@@ -106,9 +106,10 @@ tried right away. **Reset sample data** in the sidebar restores the original set
   database rules: only signed-in **@amr-architects.com** addresses, or emails added to the `app_access`
   table, can read or change anything (migrations 0004, 0005).
 - Migrations 0001–0005 are applied. New database changes go in new numbered files (add-only).
-- People sign in with Google (once enabled in Supabase → Authentication → Providers → Google) or invite + password.
-  With "Allow new users to sign up" off, only users added under Authentication → Users can sign in.
-- (Previously) People sign in with invite + password. To add someone: Supabase → Authentication → Users → **Invite user**.
+- **Adding people:** Settings & data → *Who has access* (admins only, listed in `app_admins`). Enter an email to get a
+  one-time sign-in link to send yourself; nothing is emailed. Opening it lets them choose a password. Existing
+  people can get a password-reset link or lose access. Runs through the `sign-in-link` edge function.
+- Turn off "Allow new users to sign up" in Supabase so accounts only come from these links. To add someone: Supabase → Authentication → Users → **Invite user**.
   For someone outside AMR (e.g. a consultant), also add their email to `app_access` (Table Editor).
 - Supabase → Authentication → URL Configuration: Site URL `https://amrjacob.github.io/archMGMT/`
   (so invite and reset links open the app).

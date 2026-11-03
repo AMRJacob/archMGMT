@@ -1,8 +1,9 @@
-// sign-in-link: lets an archMGMT admin create a one-time sign-in link for someone, without sending
-// any email. The app turns the returned token into a link the admin sends however they like
-// (Teams, email, text). Opening it lets the person set their password.
-//
-// Only emails in app_admins may call this. The service-role key used here never leaves the server.
+// sign-in-link: archMGMT account management for admins (emails in app_admins), with no email sent.
+//   { action: 'link',   email }  → one-time invite (new) or password-reset (existing) token
+//   { action: 'list' }          → everyone with an account, plus the outside-AMR access list
+//   { action: 'remove', email } → delete that account and take them off the access list
+// The app turns a token into a link the admin sends however they like. The service-role key used
+// here never leaves the server.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
@@ -13,6 +14,8 @@ const cors = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -28,13 +31,43 @@ Deno.serve(async (req) => {
   const callerEmail = who?.user?.email?.toLowerCase()
   if (!callerEmail) return json({ error: 'Sign in first.' }, 401)
   const { data: isAdmin } = await admin.from('app_admins').select('email').eq('email', callerEmail).maybeSingle()
-  if (!isAdmin) return json({ error: 'Only archMGMT admins can create sign-in links.' }, 403)
+  if (!isAdmin) return json({ error: 'Only archMGMT admins can manage access.' }, 403)
 
-  let email = ''
-  try { email = String((await req.json())?.email ?? '').trim().toLowerCase() } catch { /* bad body */ }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400)
+  let body: { action?: string; email?: string } = {}
+  try { body = await req.json() } catch { /* empty body */ }
+  const action = body.action ?? 'link'
+  const email = String(body.email ?? '').trim().toLowerCase()
 
-  // New person: an invite (creates the account). Existing account: a reset link to (re)set the password.
+  if (action === 'list') {
+    const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    if (error) return json({ error: error.message }, 400)
+    const { data: admins } = await admin.from('app_admins').select('email')
+    const { data: access } = await admin.from('app_access').select('email, note, added_at')
+    const adminSet = new Set((admins ?? []).map((a) => a.email))
+    return json({
+      users: data.users.map((u) => ({
+        email: u.email, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
+        admin: adminSet.has((u.email ?? '').toLowerCase()),
+      })).sort((a, b) => (a.email ?? '').localeCompare(b.email ?? '')),
+      access: access ?? [],
+    })
+  }
+
+  if (!validEmail(email)) return json({ error: 'Enter a valid email address.' }, 400)
+
+  if (action === 'remove') {
+    if (email === callerEmail) return json({ error: 'You can’t remove your own access.' }, 400)
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    const user = data?.users.find((u) => u.email?.toLowerCase() === email)
+    if (user) {
+      const { error } = await admin.auth.admin.deleteUser(user.id)
+      if (error) return json({ error: error.message }, 400)
+    }
+    await admin.from('app_access').delete().eq('email', email)
+    return json({ removed: email })
+  }
+
+  // action === 'link': new person → invite (creates the account); existing → password reset.
   let type: 'invite' | 'recovery' = 'invite'
   let res = await admin.auth.admin.generateLink({ type: 'invite', email })
   if (res.error && /already|registered|exists/i.test(res.error.message)) {

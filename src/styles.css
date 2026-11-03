@@ -592,3 +592,12 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .sl-box p { margin: 0 0 8px; }
 .sl-row { display: flex; gap: 8px; }
 .sl-row .field.boxed { flex: 1; width: auto; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.access-add { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.access-add input[type=email] { width: 260px; }
+.access-add .field.boxed { width: auto; }
+.access .sl-box { margin-bottom: 12px; }
+.access-table { margin-top: 8px; border-top: 1px solid var(--line); }
+.access-table .right-actions { text-align: right; white-space: nowrap; }
+.admin-chip { margin-left: 8px; font-size: 11px; }
+.pending { color: var(--warn); }
+.btn.ghost.danger { color: var(--danger); }

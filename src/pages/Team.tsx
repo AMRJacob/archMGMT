@@ -1,7 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, DateField, SelectField, TextField } from '../components/fields.tsx'
-import SignInLink from '../components/SignInLink.tsx'
 import { projectAccent } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts'
@@ -206,7 +205,6 @@ export default function Team() {
                               <label className="inline-check"><input type="checkbox" checked={p.active} onChange={(e) => people.patch(p.id, { active: e.target.checked })} />Active</label>
                               <button className="btn danger small-btn" onClick={() => removePerson(p)}>Remove</button>
                             </div>
-                            <SignInLink email={p.email} name={p.name} />
                             <div className="pd-cols">
                               <div>
                                 <h3>Open tasks</h3>
