@@ -4,7 +4,7 @@ import { appUrl, supabase } from '../lib/supabase.ts'
 import { AuthContext, useAuth } from './authContext.ts'
 
 function Logo() {
-  return <div className="signin-brand">arch<span>MGMT</span></div>
+  return <div className="brand signin-brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
 }
 
 const NEEDS_PW_KEY = 'archmgmt.needsPassword'

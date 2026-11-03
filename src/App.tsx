@@ -37,7 +37,7 @@ function Shell() {
     <ProjectProvider>
       <div className="shell">
         <aside className="sidebar no-print">
-          <div className="brand">arch<span>MGMT</span></div>
+          <div className="brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
           <ProjectSwitcher />
           <nav>
             <span className="nav-label">Project</span>
