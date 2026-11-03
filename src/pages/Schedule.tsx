@@ -2,14 +2,17 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
-import ScheduleChart, { type ChartMode } from '../components/ScheduleChart.tsx'
+import ScheduleChart, { type ChartMode, type ChartSpot } from '../components/ScheduleChart.tsx'
+import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
+import { kindUnder } from '../lib/treeEdit.ts'
 import { chartColors, useTheme } from '../lib/theme.ts'
 import TaskEditor from '../components/TaskEditor.tsx'
+import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import { projectPalette } from '../lib/colors.ts'
 import { addDays, parseISO, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import type { Task } from '../lib/types.ts'
+import { KIND_RANK, type Phase, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
 import { asShown, buildTree, DETAIL_LEVELS, movedBy, visibleAtLevel, type DetailLevel, type ShownTask } from '../lib/tree.ts'
@@ -47,6 +50,8 @@ export default function Schedule() {
   const level = Number(levelStr) as DetailLevel
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
+  const [phaseEdit, setPhaseEdit] = useState<string | null>(null)
+  const [spot, setSpot] = useState<(Omit<ChartSpot, 'phase'> & { phase: Phase | null }) | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -95,6 +100,51 @@ export default function Schedule() {
     })
     setEditingId(created.id)
     setNewTaskId(created.id)
+  }
+
+  /** The phase a day falls in (or the nearest one), for adding from the calendar. */
+  const phaseOn = (d: string): Phase | null => {
+    const sorted = [...phases.rows].sort((a, b) => a.start_date.localeCompare(b.start_date))
+    return sorted.find((p) => p.start_date <= d && d <= p.end_date) ?? sorted.filter((p) => p.start_date <= d).pop() ?? sorted[0] ?? null
+  }
+
+  /**
+   * Add at a spot: a task (a week long) or a milestone on a date, in a phase, optionally under a sheet or
+   * view. With no date it starts this week if the phase is under way, otherwise when the phase starts.
+   */
+  function addHere(phase: Phase | null, date: string | null, opts: { milestone?: boolean; parent?: Task | null } = {}) {
+    const t = today()
+    const inPhase = phase && phase.start_date <= t && t <= phase.end_date
+    const d = date ?? (phase ? (inPhase ? mondayOf(t) : phase.start_date) : mondayOf(t))
+    const parent = opts.parent ? real(opts.parent) : null
+    const kind = parent ? kindUnder(parent, 'task') : 'task'
+    return addTask({
+      phase_id: parent?.phase_id ?? phase?.id ?? null, parent_id: parent?.id ?? null, kind,
+      title: opts.milestone ? 'New milestone' : 'New task',
+      is_milestone: Boolean(opts.milestone), client_visible: Boolean(opts.milestone),
+      start_date: opts.milestone ? null : d, due_date: opts.milestone ? d : addDays(d, 4),
+      effort: opts.milestone ? null : 2,
+      ...(parent ? { assignee_ids: parent.assignee_ids ?? [], assignee_id: parent.assignee_id } : {}),
+    })
+  }
+
+  function spotItems(sp: NonNullable<typeof spot>): MenuItem[] {
+    const day = sp.date ? parseISO(sp.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null
+    const where = sp.phase ? ` in ${sp.phase.name}` : ''
+    const task = sp.task ? real(sp.task) : null
+    const holds = task && !task.is_milestone && KIND_RANK[task.kind ?? 'task'] < 3
+    return [
+      { label: day ? `Add task on ${day}` : `Add task${where}`, run: () => void addHere(sp.phase, sp.date) },
+      { label: day ? `Add milestone on ${day}` : `Add milestone${where}`, run: () => void addHere(sp.phase, sp.date, { milestone: true }) },
+      ...(holds ? [{ label: `Add task under “${task.title.slice(0, 28)}”`, run: () => void addHere(sp.phase, sp.date, { parent: task }) }] : []),
+      ...(!task && sp.phase ? ['sep' as const, { label: `Rename or change dates of ${sp.phase.name}…`, run: () => setPhaseEdit(sp.phase!.id) }] : []),
+      ...(task ? [
+        'sep' as const,
+        { label: `Open “${task.title.slice(0, 30)}”`, run: () => openTask(task) },
+        { label: task.status === 'done' ? 'Mark not done' : 'Mark done', run: () => plan.patchTask(task, { status: task.status === 'done' ? 'todo' : 'done' }) },
+        { label: 'Delete', danger: true, run: () => { if (window.confirm(`Delete "${task.title}"?`)) void tasks.drop(task.id) } },
+      ] : []),
+    ]
   }
 
   async function downloadPng() {
@@ -163,7 +213,7 @@ export default function Schedule() {
             </div>
             <span className="muted small grow">
               {mode === 'working'
-                ? `Drag a bar to move it, drag its ends to change length. Moving a phase moves its tasks. Click a task to edit it.${months ? ' Click and hold empty space to pan.' : ''}`
+                ? `Right-click or double-click a spot to add a task there. Drag bars to move them, their ends to change length.${months ? ' Click and hold empty space to pan.' : ''}`
                 : `Only phases and tasks marked “Show in presentation view”.${hiddenCount ? ` ${hiddenCount} item${hiddenCount === 1 ? ' is' : 's are'} hidden.` : ''}`}
             </span>
             {levelControl}
@@ -191,7 +241,9 @@ export default function Schedule() {
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
-              onOpenTask={openTask} />
+              onOpenTask={openTask}
+              onAddAt={(ph, d) => void addHere(ph, d)}
+              onContextAt={(sp) => setSpot(sp)} />
           </div>
           <p className="muted small no-print">
             “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. The page is set to landscape.
@@ -205,7 +257,9 @@ export default function Schedule() {
       {view === 'calendar' && (
         <div className="card pad no-print">
           <CalendarView phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
-            onShiftTask={(t, d) => plan.shiftTask(real(t), d)} onOpenTask={openTask} />
+            onShiftTask={(t, d) => plan.shiftTask(real(t), d)} onOpenTask={openTask}
+            onAddOn={(d) => void addHere(phaseOn(d), d)}
+            onContextAt={(sp) => setSpot({ ...sp, phase: sp.task ? phases.rows.find((p) => p.id === sp.task!.phase_id) ?? phaseOn(sp.date) : phaseOn(sp.date) })} />
         </div>
       )}
 
@@ -234,6 +288,16 @@ export default function Schedule() {
         <ScheduleChart project={project} phases={phases.rows} tasks={treeRows} people={people.rows} mode={mode}
           firmName={FIRM_NAME} svgRef={exportSvg} keepOrder />
       </div>
+
+      {phaseEdit && (() => {
+        const ph = phases.rows.find((x) => x.id === phaseEdit)
+        return ph ? (
+          <PhaseEditor phase={ph} taskCount={tasks.rows.filter((x) => x.phase_id === ph.id).length}
+            onPatch={(c) => void phases.patch(ph.id, c)} onDelete={() => { void phases.drop(ph.id).then(() => tasks.reload()) }}
+            onClose={() => setPhaseEdit(null)} />
+        ) : null
+      })()}
+      {spot && <ContextMenu x={spot.clientX} y={spot.clientY} items={spotItems(spot)} onClose={() => setSpot(null)} />}
 
       {editing && (
         <TaskEditor task={editing} phases={phases.rows} people={people.rows}

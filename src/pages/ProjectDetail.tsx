@@ -29,6 +29,7 @@ export default function ProjectDetail() {
   const [openFor, setOpenFor] = useState(id)
   const [phaseMenu, setPhaseMenu] = useState<{ x: number; y: number; phase: Phase } | null>(null)
   const [editingPhase, setEditingPhase] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState<string | null>(null)
   const [setupLocal, setSetupLocal] = useState<string | null>(null)
   // ?setup=<phase id> (from the New project dialog) opens that phase's setup.
   const setupId = setupLocal ?? params.get('setup')
@@ -94,7 +95,8 @@ export default function ProjectDetail() {
     const filled = tasksFor(p.id).length > 0
     return [
       { label: filled ? `Add suggested work to ${p.name}…` : `Set up ${p.name}…`, run: () => setSetupLocal(p.id) },
-      { label: 'Edit name and dates…', run: () => setEditingPhase(p.id) },
+      { label: 'Rename', run: () => { setOpenIds(new Set(open)); setRenaming(p.id) } },
+      { label: 'Change dates…', run: () => setEditingPhase(p.id) },
       { label: p.client_visible ? 'Hide from presentation view' : 'Show in presentation view', run: () => void phases.patch(p.id, { client_visible: !p.client_visible }) },
       'sep',
       { label: 'Add phase after', run: () => void addPhaseAfter(p) },
@@ -195,11 +197,20 @@ export default function ProjectDetail() {
           const isNow = p.id === currentPhase?.id && p.start_date <= t
           return (
             <div key={p.id} id={`phase-${p.id}`} className={`phase-sec${isOpen ? ' open' : ''}${p.end_date < t ? ' past' : ''}`}>
-              <button className="phase-row" onClick={() => toggle(p.id)} aria-expanded={isOpen}
+              <div className="phase-row" role="button" tabIndex={0} onClick={() => toggle(p.id)} aria-expanded={isOpen}
+                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(p.id) } }}
                 onContextMenu={(e) => { e.preventDefault(); setPhaseMenu({ x: e.clientX, y: e.clientY, phase: p }) }}>
                 <svg className="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 <span className="dot" style={{ background: phaseColor(i) }} />
-                <span className="phase-title">{p.name}</span>
+                {renaming === p.id ? (
+                  <span className="phase-title" onClick={(e) => e.stopPropagation()}>
+                    <TextField value={p.name} autoFocus className="phase-name-edit"
+                      onSave={(v) => { if (v) void phases.patch(p.id, { name: v }); setRenaming(null) }}
+                      onEscape={() => setRenaming(null)} />
+                  </span>
+                ) : (
+                  <span className="phase-title" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setRenaming(p.id) }}>{p.name}</span>
+                )}
                 {isNow && <span className="chip">Current</span>}
                 <span className="phase-sum">
                   <span className="muted">{shortDate(p.start_date)} – {shortDate(p.end_date)}</span>
@@ -210,7 +221,7 @@ export default function ProjectDetail() {
                 </span>
                 <span className="phase-more" role="button" tabIndex={0} title="Phase options" aria-label="Phase options"
                   onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPhaseMenu({ x: r.right - 220, y: r.bottom + 4, phase: p }) }}>⋯</span>
-              </button>
+              </div>
               {isOpen && (
                 <div className="phase-body">
                   {tasksFor(p.id).length === 0 && (

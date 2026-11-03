@@ -15,8 +15,12 @@ interface Placed extends Item { col: number; span: number; lane: number; clipped
 function monthStart(iso: string) { return iso.slice(0, 8) + '01' }
 
 export default function CalendarView({
-  phases, tasks, people, palette, onShiftTask, onOpenTask,
+  phases, tasks, people, palette, onShiftTask, onOpenTask, onAddOn, onContextAt,
 }: {
+  /** Add a task on a day (the + on each day, or a double-click). */
+  onAddOn?: (date: string) => void
+  /** Right-click: the day and the task under the pointer, if any. */
+  onContextAt?: (at: { date: string; task: Task | null; clientX: number; clientY: number }) => void
   phases: Phase[]
   tasks: Task[]
   people: Person[]
@@ -26,6 +30,8 @@ export default function CalendarView({
   onOpenTask: (task: Task) => void
 }) {
   const [month, setMonth] = useState(() => monthStart(today()))
+  // The day under the pointer (tasks sit on top of the days, so CSS :hover can't tell), for its + button.
+  const [hoverDay, setHoverDay] = useState<string | null>(null)
   const [drag, setDrag] = useState<{ id: string; grab: string; over: string; moved: boolean } | null>(null)
   const dragRef = useRef(drag)
   useEffect(() => { dragRef.current = drag }, [drag])
@@ -124,7 +130,16 @@ export default function CalendarView({
         </div>
       </div>
       <div className="cal-dow">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <span key={d}>{d}</span>)}</div>
-      <div className={`cal-grid${drag?.moved ? ' dragging' : ''}`}>
+      <div className={`cal-grid${drag?.moved ? ' dragging' : ''}`}
+        onPointerMove={onAddOn ? (e) => { const d = dayAt(e.clientX, e.clientY); if (d !== hoverDay) setHoverDay(d) } : undefined}
+        onPointerLeave={() => setHoverDay(null)}
+        onContextMenu={onContextAt ? (e) => {
+          const date = dayAt(e.clientX, e.clientY)
+          if (!date) return
+          e.preventDefault()
+          const id = (e.target as HTMLElement).closest<HTMLElement>('[data-task]')?.dataset.task
+          onContextAt({ date, task: tasks.find((x) => x.id === id) ?? null, clientX: e.clientX, clientY: e.clientY })
+        } : undefined}>
         {weeks.map((ws) => {
           const placed = placeWeek(ws)
           return (
@@ -133,7 +148,12 @@ export default function CalendarView({
                 {Array.from({ length: 7 }, (_, i) => {
                   const d = addDays(ws, i)
                   const cls = [d.slice(0, 7) !== month.slice(0, 7) ? 'other' : '', d === t ? 'today' : '', i === 0 || i === 6 ? 'weekend' : ''].join(' ')
-                  return <div key={d} className={`cal-day ${cls}`}><span>{parseISO(d).getUTCDate()}</span></div>
+                  return (
+                    <div key={d} className={`cal-day ${cls}${hoverDay === d && !drag ? ' hovered' : ''}`} onDoubleClick={onAddOn ? () => onAddOn(d) : undefined}>
+                      <span>{parseISO(d).getUTCDate()}</span>
+                      {onAddOn && <button className="cal-add" title={`Add a task on ${parseISO(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`} onClick={() => onAddOn(d)}>+</button>}
+                    </div>
+                  )
                 })}
               </div>
               <div className="cal-items">
@@ -142,7 +162,7 @@ export default function CalendarView({
                     {(!p.clippedL || p.col === 0) && <span>{p.title}</span>}
                   </div>
                 ) : (
-                  <button key={p.id}
+                  <button key={p.id} data-task={p.task?.id}
                     className={`cal-task${p.milestone ? ' milestone' : ''}${p.done ? ' done' : ''}${drag?.id === p.id && drag.moved ? ' lifted' : ''}${p.clippedL ? ' cl' : ''}${p.clippedR ? ' cr' : ''}`}
                     style={{ gridColumn: `${p.col + 1} / span ${p.span}`, gridRow: p.lane + 1, ['--c' as string]: p.color }}
                     title={p.title}
@@ -162,7 +182,7 @@ export default function CalendarView({
           )
         })}
       </div>
-      <p className="muted small">Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
+      <p className="muted small">Click + on a day (or right-click) to add a task there. Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
     </div>
   )
 }

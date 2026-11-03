@@ -23,6 +23,7 @@ const HEADER_BARE = 12
 const AXIS = 48
 const ROW_PHASE = 36
 const ROW_TASK = 26
+const ROW_ADD = 24
 const FOOTER = 64
 const EDGE = 7 // grab width for resizing, in chart units
 
@@ -30,8 +31,12 @@ type Row =
   | { kind: 'phase'; phase: Phase; color: string }
   | { kind: 'task'; task: Task; color: string }
   | { kind: 'group'; label: string; color: string }
+  | { kind: 'add'; phase: Phase; color: string }
 
 type DragMode = 'move' | 'start' | 'end'
+
+/** What's under the pointer on the timeline: the day (null over the labels), the phase and the task row, if any. */
+export interface ChartSpot { date: string | null; phase: Phase | null; task: Task | null; clientX: number; clientY: number }
 interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number; delta: number; moved: boolean }
 
 function clip(s: string, max: number) {
@@ -53,8 +58,12 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt,
 }: {
+  /** Add a task in a phase, starting on a date (from the "+ Add task" rows and double-clicks on empty space). */
+  onAddAt?: (phase: Phase, date: string | null) => void
+  /** Right-click on the chart: the date and row under the pointer. */
+  onContextAt?: (at: ChartSpot) => void
   /** Theme colors for the on-screen chart; exports leave this out and get the neutral presentation look. */
   colors?: ChartColors
   project: Project
@@ -97,6 +106,7 @@ export default function ScheduleChart({
       .filter((t) => t.phase_id === phase.id && (!pres || t.client_visible))
       .sort(keepOrder ? () => 0 : byStart)
       .forEach((task) => rows.push({ kind: 'task', task, color }))
+    if (editable && onAddAt && !pres) rows.push({ kind: 'add', phase, color })
   })
   const loose = tasks.filter((t) => !t.phase_id && (!pres || t.client_visible)).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
@@ -134,6 +144,20 @@ export default function ScheduleChart({
     if (!el) return 0
     const r = el.getBoundingClientRect()
     return ((clientX - r.left) / r.width) * W
+  }
+  /** The row and day under a pointer position. */
+  const spotAt = (clientX: number, clientY: number): ChartSpot => {
+    const el = inner.current
+    const r = el?.getBoundingClientRect()
+    const cx = toChartX(clientX)
+    const cy = r ? ((clientY - r.top) / r.height) * H : 0
+    let i = -1
+    for (let k = 0; k < rowY.length; k++) if (cy >= rowY[k]) i = k
+    const row = i >= 0 && cy < rowsBottom ? rows[i] : null
+    const date = cx >= x0 && cx <= x0 + cw ? addDays(start, Math.floor((cx - x0) / dayW)) : null
+    const phase = !row ? null : row.kind === 'phase' || row.kind === 'add' ? row.phase
+      : row.kind === 'task' ? sorted.find((p) => p.id === row.task.phase_id) ?? null : null
+    return { date, phase, task: row?.kind === 'task' ? row.task : null, clientX, clientY }
   }
   const startDrag = (e: RPointerEvent, kind: Drag['kind'], id: string, m: DragMode) => {
     if (!editable) return
@@ -222,7 +246,7 @@ export default function ScheduleChart({
   const rowsTop = axisTop + (scale === 'day' ? AXIS + 12 : AXIS)
   const rowY: number[] = []
   let y = rowsTop
-  for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : ROW_PHASE }
+  for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : r.kind === 'add' ? ROW_ADD : ROW_PHASE }
   const rowsBottom = y
   const H = rowsBottom + FOOTER
 
@@ -278,6 +302,12 @@ export default function ScheduleChart({
       style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'none' : undefined }}
       fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
       onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); pan.current = null; setPanning(false) }}
+      onContextMenu={onContextAt ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
+      onDoubleClick={onAddAt ? (e) => {
+        if (!(e.target as Element).closest('[data-pan]')) return
+        const spot = spotAt(e.clientX, e.clientY)
+        if (spot.phase) onAddAt(spot.phase, spot.date)
+      } : undefined}
     >
       <rect x={0} y={0} width={W} height={H} fill={C.bg} />
 
@@ -365,6 +395,15 @@ export default function ScheduleChart({
               {r.kind === 'phase' && (
                 <text x={x0 - 14} y={ry + 23} fontSize={11} fill={C.muted} textAnchor="end">{`${shortDate(ps)} – ${shortDate(pe)}`}</text>
               )}
+            </g>
+          )
+        }
+        if (r.kind === 'add') {
+          const phase = r.phase
+          return (
+            <g key={i} className="chart-add" style={{ cursor: 'pointer' }} onClick={() => onAddAt?.(phase, null)}>
+              <rect x={M} y={ry} width={x0 - M} height={ROW_ADD} fill="transparent" />
+              <text x={M + 30} y={ry + 16} fontSize={12} fill={C.muted}>+ Add task</text>
             </g>
           )
         }

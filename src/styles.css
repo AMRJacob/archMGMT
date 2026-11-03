@@ -816,3 +816,14 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 @media (max-width: 760px) { .setup-cols { grid-template-columns: 1fr; } }
 .my-name { display: flex; flex-direction: column; gap: 2px; max-width: 320px; margin: 4px 0 12px; }
 .access-table select.field { width: 100%; }
+
+/* adding on the calendar and timeline */
+.cal-day { position: relative; }
+.cal-add {
+  position: absolute; top: 4px; right: 5px; width: 20px; height: 20px; border-radius: 50%; border: none; padding: 0;
+  background: var(--accent); color: var(--on-accent); font-size: 14px; line-height: 20px; cursor: pointer; opacity: 0; transition: opacity 0.12s; z-index: 3;
+}
+.cal-day.hovered .cal-add, .cal-add:focus-visible { opacity: 1; }
+.chart-add:hover text { fill: var(--accent); }
+.chart-add:hover rect { fill: var(--hover); }
+.phase-title .phase-name-edit { width: 280px; font-size: 16px; font-weight: 600; }
