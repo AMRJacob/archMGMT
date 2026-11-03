@@ -60,10 +60,10 @@ export default function Settings() {
       done('Sample data removed. Reloading…', true)
       return
     }
-    // Shared database: sample projects and people are the ones named "Sample …".
+    // Shared database: sample projects are named "Sample …"; sample people have an @example.com email (or an old "Sample …" name).
     try {
       const ps = (await list<Project>('projects')).filter((p) => p.name.startsWith('Sample '))
-      const people = (await list<Person>('people')).filter((p) => p.name.startsWith('Sample '))
+      const people = (await list<Person>('people')).filter((p) => p.name.startsWith('Sample ') || (p.email ?? '').toLowerCase().endsWith('@example.com'))
       if (!ps.length && !people.length) { done('No sample projects or people in the shared database.'); return }
       if (!window.confirm(`Remove ${ps.length} sample project(s) with their phases and tasks, and ${people.length} sample people, from the shared database? Download a backup first if unsure.`)) return
       setBusy(true)
@@ -136,7 +136,7 @@ export default function Settings() {
         <p className="muted">
           {usingSampleData
             ? (samples > 0 ? `${samples} sample records are mixed in with your data.` : 'No sample records left.')
-            : 'Remove the “Sample …” projects and people once you’re working with real projects only.'}
+            : 'Remove the “Sample …” projects and the sample people (Ralph, Susan and Betty) once you’re working with real projects only.'}
         </p>
         {(!usingSampleData || samples > 0) && <div className="row-gap"><button className="btn danger" onClick={clearSamples} disabled={busy}>Remove sample data</button></div>}
       </div>
