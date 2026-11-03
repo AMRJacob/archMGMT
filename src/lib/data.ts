@@ -76,6 +76,13 @@ const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
     for (const t of s.tasks) { t.kind ??= 'task'; t.parent_id ??= null }
     seedSheets(s, (id) => meta.sampleIds.push(id))
   },
+  // 5 → 6: several people per task. assignee_ids lists everyone; assignee_id stays as the lead.
+  (s) => {
+    for (const t of s.tasks) {
+      if (Array.isArray(t.assignee_ids) && t.assignee_ids.length) continue
+      t.assignee_ids = t.assignee_id ? [t.assignee_id] : []
+    }
+  },
 ]
 
 // Read fresh every time (no cache), so two open tabs never overwrite each other's changes.
@@ -224,6 +231,15 @@ const onDelete: Record<TableName, { table: TableName; column: string; action: 'c
 function deleteLocal(s: Store, table: TableName, id: string) {
   s[table] = s[table].filter((r) => r.id !== id)
   for (const rule of onDelete[table]) {
+    if (table === 'people' && rule.column === 'assignee_id') {
+      // Mirrors the database trigger: take the person off every task, and the lead becomes the next person.
+      s.tasks = s.tasks.map((r) => {
+        const ids = Array.isArray(r.assignee_ids) ? (r.assignee_ids as string[]).filter((x) => x !== id) : r.assignee_ids
+        const touched = r.assignee_id === id || (Array.isArray(r.assignee_ids) && (r.assignee_ids as string[]).includes(id))
+        return touched ? { ...r, assignee_ids: ids, assignee_id: Array.isArray(ids) ? (ids[0] ?? null) : null } : r
+      })
+      continue
+    }
     if (rule.action === 'null') {
       s[rule.table] = s[rule.table].map((r) => (r[rule.column] === id ? { ...r, [rule.column]: null } : r))
     } else {

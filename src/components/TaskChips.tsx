@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { shortDate, today } from '../lib/dates.ts'
+import { assigneesOf, assignPatch, initialsOf } from '../lib/assignees.ts'
 import { EFFORTS, TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 
 /**
@@ -102,27 +103,49 @@ export function DateChip({ task, onPatch, locked = false }: { task: Task; onPatc
   )
 }
 
-export function AssigneeChip({ task, people, onPatch }: { task: Task; people: Person[]; onPatch: (c: Partial<Task>) => void }) {
-  const who = people.find((p) => p.id === task.assignee_id)
-  const active = people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name))
-  const group = (kind: Person['kind']) => active.filter((p) => p.kind === kind)
+/** Overlapping avatars for everyone on a task (up to three, then "+n"). */
+export function AvatarStack({ people, max = 3 }: { people: Person[]; max?: number }) {
+  const shown = people.slice(0, max)
   return (
-    <Pop title={who ? `Assigned to ${who.name}` : 'Assign'} align="right"
-      label={<span className={`avatar sm${who ? '' : ' empty'}`}>{who ? who.initials ?? who.name.slice(0, 2) : '+'}</span>}>
+    <span className="avatar-stack" title={people.map((p) => p.name).join(', ')}>
+      {shown.map((p) => <span key={p.id} className="avatar sm">{initialsOf(p)}</span>)}
+      {people.length > max && <span className="avatar sm more">+{people.length - max}</span>}
+    </span>
+  )
+}
+
+/** Who's on it: tick as many people as you like; the first ticked is the lead. */
+export function AssigneeChip({ task, people, onPatch }: { task: Task; people: Person[]; onPatch: (c: Partial<Task>) => void }) {
+  const ids = assigneesOf(task)
+  const crew = ids.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => Boolean(p))
+  const active = people.filter((p) => p.active || ids.includes(p.id)).sort((a, b) => a.name.localeCompare(b.name))
+  const group = (kind: Person['kind']) => active.filter((p) => p.kind === kind)
+  const toggle = (id: string) => onPatch(assignPatch(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+  return (
+    <Pop title={crew.length ? `Assigned to ${crew.map((p) => p.name).join(', ')}` : 'Assign'} align="right"
+      label={crew.length ? <AvatarStack people={crew} /> : <span className="avatar sm empty">+</span>}>
       {(close) => (
         <div className="pm-people">
           {(['staff', 'consultant'] as const).map((k) => group(k).length > 0 && (
             <div key={k}>
               <div className="pm-label">{k === 'staff' ? 'Staff' : 'Consultants'}</div>
-              {group(k).map((p) => (
-                <button key={p.id} className={`pm-item${p.id === task.assignee_id ? ' on' : ''}`} onClick={() => { onPatch({ assignee_id: p.id }); close() }}>
-                  <span className="avatar sm">{p.initials ?? p.name.slice(0, 2)}</span>
-                  <span>{p.name}{p.company ? <span className="pm-hint">{p.company}</span> : null}</span>
-                </button>
-              ))}
+              {group(k).map((p) => {
+                const on = ids.includes(p.id)
+                return (
+                  <button key={p.id} className={`pm-item pick${on ? ' on' : ''}`} onClick={() => toggle(p.id)} aria-pressed={on}>
+                    <span className="pick-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                    <span className="avatar sm">{initialsOf(p)}</span>
+                    <span>{p.name}{ids[0] === p.id && ids.length > 1 ? <span className="pm-hint">lead</span> : p.company ? <span className="pm-hint">{p.company}</span> : null}</span>
+                  </button>
+                )
+              })}
             </div>
           ))}
-          {task.assignee_id && <button className="pm-item muted" onClick={() => { onPatch({ assignee_id: null }); close() }}>Unassign</button>}
+          <div className="pm-sep" />
+          <div className="pm-row">
+            {ids.length > 0 && <button className="pm-item muted" onClick={() => { onPatch(assignPatch([])); close() }}>Clear</button>}
+            <button className="pm-item" onClick={close}>Done</button>
+          </div>
         </div>
       )}
     </Pop>

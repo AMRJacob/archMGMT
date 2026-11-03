@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { addDays, daysBetween, parseISO, toISO, today } from '../lib/dates.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
+import { whoLabel } from '../lib/assignees.ts'
 
 /**
  * Month calendar. Tasks show as bars across the days they run, milestones on their date,
@@ -37,10 +38,6 @@ export default function CalendarView({
 
   const sortedPhases = [...phases].sort((a, b) => a.sort_order - b.sort_order)
   const colorOfPhase = new Map(sortedPhases.map((p, i) => [p.id, palette[i]]))
-  const initials = (id: string | null) => {
-    const p = people.find((x) => x.id === id)
-    return p ? p.initials ?? p.name.slice(0, 2) : ''
-  }
 
   const delta = drag?.moved ? daysBetween(drag.grab, drag.over) : 0
   const items: Item[] = [
@@ -156,7 +153,7 @@ export default function CalendarView({
                     }}>
                     {p.milestone && <span className="diamond" />}
                     <span className="cal-title">{p.title}</span>
-                    {!p.milestone && p.task?.assignee_id && <span className="cal-who">{initials(p.task.assignee_id)}</span>}
+                    {!p.milestone && p.task && whoLabel(p.task, people) && <span className="cal-who">{whoLabel(p.task, people)}</span>}
                   </button>
                 ))}
               </div>

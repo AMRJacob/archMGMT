@@ -3,6 +3,8 @@ import { addDays, daysBetween, parseISO, shortDate, today } from '../lib/dates.t
 import { TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 import { shiftDates } from '../lib/useProjectPlan.ts'
 import { mondayOf, weekStarts } from '../lib/workload.ts'
+import { assigneesOf, isAssigned } from '../lib/assignees.ts'
+import { AvatarStack } from './TaskChips.tsx'
 
 /**
  * Task board. Columns by status (kanban), by phase, or by week (a post-it pull-plan, cards
@@ -111,7 +113,7 @@ export default function BoardView({
             <button className="btn" onClick={() => setFrom(addDays(from, 28))}>Later ›</button>
           </div>
           <div className="note-legend">
-            {staffOrder.filter((p) => p.active && tasks.some((t) => t.assignee_id === p.id)).map((p) => (
+            {staffOrder.filter((p) => p.active && tasks.some((t) => isAssigned(t, p.id))).map((p) => (
               <span key={p.id}><i style={{ background: personColor(p.id) }} />{p.name}</span>
             ))}
           </div>
@@ -138,7 +140,7 @@ export default function BoardView({
               </div>
               <div className="board-cards">
                 {col.tasks.map((t, i) => {
-                  const who = person(t.assignee_id)
+                  const crew = assigneesOf(t).map((id) => person(id)).filter((x): x is Person => Boolean(x))
                   const pi = t.phase_id ? phaseIndex.get(t.phase_id) : undefined
                   const note = group === 'week'
                   return (
@@ -157,7 +159,7 @@ export default function BoardView({
                         {t.title}
                       </div>
                       <div className="ct-meta">
-                        {who && <span className="avatar sm" title={who.name}>{who.initials ?? who.name.slice(0, 2)}</span>}
+                        {crew.length > 0 && <AvatarStack people={crew} />}
                         {t.due_date && (
                           <span className={t.due_date < today() && t.status !== 'done' ? 'late' : ''}>
                             {t.is_milestone ? '' : 'Due '}{parseISO(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}

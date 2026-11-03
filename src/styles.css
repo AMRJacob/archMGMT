@@ -724,3 +724,48 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 [data-theme='cyberpunk'] .brand .arch { color: #00e5ff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
 [data-theme='cyberpunk'] .brand .mgmt { color: #ff2e88; text-shadow: 0 0 10px rgba(255, 46, 136, 0.6); }
 [data-theme='cyberpunk'] .modal-backdrop { background: rgba(0, 0, 0, 0.6); }
+
+/* several people on one task */
+.avatar-stack { display: inline-flex; align-items: center; }
+.avatar-stack .avatar + .avatar { margin-left: -7px; box-shadow: 0 0 0 2px var(--panel); }
+.avatar-stack .avatar.more { background: var(--chip); color: var(--muted); }
+.card-task.note .avatar-stack .avatar + .avatar { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+.pm-item.pick { gap: 8px; }
+.pick-box { width: 15px; height: 15px; border: 1.5px solid var(--line-strong); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--on-accent); flex: none; }
+.pm-item.pick.on .pick-box { background: var(--accent); border-color: var(--accent); }
+.pm-row { display: flex; justify-content: space-between; }
+
+/* tree editing: grip, promote/demote, selection, drop targets, right-click menu */
+.grip { position: absolute; left: calc(var(--indent, 40px) - 38px); top: 50%; transform: translateY(-50%); width: 12px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--faint); cursor: grab; opacity: 0; transition: opacity 0.12s; }
+.grip svg { fill: currentColor; }
+.trow:hover .grip, .irow:hover .grip, .trow.selected .grip, .irow.selected .grip { opacity: 1; }
+.grip:active { cursor: grabbing; }
+.row-moves { display: inline-flex; gap: 0; opacity: 0; transition: opacity 0.12s; flex: none; }
+.trow:hover .row-moves, .irow:hover .row-moves, .trow.selected .row-moves, .irow.selected .row-moves { opacity: 1; }
+.row-moves .icon-btn { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; }
+.row-moves .icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.row-moves .icon-btn:disabled { opacity: 0.25; cursor: default; }
+.trow:focus, .irow:focus { outline: none; }
+.trow.selected, .irow.selected { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); box-shadow: inset 2px 0 0 var(--accent); }
+.trow.cutting, .irow.cutting { opacity: 0.45; }
+.trow, .irow { position: relative; }
+.drop-before::before, .drop-after::after, .tlist.drop-end::after {
+  content: ''; position: absolute; left: 20px; right: 12px; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 2;
+}
+.drop-before::before { top: -1px; }
+.drop-after::after { bottom: -1px; }
+.tlist { position: relative; }
+.tlist.drop-end { padding-bottom: 6px; }
+.tlist.drop-end::after { bottom: 0; }
+.trow.drop-inside, .irow.drop-inside { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.ctx-menu {
+  position: fixed; z-index: 90; min-width: 230px; padding: 5px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22); display: flex; flex-direction: column;
+}
+.ctx-menu .pm-item { display: flex; justify-content: space-between; gap: 18px; width: 100%; text-align: left; }
+.ctx-menu .pm-item:disabled { opacity: 0.4; cursor: default; background: none; }
+.ctx-menu .pm-item:focus-visible { outline: none; background: var(--hover); }
+.ctx-keys { color: var(--faint); font-size: 11.5px; }
+
+.irow > .grip { left: calc(var(--indent, 40px) - 18px); }
+.tree-tip { margin-left: 8px; opacity: 0.8; }

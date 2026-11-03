@@ -22,9 +22,17 @@ export function buildTree(tasks: Task[]): Tree {
     const p = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null
     children.set(p, [...(children.get(p) ?? []), t])
   }
-  for (const list of children.values()) list.sort(treeOrder)
+  for (const list of children.values()) list.sort(isArranged(list) ? arrangedOrder : treeOrder)
   return { byId, children }
 }
+
+/**
+ * Rows keep an automatic order (sheets by number, work by date) until someone arranges them by hand
+ * (drag, insert below, paste). Arranged rows get sort_order ≥ MANUAL and keep exactly that order.
+ */
+export const MANUAL = 1000
+export const isArranged = (list: Task[]) => list.some((t) => t.sort_order >= MANUAL)
+const arrangedOrder = (a: Task, b: Task) => a.sort_order - b.sort_order || treeOrder(a, b)
 
 /** Sheets by number, then everything by date, then creation order. */
 export function treeOrder(a: Task, b: Task): number {

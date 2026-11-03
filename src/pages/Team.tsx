@@ -7,6 +7,7 @@ import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts
 import { useProject } from '../lib/projectContext.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { EFFORTS, type Person, type Project, type Task, type TimeOff } from '../lib/types.ts'
+import { assigneesOf, isAssigned } from '../lib/assignees.ts'
 import {
   capacityForWeek, countsTowardWorkload, daysOff, LOAD_LEVELS, loadLevel, mondayOf, taskLoadByWeek, weekStarts,
 } from '../lib/workload.ts'
@@ -45,7 +46,9 @@ export default function Team() {
     for (const t of tasks.rows) {
       // Only the bottom scheduled level carries load (a sheet with tasks under it isn't counted twice).
       if (!countsTowardWorkload(t, projectMap) || !isWorkLeaf(tree, t)) continue
-      const who = t.assignee_id ?? 'unassigned'
+      // Everyone on a task carries it in full: shared work still fills each person's week.
+      const ids = assigneesOf(t)
+      for (const who of ids.length ? ids : ['unassigned']) {
       if (t.due_date) push(due, who, mondayOf(t.due_date), t)
       for (const [w, l] of taskLoadByWeek(t)) {
         const tw = total.get(who) ?? new Map<string, number>()
@@ -57,6 +60,7 @@ export default function Team() {
         pp.set(t.project_id, pw)
         perProject.set(who, pp)
         push(active, who, w, t)
+      }
       }
     }
     return { total, perProject, active, due }
@@ -88,7 +92,7 @@ export default function Team() {
 
   const openTasks = (id: string) =>
     tasks.rows
-      .filter((t) => t.assignee_id === id && t.status !== 'done' && t.kind !== 'item')
+      .filter((t) => isAssigned(t, id) && t.status !== 'done' && t.kind !== 'item')
       .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
 
   async function removePerson(p: Person) {

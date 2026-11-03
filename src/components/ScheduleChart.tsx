@@ -4,6 +4,7 @@ import { projectPalette } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
 import type { ShownTask } from '../lib/tree.ts'
 import { STUDIO_CHART, type ChartColors } from '../lib/theme.ts'
+import { whoLabel } from '../lib/assignees.ts'
 
 /**
  * The project schedule as one self-contained SVG: header, timeline, phases, tasks, milestones.
@@ -226,10 +227,6 @@ export default function ScheduleChart({
 
   const t = today()
   const showToday = has && t >= start && t <= end
-  const initials = (id: string | null) => {
-    const p = people.find((x) => x.id === id)
-    return p ? p.initials ?? p.name.split(' ').map((w) => w[0]).join('').slice(0, 3) : ''
-  }
 
   /** Invisible grab areas over a bar: middle moves, ends resize. */
   const handles = (kind: Drag['kind'], id: string, bx: number, bw: number, top: number, h: number, resizable: boolean) => {
@@ -359,7 +356,7 @@ export default function ScheduleChart({
         const [ts, te] = taskDates(task)
         const right = pres
           ? (task.is_milestone ? (te ? formatDate(te) : '') : ts && te ? range(ts, te) : '')
-          : initials(task.assignee_id)
+          : whoLabel(task, people)
         return (
           <g key={i} opacity={task.status === 'done' && !pres ? 0.55 : 1}>
             <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={C.ink}

@@ -67,6 +67,31 @@ export function useProjectPlan(projectId: string) {
     else for (const c of changes) void tasks.patch(c.id, c.next as Partial<Task>)
   }, [apply, tasks])
 
+  /**
+   * Several task edits as one undo step (moves, promote/demote, reordering). A change of phase takes
+   * everything under that task along.
+   */
+  const patchMany = useCallback((list: { task: Task; next: Partial<Task> }[], record = true) => {
+    const tree = buildTree(tasks.rows)
+    const byId = new Map<string, Change>()
+    const add = (t: Task, next: Partial<Task>) => {
+      const prev = byId.get(t.id)
+      byId.set(t.id, prev ? { ...prev, prev: { ...pick(t, Object.keys(next)), ...prev.prev }, next: { ...prev.next, ...next } } : taskChange(t, next))
+    }
+    for (const { task, next } of list) {
+      const real = tree.byId.get(task.id) ?? task
+      add(real, next)
+      if ('phase_id' in next) for (const d of descendants(tree, real.id)) if (d.phase_id !== next.phase_id) add(d, { phase_id: next.phase_id })
+    }
+    // Skip fields that wouldn't change.
+    const changes = [...byId.values()]
+      .map((c) => ({ ...c, next: Object.fromEntries(Object.entries(c.next).filter(([k, v]) => c.prev[k] !== v)) }))
+      .filter((c) => Object.keys(c.next).length)
+      .map((c) => ({ ...c, prev: pick(c.prev, Object.keys(c.next)) }))
+    if (record) apply(changes)
+    else run(changes)
+  }, [apply, run, tasks.rows])
+
   /** Move a task, sheet or view by some days; everything under it moves too. */
   const shiftTask = useCallback((t: Task, days: number) => {
     const tree = buildTree(tasks.rows)
@@ -95,5 +120,5 @@ export function useProjectPlan(projectId: string) {
     return () => document.removeEventListener('keydown', onKey)
   }, [undo])
 
-  return { phases, tasks, people, patchTask, shiftTask, movePhase, undo, canUndo: undoCount > 0 }
+  return { phases, tasks, people, patchTask, patchMany, shiftTask, movePhase, undo, canUndo: undoCount > 0 }
 }

@@ -20,7 +20,7 @@ export default function ProjectDetail() {
   const projects = useProject()
   const project = projects.current
   const id = project?.id ?? ''
-  const { phases, tasks, people, patchTask } = useProjectPlan(id)
+  const { phases, tasks, people, patchTask, patchMany } = useProjectPlan(id)
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
@@ -181,7 +181,7 @@ export default function ProjectDetail() {
               {isOpen && (
                 <div className="phase-body">
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
-                    onPatch={patchTask} onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
+                    onPatch={patchTask} onPatchMany={patchMany} onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
                   <div className="phase-actions">
                     <span className="phase-settings">

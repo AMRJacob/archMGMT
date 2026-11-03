@@ -65,7 +65,10 @@ export interface Task {
   project_id: string
   phase_id: string | null
   title: string
+  /** Lead person (the first of assignee_ids); kept for older code and backups. */
   assignee_id: string | null
+  /** Everyone on it. Older rows may only have assignee_id: read through assigneesOf(). */
+  assignee_ids?: string[]
   start_date: string | null
   due_date: string | null
   /** Kept from earlier versions; not shown (hours live in Monograph). */

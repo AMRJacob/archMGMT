@@ -135,7 +135,7 @@ export function sheetRows(opts: {
   const sheet = {
     id: sheetId, project_id: opts.projectId, phase_id: opts.phaseId, parent_id: null, kind: 'sheet' as const,
     sheet_number: opts.number || null, sheet_type: type.id, title: opts.name || type.name,
-    assignee_id: opts.assigneeId, start_date: opts.start, due_date: opts.due, estimated_hours: null,
+    assignee_id: opts.assigneeId, assignee_ids: opts.assigneeId ? [opts.assigneeId] : [], start_date: opts.start, due_date: opts.due, estimated_hours: null,
     effort: type.effort, status: 'todo' as TaskStatus, is_milestone: false, client_visible: false, sort_order: opts.sortOrder, notes: null,
   }
   const items = type.checklist.map((title, i) => ({
