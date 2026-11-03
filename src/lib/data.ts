@@ -54,6 +54,22 @@ const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
     }
     for (const p of s.projects) if (sample.has(p.id) && !p.color && roots[String(p.name)]) p.color = roots[String(p.name)]
   },
+  // 3 → 4: workload moves from hours to sizes. Hour estimates are KEPT; they only set a starting size.
+  (s) => {
+    for (const t of s.tasks) {
+      if (t.effort != null) continue
+      const h = typeof t.estimated_hours === 'number' ? t.estimated_hours : null
+      const a = (t.start_date ?? t.due_date) as string | null, b = (t.due_date ?? t.start_date) as string | null
+      const weeks = a && b ? Math.max(1, (Date.parse(b) - Date.parse(a)) / (7 * 86400000)) : 1
+      const perWeek = h === null ? null : h / weeks
+      t.effort = perWeek === null ? 2 : perWeek <= 8 ? 1 : perWeek <= 20 ? 2 : 3
+    }
+    for (const p of s.people) {
+      if (p.availability != null) continue
+      const wh = typeof p.weekly_hours === 'number' ? p.weekly_hours : 40
+      p.availability = p.kind === 'consultant' ? 100 : Math.max(10, Math.min(100, Math.round((wh / 40) * 10) * 10))
+    }
+  },
 ]
 
 // Read fresh every time (no cache), so two open tabs never overwrite each other's changes.

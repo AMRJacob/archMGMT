@@ -1,15 +1,17 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, DateField, NumberField, TextField } from '../components/fields.tsx'
+import { Check, DateField, SelectField, TextField } from '../components/fields.tsx'
+import { projectAccent } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
-import { addDays, formatDate, parseISO, today } from '../lib/dates.ts'
+import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import type { Person, Project, Task, TimeOff } from '../lib/types.ts'
-import { capacityForWeek, countsTowardWorkload, loadLevel, mondayOf, taskHoursByWeek, weekStarts } from '../lib/workload.ts'
+import { EFFORTS, type Person, type Project, type Task, type TimeOff } from '../lib/types.ts'
+import {
+  capacityForWeek, countsTowardWorkload, daysOff, LOAD_LEVELS, loadLevel, mondayOf, taskLoadByWeek, weekStarts,
+} from '../lib/workload.ts'
 
 const WEEKS = 12
-
-const fmt = (h: number) => (h < 0.5 ? '' : Math.round(h).toString())
+const AVAILABILITY = [100, 90, 80, 75, 60, 50, 40, 25, 20, 10]
 
 export default function Team() {
   const navigate = useNavigate()
@@ -25,34 +27,61 @@ export default function Team() {
   const byName = (a: Person, b: Person) => a.name.localeCompare(b.name)
   const staff = people.rows.filter((p) => p.kind === 'staff').sort((a, b) => Number(b.active) - Number(a.active) || byName(a, b))
   const consultants = people.rows.filter((p) => p.kind === 'consultant').sort(byName)
+  const projectMap = useMemo(() => new Map<string, Project>(projects.map((p) => [p.id, p])), [projects])
 
-  // hours[personId][week] and per-project breakdown
+  // Load per person per week, per-project breakdown, and which tasks make it up.
   const load = useMemo(() => {
-    const projectMap = new Map<string, Project>(projects.map((p) => [p.id, p]))
     const total = new Map<string, Map<string, number>>()
     const perProject = new Map<string, Map<string, Map<string, number>>>()
+    const active = new Map<string, Map<string, Task[]>>()
+    const due = new Map<string, Map<string, Task[]>>()
+    const push = <V,>(m: Map<string, Map<string, V[]>>, who: string, w: string, v: V) => {
+      const mw = m.get(who) ?? new Map<string, V[]>()
+      mw.set(w, [...(mw.get(w) ?? []), v])
+      m.set(who, mw)
+    }
     for (const t of tasks.rows) {
       if (!countsTowardWorkload(t, projectMap)) continue
       const who = t.assignee_id ?? 'unassigned'
-      for (const [w, h] of taskHoursByWeek(t)) {
+      if (t.due_date) push(due, who, mondayOf(t.due_date), t)
+      for (const [w, l] of taskLoadByWeek(t)) {
         const tw = total.get(who) ?? new Map<string, number>()
-        tw.set(w, (tw.get(w) ?? 0) + h)
+        tw.set(w, (tw.get(w) ?? 0) + l)
         total.set(who, tw)
         const pp = perProject.get(who) ?? new Map<string, Map<string, number>>()
         const pw = pp.get(t.project_id) ?? new Map<string, number>()
-        pw.set(w, (pw.get(w) ?? 0) + h)
+        pw.set(w, (pw.get(w) ?? 0) + l)
         pp.set(t.project_id, pw)
         perProject.set(who, pp)
+        push(active, who, w, t)
       }
     }
-    return { total, perProject }
-  }, [tasks.rows, projects])
+    return { total, perProject, active, due }
+  }, [tasks.rows, projectMap])
 
-  const hoursOf = (id: string, w: string) => load.total.get(id)?.get(w) ?? 0
+  const loadOf = (id: string, w: string) => load.total.get(id)?.get(w) ?? 0
   const activeStaff = staff.filter((p) => p.active)
-  const firmHours = (w: string) => activeStaff.reduce((s, p) => s + hoursOf(p.id, w), 0)
+  const firmLoad = (w: string) => activeStaff.reduce((s, p) => s + loadOf(p.id, w), 0)
   const firmCap = (w: string) => activeStaff.reduce((s, p) => s + capacityForWeek(p, w, timeOff.rows), 0)
-  const unassigned = weeks.map((w) => hoursOf('unassigned', w))
+  const unassignedCount = (w: string) => load.active.get('unassigned')?.get(w)?.length ?? 0
+
+  const levelLabel = (l: string) => LOAD_LEVELS.find((x) => x.value === l)?.label ?? 'Nothing scheduled'
+  const effortLabel = (t: Task) => EFFORTS.find((e) => e.value === (t.effort ?? 2))?.label ?? 'Medium'
+
+  /** Hover text for a cell: the level, then what's running and what's due. */
+  const cellTitle = (p: Person, w: string, cap: number) => {
+    const lv = loadLevel(loadOf(p.id, w), cap)
+    const run = load.active.get(p.id)?.get(w) ?? []
+    const dueHere = load.due.get(p.id)?.get(w) ?? []
+    const off = daysOff(p, w, timeOff.rows)
+    const name = (t: Task) => `${t.title} (${projectMap.get(t.project_id)?.name ?? ''})`
+    return [
+      `Week of ${shortDate(w)}: ${levelLabel(lv)}`,
+      off ? `${off} day${off === 1 ? '' : 's'} off` : '',
+      run.length ? `\nWorking on:\n${run.map((t) => `• ${name(t)}, ${effortLabel(t).toLowerCase()}`).join('\n')}` : '',
+      dueHere.length ? `\nDue:\n${dueHere.map((t) => `◆ ${name(t)}, ${shortDate(t.due_date)}`).join('\n')}` : '',
+    ].filter(Boolean).join('\n')
+  }
 
   const openTasks = (id: string) =>
     tasks.rows
@@ -75,7 +104,8 @@ export default function Team() {
     )
   }
 
-  const cols = WEEKS + 2
+  const dueMark = (n: number) => n > 0 ? <span className="due-mark" aria-label={`${n} due`}>◆{n > 1 ? n : ''}</span> : null
+  const cols = WEEKS + 1
 
   return (
     <section>
@@ -83,8 +113,8 @@ export default function Team() {
         <div>
           <h1>Team &amp; workload</h1>
           <p className="muted">
-            Hours from open tasks, spread over each task's dates, against each person's weekly hours (less time off).
-            Click a person to see their projects and edit their details.
+            How full each person's weeks are, from the size of the open tasks they're on, their availability and time off.
+            Hover a week to see what's in it. ◆ marks due dates. Click a person for their projects and details.
           </p>
         </div>
         <div className="toolbar">
@@ -99,32 +129,26 @@ export default function Team() {
         <div className="card-head">
           <h2>Staff <span className="count">{activeStaff.length}</span></h2>
           <div className="legend">
-            <span className="lv light" />Under 60%
-            <span className="lv good" />60–90%
-            <span className="lv full" />Full
-            <span className="lv over" />Over
-            <button className="btn" onClick={async () => { const p = await people.add({ name: 'New team member', kind: 'staff', weekly_hours: 40, active: true }); setOpenId(p.id) }}>+ Staff</button>
+            {LOAD_LEVELS.map((l) => <Fragment key={l.value}><span className={`lv ${l.value}`} />{l.label}</Fragment>)}
+            <button className="btn" onClick={async () => { const p = await people.add({ name: 'New team member', kind: 'staff', weekly_hours: 40, availability: 100, active: true }); setOpenId(p.id) }}>+ Staff</button>
           </div>
         </div>
         <div className="scroll-x">
-          <table className="table workload">
+          <table className="table workload heat">
             <thead>
               <tr>
                 <th className="who">Person</th>
                 {weeks.map(weekHead)}
-                <th className="num avg">Avg</th>
               </tr>
             </thead>
             <tbody>
               {staff.map((p) => {
                 const open = openId === p.id
                 const caps = weeks.map((w) => capacityForWeek(p, w, timeOff.rows))
-                const hrs = weeks.map((w) => hoursOf(p.id, w))
-                const capSum = caps.reduce((a, b) => a + b, 0)
-                const avg = capSum > 0 ? Math.round((hrs.reduce((a, b) => a + b, 0) / capSum) * 100) : null
                 const breakdown = [...(load.perProject.get(p.id) ?? new Map<string, Map<string, number>>()).entries()]
-                  .filter(([, m]) => weeks.some((w) => (m.get(w) ?? 0) >= 0.5))
+                  .filter(([, m]) => weeks.some((w) => (m.get(w) ?? 0) > 0.05))
                 const mine = timeOff.rows.filter((o) => o.person_id === p.id).sort((a, b) => a.start_date.localeCompare(b.start_date))
+                const avail = p.availability ?? 100
                 return (
                   <Fragment key={p.id}>
                     <tr className={`person${open ? ' open' : ''}${p.active ? '' : ' inactive'}`} onClick={() => setOpenId(open ? null : p.id)}>
@@ -133,26 +157,31 @@ export default function Team() {
                           <span className="avatar">{p.initials ?? p.name.slice(0, 2)}</span>
                           <span>
                             <span className="strong">{p.name}</span>
-                            <span className="muted small block">{p.role ?? 'No role'} · {p.weekly_hours} h/wk</span>
+                            <span className="muted small block">{p.role ?? 'No role'}{avail < 100 ? ` · ${avail}% available` : ''}</span>
                           </span>
                         </div>
                       </td>
                       {weeks.map((w, i) => (
-                        <td key={w} className={`cell ${loadLevel(hrs[i], caps[i])}${w === thisWeek ? ' now' : ''}`}
-                          title={`${Math.round(hrs[i])} h of ${Math.round(caps[i])} h available`}>
-                          {fmt(hrs[i])}
-                          {caps[i] < p.weekly_hours && <span className="off" title="Time off this week" />}
+                        <td key={w} className={`cell ${loadLevel(loadOf(p.id, w), caps[i])}${w === thisWeek ? ' now' : ''}`} title={cellTitle(p, w, caps[i])}>
+                          {dueMark(load.due.get(p.id)?.get(w)?.length ?? 0)}
+                          {daysOff(p, w, timeOff.rows) > 0 && <span className="off" />}
                         </td>
                       ))}
-                      <td className="num avg">{avg === null ? '—' : `${avg}%`}</td>
                     </tr>
                     {open && breakdown.map(([projectId, m]) => {
-                      const proj = projects.find((x) => x.id === projectId)
+                      const proj = projectMap.get(projectId)
+                      const color = projectAccent(proj?.color).accent
                       return (
                         <tr key={projectId} className="sub" onClick={() => { select(projectId); navigate('/overview') }}>
-                          <td className="who"><div className="sub-who">{proj?.number ? <span className="mono muted">{proj.number} </span> : null}{proj?.name ?? 'Project'}</div></td>
-                          {weeks.map((w) => <td key={w} className={`subcell${w === thisWeek ? ' now' : ''}`}>{fmt(m.get(w) ?? 0)}</td>)}
-                          <td />
+                          <td className="who"><div className="sub-who"><span className="pdot" style={{ background: color }} />{proj?.name ?? 'Project'}</div></td>
+                          {weeks.map((w, i) => {
+                            const share = caps[i] > 0 ? Math.min(1, (m.get(w) ?? 0) / caps[i]) : 0
+                            return (
+                              <td key={w} className={`subcell${w === thisWeek ? ' now' : ''}`}>
+                                {share > 0.02 && <i className="share" style={{ width: `${Math.max(12, share * 100)}%`, background: color }} />}
+                              </td>
+                            )
+                          })}
                         </tr>
                       )
                     })}
@@ -164,7 +193,11 @@ export default function Team() {
                               <label>Name<TextField value={p.name} onSave={(v) => v && people.patch(p.id, { name: v })} /></label>
                               <label>Initials<TextField value={p.initials} placeholder="—" onSave={(v) => people.patch(p.id, { initials: v })} /></label>
                               <label>Role<TextField value={p.role} placeholder="Role" onSave={(v) => people.patch(p.id, { role: v })} /></label>
-                              <label>Hours / week<NumberField value={p.weekly_hours} onSave={(v) => people.patch(p.id, { weekly_hours: v ?? 0 })} /></label>
+                              <label title="Share of a full-time load this person can take on">Availability
+                                <SelectField value={String(avail)} onSave={(v) => people.patch(p.id, { availability: Number(v ?? 100) })}>
+                                  {[...new Set([...AVAILABILITY, avail])].sort((a, b) => b - a).map((a) => <option key={a} value={String(a)}>{a === 100 ? 'Full time (100%)' : `${a}%`}</option>)}
+                                </SelectField>
+                              </label>
                               <label className="inline-check"><input type="checkbox" checked={p.active} onChange={(e) => people.patch(p.id, { active: e.target.checked })} />Active</label>
                               <button className="btn danger small-btn" onClick={() => removePerson(p)}>Remove</button>
                             </div>
@@ -172,17 +205,14 @@ export default function Team() {
                               <div>
                                 <h3>Open tasks</h3>
                                 <ul className="task-list">
-                                  {openTasks(p.id).slice(0, 8).map((t) => {
-                                    const proj = projects.find((x) => x.id === t.project_id)
-                                    return (
-                                      <li key={t.id}>
-                                        {t.is_milestone && <span className="diamond" />}
-                                        <span className="strong">{t.title}</span>
-                                        <span className="muted"> · {proj?.name ?? ''}</span>
-                                        <span className="muted right">{t.due_date ? `Due ${formatDate(t.due_date)}` : ''}{t.estimated_hours ? ` · ${t.estimated_hours} h` : ''}</span>
-                                      </li>
-                                    )
-                                  })}
+                                  {openTasks(p.id).slice(0, 8).map((t) => (
+                                    <li key={t.id}>
+                                      {t.is_milestone ? <span className="diamond" /> : <span className={`effort e${t.effort ?? 2}`} title={effortLabel(t)}><i /><i /><i /></span>}
+                                      <span className="strong">{t.title}</span>
+                                      <span className="muted"> · {projectMap.get(t.project_id)?.name ?? ''}</span>
+                                      <span className="muted right">{t.due_date ? `Due ${formatDate(t.due_date)}` : ''}</span>
+                                    </li>
+                                  ))}
                                   {openTasks(p.id).length === 0 && <li className="muted">No open tasks.</li>}
                                   {openTasks(p.id).length > 8 && <li className="muted">and {openTasks(p.id).length - 8} more</li>}
                                 </ul>
@@ -217,19 +247,16 @@ export default function Team() {
             </tbody>
             <tfoot>
               <tr className="total">
-                <td className="who">Office total <span className="muted small block">hours / available</span></td>
+                <td className="who">Whole office</td>
                 {weeks.map((w) => (
-                  <td key={w} className={`cell ${loadLevel(firmHours(w), firmCap(w))}${w === thisWeek ? ' now' : ''}`}>
-                    {Math.round(firmHours(w))}<span className="cap">/{Math.round(firmCap(w))}</span>
-                  </td>
+                  <td key={w} className={`cell ${loadLevel(firmLoad(w), firmCap(w))}${w === thisWeek ? ' now' : ''}`}
+                    title={`Week of ${shortDate(w)}: office is ${levelLabel(loadLevel(firmLoad(w), firmCap(w))).toLowerCase()}`} />
                 ))}
-                <td />
               </tr>
-              {unassigned.some((h) => h >= 0.5) && (
+              {weeks.some((w) => unassignedCount(w) > 0) && (
                 <tr className="unassigned">
-                  <td className="who">Unassigned <span className="muted small block">hours with no one on them</span></td>
-                  {weeks.map((w, i) => <td key={w} className="subcell">{fmt(unassigned[i])}</td>)}
-                  <td />
+                  <td className="who">Unassigned <span className="muted small block">open tasks with no one on them</span></td>
+                  {weeks.map((w) => <td key={w} className="subcell">{unassignedCount(w) || ''}</td>)}
                 </tr>
               )}
             </tfoot>
@@ -240,7 +267,7 @@ export default function Team() {
       <div className="card">
         <div className="card-head">
           <h2>Consultants <span className="count">{consultants.length}</span></h2>
-          <button className="btn" onClick={() => people.add({ name: 'New consultant', kind: 'consultant', weekly_hours: 0, active: true })}>+ Consultant</button>
+          <button className="btn" onClick={() => people.add({ name: 'New consultant', kind: 'consultant', weekly_hours: 0, availability: 100, active: true })}>+ Consultant</button>
         </div>
         <table className="table">
           <thead>
@@ -268,7 +295,10 @@ export default function Team() {
           </tbody>
         </table>
       </div>
-      <p className="muted small">Consultants can be assigned tasks but aren't counted in staff workload. Tasks on projects that are complete or on hold aren't counted.</p>
+      <p className="muted small">
+        A full-time person is treated as comfortably carrying about three medium tasks at once. Consultants aren't counted in staff
+        workload, and tasks on projects that are complete or on hold aren't counted. Hours and billing stay in Monograph.
+      </p>
     </section>
   )
 }

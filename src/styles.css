@@ -235,10 +235,10 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .legend .btn { margin-left: 10px; }
 .lv { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 8px; }
-.lv.light, .cell.light { background: #eef3ef; }
-.lv.good, .cell.good { background: #cfe5d6; }
-.lv.full, .cell.full { background: #f3e1b6; }
-.lv.over, .cell.over { background: #f3c6ba; }
+.lv.light, .cell.light { background: #e4eee7; }
+.lv.steady, .cell.steady { background: #a9cfb5; }
+.lv.busy, .cell.busy { background: #ecc97f; }
+.lv.over, .cell.over { background: #e08f78; }
 .table.workload { min-width: 980px; }
 .table.workload th.wk { text-align: center; padding: 6px 2px; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 600; width: 56px; }
 .table.workload th.wk span { display: block; font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -442,3 +442,61 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .overview .chip { background: var(--p-soft); color: var(--p-accent); }
 .overview .project-head { border-top: 3px solid var(--p-accent); }
 .overview .strip-seg.now { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--p-accent); }
+
+/* heat-map workload */
+.table.workload.heat td.cell { height: 46px; padding: 0; border-left: 3px solid var(--panel); border-bottom: 3px solid var(--panel); border-radius: 6px; cursor: default; }
+.table.workload.heat tr.person td.cell { cursor: pointer; }
+.table.workload.heat td.cell.none { background: #f6f5f1; }
+.table.workload.heat th.wk { width: 64px; }
+.due-mark { position: absolute; left: 6px; bottom: 4px; font-size: 10px; font-weight: 600; color: rgba(28, 31, 35, 0.7); letter-spacing: -0.02em; }
+.table.workload.heat .cell .off { top: 5px; right: 5px; width: 7px; height: 7px; }
+.table.workload.heat td.subcell { padding: 4px 6px; vertical-align: middle; }
+.share { display: block; height: 6px; border-radius: 3px; opacity: 0.75; margin: 0 auto 0 0; }
+.table.workload.heat tfoot td.cell { height: 28px; }
+.effort { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; flex: none; }
+.effort i { width: 3px; border-radius: 1px; background: #d5d1c9; }
+.effort i:nth-child(1) { height: 5px; } .effort i:nth-child(2) { height: 8px; } .effort i:nth-child(3) { height: 11px; }
+.effort.e1 i:nth-child(1), .effort.e2 i:nth-child(-n+2), .effort.e3 i { background: var(--muted); }
+.task-list .effort { margin: 0 6px 0 2px; }
+.effort-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.effort-field .segmented { align-self: flex-start; text-transform: none; letter-spacing: 0; }
+
+/* ---------- click-to-change task chips ---------- */
+.trow { cursor: default; }
+.task-controls { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.pop { position: relative; display: inline-flex; }
+.chip-btn { border: 1px solid transparent; background: none; border-radius: 6px; padding: 3px 5px; cursor: pointer; display: inline-flex; align-items: center; min-height: 28px; color: inherit; }
+.chip-btn:hover, .chip-btn.open { background: var(--hover); border-color: var(--line); }
+.status-pop .chip-btn { min-width: 96px; justify-content: flex-start; }
+.st.todo { background: #eceae4; color: var(--muted); }
+.date-chip { font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 108px; text-align: right; display: inline-block; font-variant-numeric: tabular-nums; }
+.date-chip.empty { color: #b3b0aa; }
+.chip-spacer { display: inline-block; width: 31px; }
+.more-dots { font-size: 16px; line-height: 1; color: var(--muted); width: 16px; display: inline-block; text-align: center; }
+.pop-menu { position: absolute; top: calc(100% + 4px); z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); padding: 5px; min-width: 190px; display: flex; flex-direction: column; gap: 1px; }
+.pop-menu.left { left: 0; }
+.pop-menu.right { right: 0; }
+.pop-menu.up { top: auto; bottom: calc(100% + 4px); }
+.pm-item { display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: none; text-align: left; padding: 7px 9px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.pm-item:hover { background: var(--hover); }
+.pm-item.on { background: var(--accent-soft); }
+.pm-item.check { cursor: pointer; }
+.pm-item.check input { accent-color: var(--accent); }
+.pm-item.danger { color: var(--danger); }
+.pm-item.muted { color: var(--muted); }
+.pm-hint { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.pm-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 6px 9px 3px; }
+.pm-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+.pm-people { max-height: 320px; overflow-y: auto; min-width: 220px; }
+.pm-dates { display: flex; flex-direction: column; gap: 8px; padding: 6px; }
+.pm-dates label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.pm-dates .field { border-color: var(--line); text-transform: none; font-weight: 400; color: var(--ink); font-size: 13.5px; }
+.trow .task-controls { opacity: 0.92; }
+.trow:hover .task-controls { opacity: 1; }
+
+/* quick panel (timeline, calendar, board) */
+.quick-panel { position: fixed; right: 24px; bottom: 24px; z-index: 55; width: min(620px, calc(100vw - 280px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18); padding: 12px 14px 12px; display: flex; flex-direction: column; gap: 4px; }
+.qp-head { display: flex; align-items: center; gap: 6px; }
+.qp-title { font-size: 16px; font-weight: 600; }
+.qp-sub { padding-left: 7px; margin-bottom: 4px; }
+.quick-panel .task-controls { flex-wrap: wrap; }

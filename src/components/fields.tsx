@@ -1,19 +1,22 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /** Inline fields: look like plain text until focused, save when you leave the field. */
 
 export function TextField({
-  value, onSave, placeholder, className = '', multiline = false,
+  value, onSave, placeholder, className = '', multiline = false, autoFocus = false,
 }: {
   value: string | null
   onSave: (v: string | null) => void
   placeholder?: string
   className?: string
   multiline?: boolean
+  autoFocus?: boolean
 }) {
   const [draft, setDraft] = useState(value ?? '')
   const [shown, setShown] = useState(value)
   if (shown !== value) { setShown(value); setDraft(value ?? '') } // value changed elsewhere
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (autoFocus) { input.current?.focus(); input.current?.select() } }, [autoFocus])
   const commit = () => {
     const next = draft.trim() === '' ? null : draft.trim()
     if (next !== (value ?? null)) onSave(next)
@@ -25,7 +28,7 @@ export function TextField({
     )
   }
   return (
-    <input className={`field ${className}`} value={draft} placeholder={placeholder}
+    <input ref={input} className={`field ${className}`} value={draft} placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)} onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
   )

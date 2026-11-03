@@ -20,7 +20,9 @@ with Gantt charts that export ready to hand to a client.
 - **Phases**: Predesign / SD / DD / CD / Bidding / CA bars on the schedule; can be shown to the client or hidden
 - **Tasks**: work inside a phase, with assignee, dates and estimated hours; milestones show as diamonds
 
-Workload = each person's open task hours spread over the weekdays they run, compared with their weekly hours less time off.
+Workload (no hours: those live in Monograph) = the size of each person's open tasks (light / medium / heavy) over the
+weekdays they run, against their availability less time off, shown as a heat map. A full-time person is treated as
+carrying about three medium tasks at once.
 
 ## Pages
 
@@ -40,8 +42,10 @@ Workload = each person's open task hours spread over the weekdays they run, comp
   Every phase gets a different hue that harmonises with the root (Balanced, Triad or Complementary), all at one
   soft lightness and chroma (computed in OKLCH). The first phase is the root colour. Used on every view and export.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
-- **Team & workload**: 12-week hours-vs-capacity grid per staff member; click a person for their per-project
-  breakdown, open tasks, time off and details. Consultants listed below.
+- **Team & workload**: 12-week heat map per staff member (Light / Steady / Busy / Overloaded), ◆ for due dates,
+  hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
+- **Editing tasks**: every part of a task row is clickable in place (status, size, dates, assignee, ⋯ for more);
+  clicking a task in the timeline, calendar or board opens the same controls in a small panel.
 - **Settings & data**: backup / restore, remove sample data.
 
 ## Keeping data safe while iterating

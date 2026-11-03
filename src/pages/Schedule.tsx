@@ -56,7 +56,7 @@ export default function Schedule() {
     const start = mondayOf(t)
     const created = await tasks.add({
       project_id: project!.id, phase_id: phase?.id ?? null, title: 'New task', assignee_id: null,
-      start_date: start, due_date: addDays(start, 4), estimated_hours: null, status: 'todo',
+      start_date: start, due_date: addDays(start, 4), estimated_hours: null, effort: 2, status: 'todo',
       is_milestone: false, client_visible: false, sort_order: tasks.rows.length, ...defaults,
     })
     setEditingId(created.id)

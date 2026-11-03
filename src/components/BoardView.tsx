@@ -120,7 +120,7 @@ export default function BoardView({
       <div className="board-cols">
         {columns.map((col) => {
           const defaults = addDefaults(col)
-          const hours = col.tasks.reduce((s, t) => s + (t.status === 'done' ? 0 : t.estimated_hours ?? 0), 0)
+          const openCount = col.tasks.filter((t) => t.status !== 'done').length
           return (
             <div key={col.key || 'none'}
               className={`board-col${over === col.key && col.droppable ? ' over' : ''}${col.current ? ' current' : ''}${col.droppable ? '' : ' fixed'}`}
@@ -132,8 +132,8 @@ export default function BoardView({
                   <span className="strong">{col.title}</span>
                   <span className="count">{col.tasks.length}</span>
                 </div>
-                {(col.sub || hours > 0) && (
-                  <div className="muted small">{[col.sub, hours > 0 ? `${Math.round(hours)} h open` : ''].filter(Boolean).join(' · ')}</div>
+                {(col.sub || (group !== 'status' && openCount > 0)) && (
+                  <div className="muted small">{[col.sub, group !== 'status' && openCount > 0 ? `${openCount} open` : ''].filter(Boolean).join(' · ')}</div>
                 )}
               </div>
               <div className="board-cards">
@@ -161,7 +161,7 @@ export default function BoardView({
                             {t.is_milestone ? '' : 'Due '}{parseISO(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
                           </span>
                         )}
-                        {t.estimated_hours ? <span>{t.estimated_hours} h</span> : null}
+                        {!t.is_milestone && <span className={`effort e${t.effort ?? 2}`} title={['Light', 'Medium', 'Heavy'][(t.effort ?? 2) - 1]}><i /><i /><i /></span>}
                         {group !== 'status' && <span className={`st ${t.status}`}>{TASK_STATUSES.find((s) => s.value === t.status)?.label}</span>}
                       </div>
                     </div>

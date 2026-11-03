@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DateField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
-import TaskEditor from '../components/TaskEditor.tsx'
+import { TaskControls } from '../components/TaskChips.tsx'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
 import ColorPicker from '../components/ColorPicker.tsx'
 import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
@@ -17,7 +17,7 @@ export default function ProjectDetail() {
   const id = project?.id ?? ''
   const { phases, tasks, people, patchTask } = useProjectPlan(id)
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
 
   const sortedPhases = useMemo(
@@ -50,11 +50,9 @@ export default function ProjectDetail() {
 
   const staff = people.rows.filter((p) => p.kind === 'staff')
   const openTaskRows = tasks.rows.filter((x) => x.status !== 'done' && !x.is_milestone)
-  const hoursOpen = openTaskRows.reduce((s, x) => s + (x.estimated_hours ?? 0), 0)
   const start = minDate(phases.rows.map((p) => p.start_date))
   const end = maxDate(phases.rows.map((p) => p.end_date))
   const nextMilestone = tasks.rows.filter((x) => x.is_milestone && x.due_date && x.due_date >= t).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
-  const editing = tasks.rows.find((x) => x.id === editingId) ?? null
 
   async function addPhase() {
     const last = sortedPhases[sortedPhases.length - 1]
@@ -68,9 +66,9 @@ export default function ProjectDetail() {
     const created = await tasks.add({
       project_id: id, phase_id: phase?.id ?? null, title: milestone ? 'New milestone' : 'New task',
       assignee_id: null, start_date: milestone ? null : s, due_date: milestone ? phase?.end_date ?? s : addDays(s, 13),
-      estimated_hours: null, status: 'todo', is_milestone: milestone, client_visible: milestone, sort_order: tasks.rows.length,
+      estimated_hours: null, effort: 2, status: 'todo', is_milestone: milestone, client_visible: milestone, sort_order: tasks.rows.length,
     })
-    setEditingId(created.id)
+    setNewId(created.id) // focus its title so it can be named straight away
   }
 
   async function deleteProject() {
@@ -91,29 +89,20 @@ export default function ProjectDetail() {
   const { accent, soft } = projectAccent(project.color)
   const span = start && end ? Math.max(1, daysBetween(start, end) + 1) : 1
 
-  const taskRow = (x: Task) => {
-    const who = people.rows.find((p) => p.id === x.assignee_id)
-    const late = x.due_date && x.due_date < t && x.status !== 'done'
-    return (
-      <li key={x.id} className={`trow${x.status === 'done' ? ' done' : ''}`} onClick={() => setEditingId(x.id)}>
-        <button className={`tick ${x.status}`} title={x.status === 'done' ? 'Mark not done' : 'Mark done'}
-          onClick={(e) => { e.stopPropagation(); patchTask(x, { status: x.status === 'done' ? 'todo' : 'done' }) }}>
-          {x.status === 'done' ? '✓' : ''}
-        </button>
-        {x.is_milestone && <span className="diamond" title="Milestone" />}
-        <div className="trow-title" onClick={(e) => e.stopPropagation()}>
-          <TextField value={x.title} onSave={(v) => v && patchTask(x, { title: v }, false)} />
-        </div>
-        <span className="trow-meta">
-          {x.status === 'in_progress' && <span className="st in_progress">In progress</span>}
-          {x.status === 'review' && <span className="st review">In review</span>}
-          {x.estimated_hours ? <span className="muted">{x.estimated_hours} h</span> : null}
-          <span className={late ? 'late' : 'muted'}>{x.due_date ? shortDate(x.due_date) : ''}</span>
-          <span className={`avatar sm${who ? '' : ' empty'}`} title={who?.name ?? 'Unassigned'}>{who ? who.initials ?? who.name.slice(0, 2) : '+'}</span>
-        </span>
-      </li>
-    )
-  }
+  const taskRow = (x: Task) => (
+    <li key={x.id} className={`trow${x.status === 'done' ? ' done' : ''}`}>
+      <button className={`tick ${x.status}`} title={x.status === 'done' ? 'Mark not done' : 'Mark done'}
+        onClick={() => patchTask(x, { status: x.status === 'done' ? 'todo' : 'done' })}>
+        {x.status === 'done' ? '✓' : ''}
+      </button>
+      {x.is_milestone && <span className="diamond" title="Milestone" />}
+      <div className="trow-title">
+        <TextField value={x.title} autoFocus={x.id === newId} onSave={(v) => v && patchTask(x, { title: v }, false)} />
+      </div>
+      <TaskControls task={x} people={people.rows} phases={phases.rows}
+        onPatch={(c) => patchTask(x, c)} onDelete={() => void tasks.drop(x.id)} />
+    </li>
+  )
 
   return (
     <section className="overview" style={{ ['--p-accent' as string]: accent, ['--p-soft' as string]: soft }}>
@@ -141,7 +130,7 @@ export default function ProjectDetail() {
             </SelectField>
           </label>
           <div className="stat"><span>Schedule</span>{formatDate(start)} – {formatDate(end)}</div>
-          <div className="stat"><span>Open work</span>{openTaskRows.length} tasks · {Math.round(hoursOpen)} h</div>
+          <div className="stat"><span>Open work</span>{openTaskRows.length} task{openTaskRows.length === 1 ? '' : 's'}</div>
         </div>
         <label className="notes">Notes<TextField multiline value={project.notes} placeholder="Scope, contract notes…" onSave={(v) => projects.patch(id, { notes: v })} /></label>
       </header>
@@ -175,7 +164,6 @@ export default function ProjectDetail() {
           const work = list.filter((x) => !x.is_milestone)
           const done = work.filter((x) => x.status === 'done').length
           const openCount = work.length - done
-          const hrs = work.filter((x) => x.status !== 'done').reduce((s, x) => s + (x.estimated_hours ?? 0), 0)
           const isOpen = open.has(p.id)
           const isNow = p.id === currentPhase?.id && p.start_date <= t
           return (
@@ -190,7 +178,7 @@ export default function ProjectDetail() {
                   <span className="progress" title={`${done} of ${work.length} tasks done`}>
                     <i style={{ width: work.length ? `${(done / work.length) * 100}%` : 0 }} />
                   </span>
-                  <span className="muted sum-text">{work.length ? (openCount ? `${openCount} open${hrs ? ` · ${Math.round(hrs)} h` : ''}` : 'All done') : 'No tasks'}</span>
+                  <span className="muted sum-text">{work.length ? (openCount ? `${openCount} open` : 'All done') : 'No tasks'}</span>
                 </span>
               </button>
               {isOpen && (
@@ -233,12 +221,6 @@ export default function ProjectDetail() {
         <button className="btn danger" onClick={deleteProject}>Delete project</button>
       </div>
 
-      {editing && (
-        <TaskEditor task={editing} phases={phases.rows} people={people.rows}
-          onPatch={(c) => patchTask(editing, c, false)}
-          onDelete={() => void tasks.drop(editing.id)}
-          onClose={() => setEditingId(null)} />
-      )}
     </section>
   )
 }

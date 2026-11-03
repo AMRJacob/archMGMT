@@ -8,7 +8,10 @@ export interface Person {
   kind: PersonKind
   company: string | null
   discipline: string | null
+  /** Kept from earlier versions; not shown. Workload uses `availability`. */
   weekly_hours: number
+  /** Share of a full-time load this person can carry, in percent (100 = full time). */
+  availability?: number | null
   color: string | null
   active: boolean
 }
@@ -41,6 +44,14 @@ export interface Phase {
   client_visible: boolean
 }
 
+export type Effort = 1 | 2 | 3
+
+export const EFFORTS: { value: Effort; label: string; hint: string }[] = [
+  { value: 1, label: 'Light', hint: 'Background or occasional work' },
+  { value: 2, label: 'Medium', hint: 'A normal share of the week' },
+  { value: 3, label: 'Heavy', hint: 'Takes most of the week while it runs' },
+]
+
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done'
 
 export interface Task {
@@ -51,7 +62,10 @@ export interface Task {
   assignee_id: string | null
   start_date: string | null
   due_date: string | null
+  /** Kept from earlier versions; not shown (hours live in Monograph). */
   estimated_hours: number | null
+  /** Task size for workload: 1 light, 2 medium, 3 heavy. */
+  effort?: Effort | null
   status: TaskStatus
   is_milestone: boolean
   client_visible: boolean
