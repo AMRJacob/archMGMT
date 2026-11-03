@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react'
+import { useTableText } from '../lib/prefs.ts'
 import { useNavigate } from 'react-router-dom'
 import { useRows } from '../lib/data.ts'
 import { useProject } from '../lib/projectContext.ts'
@@ -52,6 +53,17 @@ const COLUMNS: Col[] = [
 ]
 const DEFAULT_COLS: ColKey[] = ['number', 'owner', 'type', 'pm', 'phase', 'schedule', 'budget', 'open']
 const COLS_KEY = 'archmgmt:projects-columns'
+const WIDTHS_KEY = 'archmgmt:projects-widths'
+/** Starting widths when long text is cropped (fixed layout); dragged widths win. */
+const CROP_WIDTHS: Record<string, number> = {
+  name: 250, number: 100, owner: 180, type: 150, pm: 150, status: 100, phase: 170, schedule: 210,
+  start: 110, end: 110, budget: 120, area: 110, costSf: 100, open: 100,
+}
+
+function savedWidths(): Record<string, number> {
+  try { const v = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? 'null'); if (v && typeof v === 'object') return v as Record<string, number> } catch { /* storage unavailable */ }
+  return {}
+}
 
 function savedCols(): ColKey[] {
   try {
@@ -76,6 +88,39 @@ export default function Projects() {
   const [cols, setColsState] = useState<ColKey[]>(savedCols)
   const [sort, setSort] = useState<{ key: ColKey | 'name'; dir: 1 | -1 }>({ key: 'number', dir: -1 })
   const [creating, setCreating] = useState(false)
+  const [widths, setWidthsState] = useState<Record<string, number>>(savedWidths)
+  const [dragCol, setDragCol] = useState<ColKey | null>(null)
+  const [dropAt, setDropAt] = useState<{ key: ColKey; side: 'l' | 'r' } | null>(null)
+  const resizing = useRef(false)
+  const tableText = useTableText()
+
+  const setWidths = (next: Record<string, number>) => {
+    setWidthsState(next)
+    try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(next)) } catch { /* storage unavailable */ }
+  }
+  /** Drag a column's right edge to resize it. */
+  const startResize = (key: string) => (e: RPointerEvent<HTMLSpanElement>) => {
+    e.preventDefault(); e.stopPropagation()
+    resizing.current = true
+    const th = (e.currentTarget as HTMLElement).closest('th')!
+    const x0 = e.clientX, w0 = th.getBoundingClientRect().width
+    let w = w0
+    const move = (ev: PointerEvent) => { w = Math.max(60, Math.round(w0 + ev.clientX - x0)); setWidthsState((ws) => ({ ...ws, [key]: w })) }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      resizing.current = false
+      setWidths({ ...savedWidths(), ...widths, [key]: w })
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
+  /** Drop a dragged column header next to another one. */
+  const moveCol = (from: ColKey, to: ColKey, side: 'l' | 'r') => {
+    if (from === to) return
+    const order = cols.filter((k) => k !== from)
+    const i = order.indexOf(to) + (side === 'r' ? 1 : 0)
+    setCols([...order.slice(0, i), from, ...order.slice(i)])
+  }
 
   const setCols = (next: ColKey[]) => {
     setColsState(next)
@@ -130,25 +175,54 @@ export default function Projects() {
     return c * sort.dir || a.project.name.localeCompare(b.project.name)
   })
 
-  const shownCols = COLUMNS.filter((c) => cols.includes(c.key))
+  const shownCols = cols.map((k) => COLUMNS.find((c) => c.key === k)).filter((c): c is Col => Boolean(c)) // in the order you arranged them
   const filtersOn = Boolean(q || types.length || pms.length || minN !== null || maxN !== null)
   const clear = () => { setSearch(''); setTypes([]); setPms([]); setBudgetMin(''); setBudgetMax('') }
   const sumOf = (f: (p: Project) => number | null | undefined) => rows.reduce((s, r) => s + (f(r.project) ?? 0), 0)
   const totals: Partial<Record<ColKey, string>> = {
-    budget: money(sumOf((p) => p.budget)),
-    area: area(sumOf((p) => p.gross_area)),
+    budget: sumOf((p) => p.budget) ? money(sumOf((p) => p.budget)) : '',
+    area: sumOf((p) => p.gross_area) ? area(sumOf((p) => p.gross_area)) : '',
     open: String(rows.reduce((s, r) => s + r.open, 0)),
   }
   const showTotals = rows.length > 1 && shownCols.some((c) => c.key in totals)
 
-  const header = (key: ColKey | 'name', label: string, num = false) => (
-    <th key={key} className={num ? 'num' : ''} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-      <button className={`th-sort${sort.key === key ? ' on' : ''}`}
-        onClick={() => setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: num ? -1 : 1 }))}>
-        {label}{sort.key === key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}
-      </button>
-    </th>
-  )
+  const header = (key: ColKey | 'name', label: string, num = false) => {
+    const movable = key !== 'name'
+    return (
+      <th key={key} className={`${num ? 'num' : ''}${dragCol === key ? ' col-dragging' : ''}${dropAt?.key === key ? ` col-drop-${dropAt.side}` : ''}`}
+        aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}
+        draggable={movable}
+        title={movable ? 'Click to sort · drag to move · drag the edge to resize' : 'Click to sort · drag the edge to resize'}
+        onDragStart={(e) => {
+          if (!movable || resizing.current) { e.preventDefault(); return }
+          setDragCol(key as ColKey); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', label)
+        }}
+        onDragOver={(e) => {
+          if (!dragCol || !movable) return
+          e.preventDefault()
+          const r = e.currentTarget.getBoundingClientRect()
+          const side = e.clientX < r.left + r.width / 2 ? 'l' : 'r'
+          if (dropAt?.key !== key || dropAt.side !== side) setDropAt({ key: key as ColKey, side })
+        }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt(null) }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const r = e.currentTarget.getBoundingClientRect()
+          if (dragCol && movable) moveCol(dragCol, key as ColKey, e.clientX < r.left + r.width / 2 ? 'l' : 'r')
+          setDragCol(null); setDropAt(null)
+        }}
+        onDragEnd={() => { setDragCol(null); setDropAt(null) }}>
+        {/* A span, not a button: browsers won't start dragging a header from a button. */}
+        <span role="button" tabIndex={0} className={`th-sort${sort.key === key ? ' on' : ''}`}
+          onClick={() => setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: num ? -1 : 1 }))}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }}>
+          {label}{sort.key === key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}
+        </span>
+        <span className="col-resize" onPointerDown={startResize(key)} onDoubleClick={() => { const { [key]: _drop, ...rest } = widths; void _drop; setWidths(rest) }}
+          title="Drag to resize · double-click to reset" />
+      </th>
+    )
+  }
 
   function exportCsv() {
     const esc = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
@@ -231,7 +305,7 @@ export default function Projects() {
               {COLUMNS.map((c) => (
                 <label key={c.key} className="pm-item check">
                   <input type="checkbox" checked={cols.includes(c.key)}
-                    onChange={() => setCols(cols.includes(c.key) ? cols.filter((k) => k !== c.key) : COLUMNS.map((x) => x.key).filter((k) => k === c.key || cols.includes(k)))} />
+                    onChange={() => setCols(cols.includes(c.key) ? cols.filter((k) => k !== c.key) : [...cols, c.key])} />
                   {c.label}
                 </label>
               ))}
@@ -246,7 +320,13 @@ export default function Projects() {
       {error && <p className="error">{error}</p>}
 
       <div className="card table-scroll">
-        <table className="table clickable">
+        <table className={`table clickable${tableText === 'crop' ? ' crop' : ''}`}>
+          <colgroup>
+            {['name', ...shownCols.map((c) => c.key)].map((k) => {
+              const w = widths[k] ?? (tableText === 'crop' ? CROP_WIDTHS[k] : undefined)
+              return <col key={k} style={w ? { width: w } : undefined} />
+            })}
+          </colgroup>
           <thead>
             <tr>
               {header('name', 'Project')}
@@ -257,11 +337,14 @@ export default function Projects() {
             {rows.map((r) => (
               <tr key={r.project.id} className={r.project.id === projects.current?.id ? 'current' : ''}
                 onClick={() => { projects.select(r.project.id); navigate('/overview') }}>
-                <td>
+                <td title={tableText === 'crop' ? [r.project.name, r.project.client].filter(Boolean).join(' · ') : undefined}>
                   <div className="strong"><span className="pdot" style={{ background: projectAccent(r.project.color).accent }} />{r.project.name}</div>
                   {!cols.includes('owner') && r.project.client && <div className="muted small">{r.project.client}</div>}
                 </td>
-                {shownCols.map((c) => <td key={c.key} className={c.num ? 'num' : ''}>{c.cell(r)}</td>)}
+                {shownCols.map((c) => {
+                  const v = c.key === 'schedule' ? `${formatDate(r.start)} – ${formatDate(r.end)}` : c.value(r)
+                  return <td key={c.key} className={c.num ? 'num' : ''} title={tableText === 'crop' && v != null && typeof v === 'string' ? v : undefined}>{c.cell(r)}</td>
+                })}
               </tr>
             ))}
             {!projects.loading && rows.length === 0 && (

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export type MenuItem = 'sep' | { label: string; run: () => void; keys?: string; disabled?: boolean; danger?: boolean }
 
@@ -38,7 +39,7 @@ export default function ContextMenu({ x, y, items, onClose }: { x: number; y: nu
     }
   }, [onClose])
 
-  return (
+  return createPortal(
     <div ref={box} className="ctx-menu" role="menu" style={pos} onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
@@ -56,6 +57,7 @@ export default function ContextMenu({ x, y, items, onClose }: { x: number; y: nu
             {it.keys && <span className="ctx-keys">{it.keys}</span>}
           </button>
         ))}
-    </div>
+    </div>,
+    document.body,
   )
 }
