@@ -25,10 +25,16 @@ Workload = each person's open task hours spread over the weekdays they run, comp
 ## Pages
 
 - **Project switcher** (top of the sidebar, as in CAzen): the current project, remembered between visits.
-- **Overview**: the current project's details, phases, tasks and milestones, all edited in place.
-- **Schedule**: Gantt chart of the current project. *Client view* shows only phases marked "On client schedule"
-  and tasks marked "Client"; *Internal view* shows every task with who it's assigned to.
-  Export as PDF (print dialog, landscape) or PNG. Both match the screen.
+- **Overview**: the current project's heading, a phase strip showing where the project is, and collapsible
+  phases (current one open) with one-line summaries. Click a task to edit all of its details.
+- **Schedule**, three views of the current project:
+  - *Timeline*: drag bars to move them, drag ends to change length; moving a phase moves its tasks.
+    Zoom to 12 / 6 / 3 months for fine moves. *Working view* shows everything; *Presentation view* shows only
+    phases and tasks marked "Show in presentation view". Export as PDF (print, landscape) or PNG.
+  - *Calendar*: month grid; drag a task to another day.
+  - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
+    drag cards between columns.
+  - Undo (button or Ctrl+Z) reverses drags and moves.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week hours-vs-capacity grid per staff member; click a person for their per-project
   breakdown, open tasks, time off and details. Consultants listed below.
@@ -63,9 +69,9 @@ supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 
 1. Phase 0: Setup (repo, shell, schema) ✓
 2. Phase 1: Projects, phases and tasks (create, edit, assign) ✓ (runs on sample data until Supabase is connected)
-3. Phase 2: Schedule with client / internal views ✓ (drag to reschedule next)
+3. Phase 2: Schedule: timeline with drag + zoom, calendar, board; working / presentation views ✓
 4. Phase 3: Workload per person vs capacity, merged into Team ✓
-5. Phase 4: Client export, PDF / PNG ✓
+5. Phase 4: Presentation export, PDF / PNG ✓
 6. Next: shared database (Supabase) and sign-in for the office
 7. Sheets: per-project sheet list (number, name, discipline, assignee, status), import from a pasted
    sheet index / Revit schedule CSV / PDF set, counted in workload

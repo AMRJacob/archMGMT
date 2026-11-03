@@ -1,28 +1,65 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
+import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode } from '../components/ScheduleChart.tsx'
-import { useRows } from '../lib/data.ts'
-import { today } from '../lib/dates.ts'
+import TaskEditor from '../components/TaskEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
+import { addDays, parseISO, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import type { Person, Phase, Task } from '../lib/types.ts'
+import type { Task } from '../lib/types.ts'
+import { useProjectPlan } from '../lib/useProjectPlan.ts'
+import { mondayOf } from '../lib/workload.ts'
+
+type View = 'timeline' | 'calendar' | 'board'
+type Zoom = 'all' | '12' | '6' | '3'
+
+/** First of the month, n months from the month containing iso. */
+function monthFrom(iso: string, n: number) {
+  const d = parseISO(iso)
+  return toISO(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1)))
+}
+
+function useSaved<T extends string>(key: string, initial: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try { return (localStorage.getItem(key) as T) || initial } catch { return initial }
+  })
+  return [v, (next: T) => { setV(next); try { localStorage.setItem(key, next) } catch { /* ignore */ } }]
+}
 
 export default function Schedule() {
   const { current: project } = useProject()
-  const id = project?.id ?? ''
-  const phases = useRows<Phase>('phases', { project_id: id })
-  const tasks = useRows<Task>('tasks', { project_id: id })
-  const people = useRows<Person>('people')
-  const [mode, setMode] = useState<ChartMode>('client')
-  const svg = useRef<SVGSVGElement>(null)
+  const plan = useProjectPlan(project?.id ?? '')
+  const { phases, tasks, people } = plan
+  const [view, setView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
+  const [mode, setMode] = useSaved<ChartMode>('archmgmt.chartMode', 'working')
+  const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
+  const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
+  const [winStart, setWinStart] = useState(() => monthFrom(today(), -1))
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
 
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
+  const editing = tasks.rows.find((t) => t.id === editingId) ?? null
+  const openTask = (t: Task) => setEditingId(t.id)
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 
+  async function addTask(defaults: Partial<Task>) {
+    const t = today()
+    const phase = phases.rows.find((p) => p.start_date <= t && t <= p.end_date) ?? phases.rows[0]
+    const start = mondayOf(t)
+    const created = await tasks.add({
+      project_id: project!.id, phase_id: phase?.id ?? null, title: 'New task', assignee_id: null,
+      start_date: start, due_date: addDays(start, 4), estimated_hours: null, status: 'todo',
+      is_milestone: false, client_visible: false, sort_order: tasks.rows.length, ...defaults,
+    })
+    setEditingId(created.id)
+  }
+
   async function downloadPng() {
-    const el = svg.current
+    const el = exportSvg.current
     if (!el) return
     setSaving(true)
     try {
@@ -51,44 +88,112 @@ export default function Schedule() {
     }
   }
 
-  const hidden = mode === 'client'
-    ? { phases: phases.rows.filter((p) => !p.client_visible).length, tasks: tasks.rows.filter((t) => !t.client_visible).length }
-    : null
+  const months = zoom === 'all' ? 0 : Number(zoom)
+  const chartWindow: [string, string] | undefined = months
+    ? [winStart, addDays(monthFrom(winStart, months), -1)]
+    : undefined
+  const step = Math.max(1, Math.round(months / 3))
+
+  const hiddenCount = tasks.rows.filter((t) => !t.client_visible).length + phases.rows.filter((p) => !p.client_visible).length
 
   return (
-    <section>
+    <section className="schedule-page">
       <header className="page-head no-print">
         <div>
           <h1>Schedule</h1>
-          <p className="muted">
-            {project.number ? `${project.number} · ` : ''}{project.name}. Edit dates on the <Link to="/overview">Overview</Link>; the chart updates.
-          </p>
+          <p className="muted">{project.number ? `${project.number} · ` : ''}{project.name}</p>
         </div>
         <div className="toolbar">
-          <div className="segmented" role="tablist" aria-label="View">
-            <button className={mode === 'client' ? 'on' : ''} onClick={() => setMode('client')}>Client view</button>
-            <button className={mode === 'internal' ? 'on' : ''} onClick={() => setMode('internal')}>Internal view</button>
+          {plan.canUndo && <button className="btn" onClick={plan.undo} title="Undo the last move (Ctrl+Z)">↶ Undo</button>}
+          <div className="segmented" role="tablist" aria-label="Schedule view">
+            <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
+            <button className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Calendar</button>
+            <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>Board</button>
           </div>
-          <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
-          <button className="btn primary" onClick={() => window.print()}>Save as PDF</button>
         </div>
       </header>
 
-      {hidden && (
-        <p className="muted small no-print hint">
-          Client view shows phases marked “On client schedule” and tasks marked “Client” (usually milestones).
-          {hidden.tasks > 0 && ` ${hidden.tasks} internal task${hidden.tasks === 1 ? ' is' : 's are'} hidden.`}
-          {hidden.phases > 0 && ` ${hidden.phases} phase${hidden.phases === 1 ? ' is' : 's are'} hidden.`}
-        </p>
+      {view === 'timeline' && (
+        <>
+          <div className="subbar no-print">
+            <div className="segmented small-seg" aria-label="Timeline style">
+              <button className={mode === 'working' ? 'on' : ''} onClick={() => setMode('working')}>Working view</button>
+              <button className={mode === 'presentation' ? 'on' : ''} onClick={() => setMode('presentation')}>Presentation view</button>
+            </div>
+            <span className="muted small grow">
+              {mode === 'working'
+                ? 'Drag a bar to move it, drag its ends to change length. Moving a phase moves its tasks. Click a task to edit it.'
+                : `Only phases and tasks marked “Show in presentation view”.${hiddenCount ? ` ${hiddenCount} item${hiddenCount === 1 ? ' is' : 's are'} hidden.` : ''}`}
+            </span>
+            <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
+            <button className="btn primary" onClick={() => window.print()}>Save as PDF</button>
+          </div>
+          <div className="zoombar no-print">
+            <span className="muted small">Zoom</span>
+            <div className="segmented small-seg" aria-label="Zoom">
+              {([['all', 'Whole project'], ['12', '12 months'], ['6', '6 months'], ['3', '3 months']] as [Zoom, string][]).map(([z, label]) => (
+                <button key={z} className={zoom === z ? 'on' : ''} onClick={() => setZoom(z)}>{label}</button>
+              ))}
+            </div>
+            {months > 0 && (
+              <div className="toolbar">
+                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(winStart, -step))} title="Earlier">‹</button>
+                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(today(), -1))}>Today</button>
+                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(winStart, step))} title="Later">›</button>
+              </div>
+            )}
+          </div>
+          <div className="card chart-card no-print">
+            <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows} mode={mode}
+              firmName={FIRM_NAME} editable window={chartWindow} showHeader={false}
+              onMovePhase={plan.movePhase}
+              onMoveTask={(t, s, d) => plan.patchTask(t, { start_date: s, due_date: d })}
+              onOpenTask={openTask} />
+          </div>
+          <p className="muted small no-print">
+            “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. The page is set to landscape.
+          </p>
+        </>
       )}
 
-      <div className="card chart-card print-area">
-        <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows}
-          mode={mode} firmName={FIRM_NAME} svgRef={svg} />
+      {view === 'calendar' && (
+        <div className="card pad no-print">
+          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows}
+            onShiftTask={plan.shiftTask} onOpenTask={openTask} />
+        </div>
+      )}
+
+      {view === 'board' && (
+        <>
+          <div className="subbar no-print">
+            <div className="segmented small-seg" aria-label="Board columns">
+              <button className={group === 'status' ? 'on' : ''} onClick={() => setGroup('status')}>By status</button>
+              <button className={group === 'phase' ? 'on' : ''} onClick={() => setGroup('phase')}>By phase</button>
+              <button className={group === 'week' ? 'on' : ''} onClick={() => setGroup('week')}>By week (post-it)</button>
+            </div>
+            <span className="muted small grow">
+              {group === 'week'
+                ? 'Pull-plan board: notes are coloured by person. Drag a note to another week to move its dates.'
+                : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
+            </span>
+          </div>
+          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows}
+            onPatch={(t, c) => plan.patchTask(t, c)} onOpenTask={openTask} onAdd={addTask} />
+        </>
+      )}
+
+      {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
+      <div className="print-area export-only" aria-hidden="true">
+        <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows} mode={mode}
+          firmName={FIRM_NAME} svgRef={exportSvg} />
       </div>
-      <p className="muted small no-print">
-        “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. The page is set to landscape.
-      </p>
+
+      {editing && (
+        <TaskEditor task={editing} phases={phases.rows} people={people.rows}
+          onPatch={(c) => plan.patchTask(editing, c, false)}
+          onDelete={() => void tasks.drop(editing.id)}
+          onClose={() => setEditingId(null)} />
+      )}
     </section>
   )
 }

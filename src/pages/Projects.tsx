@@ -92,7 +92,7 @@ export default function Projects() {
                 <td className="mono">{r.project.number ?? '—'}</td>
                 <td>
                   <div className="strong">{r.project.name}</div>
-                  <div className="muted small">{r.project.client ?? 'No client'}</div>
+                  <div className="muted small">{r.project.client ?? 'No owner listed'}</div>
                 </td>
                 <td>{r.pm ?? <span className="muted">—</span>}</td>
                 <td>{r.currentPhase ? <span className="chip">{r.currentPhase}</span> : <span className="muted">—</span>}</td>

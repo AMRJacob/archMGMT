@@ -40,3 +40,13 @@ export function maxDate(dates: (string | null | undefined)[]): string | null {
   const v = dates.filter((d): d is string => Boolean(d)).sort()
   return v[v.length - 1] ?? null
 }
+
+/** Whole days from a to b (b − a). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / 86400000)
+}
+
+export function shortDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  return parseISO(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
