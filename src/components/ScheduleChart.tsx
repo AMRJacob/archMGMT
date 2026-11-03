@@ -15,7 +15,8 @@ import { MILESTONE_TYPES, milestoneColor, milestoneType } from '../lib/milestone
 
 export type ChartMode = 'working' | 'presentation'
 
-const W = 1400
+/** Drawing width for exports; on screen the chart takes the width it's given so text stays its normal size. */
+const EXPORT_W = 1400
 const M = 40 // outer margin
 const LABEL = 340 // label column width
 const HEADER_FULL = 128
@@ -58,8 +59,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width,
 }: {
+  /** Width to draw at, in screen pixels (on screen). Exports leave it out. */
+  width?: number
   /** In presentation mode, whether a task is shown (rules plus hand-picked items). */
   presented?: (t: Task) => boolean
   /** Add a task in a phase, starting on a date (from the "+ Add task" rows and double-clicks on empty space). */
@@ -88,6 +91,7 @@ export default function ScheduleChart({
   keepOrder?: boolean
 }) {
   const HEADER = showHeader ? HEADER_FULL : HEADER_BARE
+  const W = width ? Math.max(900, Math.round(width)) : EXPORT_W
   const inner = useRef<SVGSVGElement | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const pan = useRef<{ x0: number; applied: number } | null>(null)

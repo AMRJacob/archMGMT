@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
@@ -56,6 +56,14 @@ export default function Schedule() {
   const [spot, setSpot] = useState<(Omit<ChartSpot, 'phase'> & { phase: Phase | null }) | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
+  // The on-screen timeline draws at the card's real width, so text stays normal size on wide screens.
+  const [chartW, setChartW] = useState<number | undefined>(undefined)
+  const chartBox = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setChartW(e.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
@@ -258,9 +266,9 @@ export default function Schedule() {
               </div>
             )}
           </div>
-          <div className="card chart-card no-print">
+          <div className="card chart-card no-print" ref={chartBox}>
             <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
-              firmName={FIRM_NAME} editable window={chartWindow} colors={chartColors(theme)} showHeader={false} keepOrder
+              firmName={FIRM_NAME} editable window={chartWindow} width={chartW} colors={chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
