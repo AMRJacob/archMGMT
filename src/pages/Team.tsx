@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, DateField, SelectField, TextField } from '../components/fields.tsx'
+import SignInLink from '../components/SignInLink.tsx'
 import { projectAccent } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts'
@@ -196,6 +197,7 @@ export default function Team() {
                               <label>Name<TextField value={p.name} onSave={(v) => v && people.patch(p.id, { name: v })} /></label>
                               <label>Initials<TextField value={p.initials} placeholder="—" onSave={(v) => people.patch(p.id, { initials: v })} /></label>
                               <label>Role<TextField value={p.role} placeholder="Role" onSave={(v) => people.patch(p.id, { role: v })} /></label>
+                              <label>Email<TextField value={p.email ?? null} placeholder="name@amr-architects.com" onSave={(v) => people.patch(p.id, { email: v?.toLowerCase() ?? null })} /></label>
                               <label title="Share of a full-time load this person can take on">Availability
                                 <SelectField value={String(avail)} onSave={(v) => people.patch(p.id, { availability: Number(v ?? 100) })}>
                                   {[...new Set([...AVAILABILITY, avail])].sort((a, b) => b - a).map((a) => <option key={a} value={String(a)}>{a === 100 ? 'Full time (100%)' : `${a}%`}</option>)}
@@ -204,6 +206,7 @@ export default function Team() {
                               <label className="inline-check"><input type="checkbox" checked={p.active} onChange={(e) => people.patch(p.id, { active: e.target.checked })} />Active</label>
                               <button className="btn danger small-btn" onClick={() => removePerson(p)}>Remove</button>
                             </div>
+                            <SignInLink email={p.email} name={p.name} />
                             <div className="pd-cols">
                               <div>
                                 <h3>Open tasks</h3>
@@ -278,6 +281,7 @@ export default function Team() {
               <th>Contact</th>
               <th>Company</th>
               <th style={{ width: 180 }}>Discipline</th>
+              <th style={{ width: 220 }}>Email</th>
               <th style={{ width: 100 }} className="num">Open tasks</th>
               <th style={{ width: 70 }} className="center">Active</th>
               <th style={{ width: 36 }} />
@@ -289,12 +293,13 @@ export default function Team() {
                 <td><TextField value={p.name} onSave={(v) => v && people.patch(p.id, { name: v })} /></td>
                 <td><TextField value={p.company} placeholder="Company" onSave={(v) => people.patch(p.id, { company: v })} /></td>
                 <td><TextField value={p.discipline} placeholder="Structural, MEP, Civil…" onSave={(v) => people.patch(p.id, { discipline: v })} /></td>
+                <td><TextField value={p.email ?? null} placeholder="Email" onSave={(v) => people.patch(p.id, { email: v?.toLowerCase() ?? null })} /></td>
                 <td className="num">{openTasks(p.id).length}</td>
                 <td className="center"><Check checked={p.active} label="Active" onChange={(v) => people.patch(p.id, { active: v })} /></td>
                 <td><button className="icon-btn" title="Remove" onClick={() => removePerson(p)}>×</button></td>
               </tr>
             ))}
-            {consultants.length === 0 && <tr><td colSpan={6} className="empty small">No consultants yet.</td></tr>}
+            {consultants.length === 0 && <tr><td colSpan={7} className="empty small">No consultants yet.</td></tr>}
           </tbody>
         </table>
       </div>

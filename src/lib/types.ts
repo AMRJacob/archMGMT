@@ -5,6 +5,8 @@ export interface Person {
   name: string
   initials: string | null
   role: string | null
+  /** Used for their archMGMT sign-in. */
+  email?: string | null
   kind: PersonKind
   company: string | null
   discipline: string | null
