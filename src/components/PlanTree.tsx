@@ -19,7 +19,7 @@ const ghostName = (t: Task) =>
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
 
-type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' }
+type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam'; place?: Place }
 
 /**
  * One phase's work as a tree: sheets → views → tasks → items (checklist lines / info).
@@ -51,6 +51,7 @@ export default function PlanTree({
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [hint, setHint] = useState<{ id: string; place: Place } | null>(null)
   const [clip, setClip] = useState<Clip | null>(() => readClip())
+  const [seamPick, setSeamPick] = useState<{ key: string; idx: number } | null>(null)
 
   useEffect(() => {
     const sync = () => setClip(readClip())
@@ -200,6 +201,37 @@ export default function PlanTree({
       <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true">{[2, 7, 12].flatMap((y) => [<circle key={`a${y}`} cx="2" cy={y} r="1.2" />, <circle key={`b${y}`} cx="6" cy={y} r="1.2" />])}</svg>
     </span>
   )
+  /**
+   * The + that appears on the seam between rows: click it to add something right there. Where a branch
+   * ends, the seam serves several levels; the pointer's left/right position picks which (the + slides).
+   */
+  const seam = (cands: { task: Task; depth: number }[], place: 'before' | 'after') => {
+    const key = `${cands[0].task.id}-${place}`
+    const idx = seamPick?.key === key ? seamPick.idx : 0
+    const pick = cands[Math.min(idx, cands.length - 1)]
+    return (
+      <button type="button" className={`seam ${place}`} tabIndex={-1}
+        style={{ '--seam-x': `${40 + pick.depth * 24 - 30}px` } as CSSProperties}
+        aria-label={`Add ${place === 'before' ? 'above' : 'below'} “${pick.task.title || ghostName(pick.task)}”`}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseMove={cands.length > 1 ? (e) => {
+          const x = e.clientX - e.currentTarget.getBoundingClientRect().left
+          // Deepest level whose indent is left of the pointer.
+          let i = cands.findIndex((c) => 40 + c.depth * 24 - 14 <= x)
+          if (i < 0) i = cands.length - 1
+          if (seamPick?.key !== key || seamPick.idx !== i) setSeamPick({ key, idx: i })
+        } : undefined}
+        onClick={(e) => {
+          e.stopPropagation()
+          const r = e.currentTarget.querySelector('.seam-plus')!.getBoundingClientRect()
+          setSelected(pick.task.id)
+          setMenu({ x: r.left, y: r.bottom + 4, target: pick.task, only: 'seam', place })
+        }}>
+        <span className="seam-line" /><span className="seam-plus">+</span>
+      </button>
+    )
+  }
+
   const rowProps = (t: Task, className: string, depth: number) => ({
     className: `${className}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
@@ -235,7 +267,14 @@ export default function PlanTree({
     )
   }
 
-  const node = (t: Task, depth: number): ReactNode[] => {
+  /** First row among its siblings: it also gets a seam above it. */
+  const firstOf = (t: Task) => {
+    const sibs = t.parent_id ? childrenOf(tree, t.parent_id) : top
+    return sibs[0]?.id === t.id
+  }
+
+  /** `enders`: ancestors whose branch ends right after this row (their seam is drawn here). */
+  const node = (t: Task, depth: number, enders: { task: Task; depth: number }[] = []): ReactNode[] => {
     const kind = kindOf(t)
     if (isItem(t)) {
       return [
@@ -245,6 +284,8 @@ export default function PlanTree({
             onChange={(e) => onPatch(t, { status: e.target.checked ? 'done' : 'todo' }, false)} />
           <div className="trow-title">{title(t)}</div>
           <button className="icon-btn" title="Remove item" onClick={() => onDrop(t.id)}>×</button>
+          {firstOf(t) && seam([{ task: t, depth }], 'before')}
+          {seam([{ task: t, depth }, ...enders], 'after')}
         </li>,
       ]
     }
@@ -301,9 +342,11 @@ export default function PlanTree({
         {prog.total > 0 && <span className={`prog${prog.done === prog.total ? ' all' : ''}`} title={`${prog.done} of ${prog.total} done`}>{prog.done}/{prog.total}</span>}
         <TaskControls task={shown} people={people} phases={phases} isParent={parent}
           onPatch={(c) => onPatch(t, c)} onDelete={() => onDrop(t.id)} />
+        {firstOf(t) && seam([{ task: t, depth }], 'before')}
+        {!(isOpen && kids.length) && seam([{ task: t, depth }, ...enders], 'after')}
       </li>,
-      ...(isOpen ? kids.flatMap((c): ReactNode[] => node(c, depth + 1)) : []),
-      ...(isOpen ? [
+      ...(isOpen ? kids.flatMap((c, i): ReactNode[] => node(c, depth + 1, i === kids.length - 1 ? [{ task: t, depth }, ...enders] : [])) : []),
+      ...(isOpen && kids.length === 0 ? [
         <li key={`${t.id}-add`} className="tree-add" style={{ paddingLeft: 40 + (depth + 1) * 24 }}>
           <button className="btn ghost" onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
@@ -348,7 +391,11 @@ export default function PlanTree({
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHint(null) }}
         onDrop={(e) => { e.preventDefault(); setHint(null); dropRow(e, null, 'after') }}>
         {top.flatMap((t) => node(t, 0))}
-        {top.length === 0 && !addingSheet && <li className="muted small empty-row">Nothing in this phase yet. Right-click here, or use the buttons below, to add sheets, tasks and milestones.</li>}
+        {top.length === 0 && !addingSheet && (
+          <li className="muted small empty-row">
+            <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
+          </li>
+        )}
         {addingSheet && (
           <AddSheetRow
             onCancel={() => setAddingSheet(false)}
@@ -361,19 +408,38 @@ export default function PlanTree({
             }} />
         )}
       </ul>
-      <div className="phase-actions-left"
-        onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, target: null }) }}>
-        <button className="btn ghost" onClick={() => setAddingSheet(true)}>+ Sheet</button>
-        <button className="btn ghost" onClick={() => setPlanning(true)}>+ Sheets by type</button>
-        <button className="btn ghost" onClick={() => addAt(null, 'inside', 'task')}>+ Task</button>
-        <span className="muted small tree-tip">Right-click a row to add next to it, move it or copy it</span>
-      </div>
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}
-          items={menu.only ? insideItems(menu.target!) : menuItems(menu.target)} />
+          items={menu.only === 'add-inside' ? insideItems(menu.target!) : menu.only === 'seam' ? seamItems(menu.target!, menu.place ?? 'after') : menuItems(menu.target)} />
       )}
     </>
   )
+
+  /** Adding on a seam: siblings at that level, right there. */
+  function seamItems(t: Task, place: Place): MenuItem[] {
+    const k = kindOf(t)
+    const parent = t.parent_id ? tree.byId.get(t.parent_id) ?? null : null
+    const pk = parent ? kindOf(parent) : null
+    const pasteLabel = clip?.mode === 'cut' ? 'Move here' : 'Paste here'
+    const opts: MenuItem[] = !parent
+      ? [
+          { label: 'Sheet', run: () => addAt(t, place, 'sheet') },
+          { label: 'Task', run: () => addAt(t, place, 'task') },
+          { label: 'Milestone', run: () => addAt(t, place, 'task', true) },
+        ]
+      : k === 'item' || pk === 'task'
+        ? [{ label: 'Checklist item', run: () => addAt(t, place, 'item') }]
+        : [
+            ...(pk === 'sheet' ? [{ label: 'View', run: () => addAt(t, place, 'view') }] : []),
+            { label: 'Task', run: () => addAt(t, place, 'task') },
+            { label: 'Checklist item', run: () => addAt(t, place, 'item') },
+          ]
+    return [
+      ...opts,
+      ...(!parent ? ['sep' as const, { label: 'Sheets by type…', run: () => setPlanning(true) }, { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) }] : []),
+      ...(clip ? ['sep' as const, { label: pasteLabel, run: () => paste(t, place) }] : []),
+    ]
+  }
 
   function insideItems(t: Task): MenuItem[] {
     const k = kindOf(t)
@@ -392,6 +458,7 @@ export default function PlanTree({
       return [
         { label: 'Add sheet', run: () => addAt(null, 'inside', 'sheet') },
         { label: 'Add sheets by type…', run: () => setPlanning(true) },
+        { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) },
         { label: 'Add task', run: () => addAt(null, 'inside', 'task') },
         { label: 'Add milestone', run: () => addAt(null, 'inside', 'task', true) },
         'sep',

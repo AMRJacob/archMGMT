@@ -254,7 +254,7 @@ export default function ProjectDetail() {
                   {tasksFor(p.id).length === 0 && (
                     <div className="phase-empty">
                       <button className="btn primary" onClick={() => setSetupLocal(p.id)}>Set up {p.name}</button>
-                      <span className="muted small">Pick the usual tasks, milestones and sheets for this phase in one go, or right-click below to add one thing at a time.</span>
+                      <span className="muted small">Pick the usual tasks, milestones and sheets for this phase in one go, or add one thing at a time below.</span>
                     </div>
                   )}
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
