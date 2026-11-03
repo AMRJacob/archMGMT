@@ -1,6 +1,6 @@
 import { useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react'
 import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
-import { phaseColor } from '../lib/phases.ts'
+import { projectPalette } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
 
 /**
@@ -55,7 +55,7 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, window: view, showHeader = true,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true,
 }: {
   project: Project
   phases: Phase[]
@@ -70,21 +70,26 @@ export default function ScheduleChart({
   onOpenTask?: (task: Task) => void
   /** Show only this date range (zoomed in); bars outside it are cut off at the edges. */
   window?: [string, string]
+  /** Called while click-and-hold panning the timeline, with days to move the window by. */
+  onPan?: (days: number) => void
   showHeader?: boolean
 }) {
   const HEADER = showHeader ? HEADER_FULL : HEADER_BARE
   const inner = useRef<SVGSVGElement | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
+  const pan = useRef<{ x0: number; applied: number } | null>(null)
+  const [panning, setPanning] = useState(false)
   const pres = mode === 'presentation'
 
   const sorted = [...phases].sort((a, b) => a.sort_order - b.sort_order || a.start_date.localeCompare(b.start_date))
   const byStart = (a: Task, b: Task) =>
     (a.start_date ?? a.due_date ?? '').localeCompare(b.start_date ?? b.due_date ?? '') || a.sort_order - b.sort_order
 
+  const palette = projectPalette(project.color, sorted.length)
   const rows: Row[] = []
   sorted.forEach((phase, i) => {
     if (pres && !phase.client_visible) return
-    const color = phaseColor(i)
+    const color = palette[i]
     rows.push({ kind: 'phase', phase, color })
     tasks
       .filter((t) => t.phase_id === phase.id && (!pres || t.client_visible))
@@ -134,7 +139,19 @@ export default function ScheduleChart({
     inner.current?.setPointerCapture(e.pointerId)
     setDrag({ kind, id, mode: m, x0: toChartX(e.clientX), delta: 0, moved: false })
   }
+  const startPan = (e: RPointerEvent) => {
+    if (!onPan || e.button !== 0) return
+    inner.current?.setPointerCapture(e.pointerId)
+    pan.current = { x0: toChartX(e.clientX), applied: 0 }
+    setPanning(true)
+  }
   const onMove = (e: RPointerEvent) => {
+    if (pan.current) {
+      // Drag right to see earlier dates, left to see later ones.
+      const d = Math.round((toChartX(e.clientX) - pan.current.x0) / dayW)
+      if (d !== pan.current.applied) { onPan?.(-(d - pan.current.applied)); pan.current.applied = d }
+      return
+    }
     if (!drag) return
     const dx = toChartX(e.clientX) - drag.x0
     const delta = Math.round(dx / dayW)
@@ -142,6 +159,7 @@ export default function ScheduleChart({
     if (delta !== drag.delta || moved !== drag.moved) setDrag({ ...drag, delta, moved })
   }
   const endDrag = () => {
+    if (pan.current) { pan.current = null; setPanning(false); return }
     if (!drag) return
     const d = drag
     setDrag(null)
@@ -192,8 +210,14 @@ export default function ScheduleChart({
     return acc
   }, [])
 
+  // Tick detail follows the zoom: days at about 3 months, weeks at about 6, months beyond.
+  const scale: 'month' | 'week' | 'day' = view ? (days <= 100 ? 'day' : days <= 200 ? 'week' : 'month') : 'month'
+  const dayList: string[] = []
+  if (scale !== 'month') for (let d = start; d <= end; d = addDays(d, 1)) dayList.push(d)
+  const dow = (iso: string) => parseISO(iso).getUTCDay()
+
   const axisTop = HEADER
-  const rowsTop = axisTop + AXIS
+  const rowsTop = axisTop + (scale === 'day' ? AXIS + 12 : AXIS)
   const rowY: number[] = []
   let y = rowsTop
   for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : ROW_PHASE }
@@ -239,7 +263,7 @@ export default function ScheduleChart({
       xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
       style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'none' : undefined }}
       fontFamily={FONT} role="img" aria-label={`${project.name} schedule`}
-      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}
+      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); pan.current = null; setPanning(false) }}
     >
       <rect x={0} y={0} width={W} height={H} fill="#ffffff" />
 
@@ -260,17 +284,55 @@ export default function ScheduleChart({
       <defs><clipPath id="chart-area"><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
 
       {/* Timeline axis */}
-      {years.map((yr) => (
-        <text key={yr.year} x={Math.max(yr.x1, x0) + 6} y={axisTop + 16} fontSize={11} fontWeight={600} fill={INK}>{yr.year}</text>
-      ))}
-      {months.map((m) => (
-        <g key={`${m.year}-${m.month}`}>
-          <line x1={m.x1} x2={m.x1} y1={m.month === 0 || m.x1 === x0 ? axisTop + 2 : axisTop + 24} y2={rowsBottom} stroke={m.month === 0 ? '#d6d2ca' : LINE} strokeWidth={1} />
-          <text x={(m.x1 + m.x2) / 2} y={axisTop + 38} fontSize={11} fill={MUTED} textAnchor="middle">
-            {monthW >= 30 ? m.label : m.label[0]}
-          </text>
-        </g>
-      ))}
+      {scale === 'month' ? (
+        <>
+          {years.map((yr) => (
+            <text key={yr.year} x={Math.max(yr.x1, x0) + 6} y={axisTop + 16} fontSize={11} fontWeight={600} fill={INK}>{yr.year}</text>
+          ))}
+          {months.map((m) => (
+            <g key={`${m.year}-${m.month}`}>
+              <line x1={m.x1} x2={m.x1} y1={m.month === 0 || m.x1 === x0 ? axisTop + 2 : axisTop + 24} y2={rowsBottom} stroke={m.month === 0 ? '#d6d2ca' : LINE} strokeWidth={1} />
+              <text x={(m.x1 + m.x2) / 2} y={axisTop + 38} fontSize={11} fill={MUTED} textAnchor="middle">
+                {monthW >= 30 ? m.label : m.label[0]}
+              </text>
+            </g>
+          ))}
+        </>
+      ) : (
+        <>
+          {scale === 'day' && dayList.map((d) => {
+            // Days: a line per day, the date on each Monday, and a weekday letter under every day.
+            const w = dow(d)
+            const weekend = w === 0 || w === 6
+            return (
+              <g key={d}>
+                <line x1={x(d)} x2={x(d)} y1={w === 1 ? axisTop + 22 : axisTop + 42} y2={rowsBottom} stroke={w === 1 ? '#dcd8d0' : '#f0eee9'} />
+                {w === 1 && <text x={x(d) + 3} y={axisTop + 36} fontSize={10.5} fontWeight={500} fill={INK}>{parseISO(d).getUTCDate()}</text>}
+                <text x={x(d) + dayW / 2} y={axisTop + 54} fontSize={9} fill={weekend ? '#bcb9b2' : MUTED} textAnchor="middle">
+                  {'SMTWTFS'[w]}
+                </text>
+              </g>
+            )
+          })}
+          {scale === 'week' && dayList.filter((d) => dow(d) === 1).map((d) => (
+            <g key={d}>
+              <line x1={x(d)} x2={x(d)} y1={axisTop + 26} y2={rowsBottom} stroke={LINE} />
+              <text x={x(d) + 4} y={axisTop + 39} fontSize={10.5} fill={MUTED}>{parseISO(d).getUTCDate()}</text>
+            </g>
+          ))}
+          {months.map((m) => (
+            <g key={`${m.year}-${m.month}`}>
+              <line x1={m.x1} x2={m.x1} y1={axisTop + 2} y2={rowsBottom} stroke="#d6d2ca" />
+              {m.x2 - m.x1 > 34 && (
+                <text x={showToday && x(t) >= m.x1 - 24 && x(t) < m.x1 + 90 ? Math.max(m.x1 + 6, x(t) + 28) : m.x1 + 6}
+                  y={axisTop + 16} fontSize={11} fontWeight={600} fill={INK}>
+                  {m.x2 - m.x1 > 90 ? `${m.label} ${m.year}` : m.label}
+                </text>
+              )}
+            </g>
+          ))}
+        </>
+      )}
       <line x1={x0 + cw} x2={x0 + cw} y1={axisTop + 2} y2={rowsBottom} stroke={LINE} />
       <line x1={M} x2={W - M} y1={rowsTop} y2={rowsTop} stroke="#d6d2ca" />
 
@@ -309,6 +371,17 @@ export default function ScheduleChart({
         )
       })}
 
+      {scale === 'day' && (
+        <g pointerEvents="none">
+          {dayList.filter((d) => dow(d) === 0 || dow(d) === 6).map((d) => (
+            <rect key={d} x={x(d)} y={rowsTop} width={dayW} height={rowsBottom - rowsTop} fill={INK} opacity={0.035} />
+          ))}
+        </g>
+      )}
+      {onPan && (
+        <rect x={x0} y={axisTop} width={cw} height={rowsBottom - axisTop} fill="transparent"
+          style={{ cursor: panning ? 'grabbing' : 'grab' }} data-pan="1" onPointerDown={startPan} />
+      )}
       <g clipPath={view ? 'url(#chart-area)' : undefined}>
       {rows.map((r, i) => {
         const ry = rowY[i]
@@ -369,9 +442,9 @@ export default function ScheduleChart({
 
       {/* Legend and footer */}
       <g transform={`translate(${M}, ${rowsBottom + 34})`} fontSize={11} fill={MUTED}>
-        <rect x={0} y={-9} width={26} height={12} rx={3} fill={phaseColor(2)} />
+        <rect x={0} y={-9} width={26} height={12} rx={3} fill={palette[Math.min(2, palette.length - 1)]} />
         <text x={34} y={1}>Phase</text>
-        <rect x={86} y={-6} width={26} height={7} rx={2} fill={phaseColor(2)} opacity={0.6} />
+        <rect x={86} y={-6} width={26} height={7} rx={2} fill={palette[Math.min(2, palette.length - 1)]} opacity={0.6} />
         <text x={120} y={1}>{pres ? 'Activity' : 'Task'}</text>
         <rect x={172} y={-8} width={9} height={9} fill={INK} transform="rotate(45 176.5 -3.5)" />
         <text x={190} y={1}>Milestone</text>

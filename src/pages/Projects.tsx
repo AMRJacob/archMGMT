@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { insertMany, useRows } from '../lib/data.ts'
 import { useProject } from '../lib/projectContext.ts'
+import { projectAccent } from '../lib/colors.ts'
 import { defaultPhaseRows } from '../lib/phases.ts'
 import { formatDate, maxDate, minDate, nextMonday, today as todayISO } from '../lib/dates.ts'
 import { PROJECT_STATUSES, type Person, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
@@ -91,7 +92,7 @@ export default function Projects() {
                 onClick={() => { projects.select(r.project.id); navigate('/overview') }}>
                 <td className="mono">{r.project.number ?? '—'}</td>
                 <td>
-                  <div className="strong">{r.project.name}</div>
+                  <div className="strong"><span className="pdot" style={{ background: projectAccent(r.project.color).accent }} />{r.project.name}</div>
                   <div className="muted small">{r.project.client ?? 'No owner listed'}</div>
                 </td>
                 <td>{r.pm ?? <span className="muted">—</span>}</td>

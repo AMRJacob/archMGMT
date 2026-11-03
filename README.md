@@ -29,12 +29,15 @@ Workload = each person's open task hours spread over the weekdays they run, comp
   phases (current one open) with one-line summaries. Click a task to edit all of its details.
 - **Schedule**, three views of the current project:
   - *Timeline*: drag bars to move them, drag ends to change length; moving a phase moves its tasks.
-    Zoom to 12 / 6 / 3 months for fine moves. *Working view* shows everything; *Presentation view* shows only
+    Zoom to 12 months (month ticks), 6 months (week ticks) or 3 months (day ticks) for fine moves;
+    click and hold empty space to pan. *Working view* shows everything; *Presentation view* shows only
     phases and tasks marked "Show in presentation view". Export as PDF (print, landscape) or PNG.
   - *Calendar*: month grid; drag a task to another day.
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
     drag cards between columns.
   - Undo (button or Ctrl+Z) reverses drags and moves.
+- **Project colours**: each project picks one root colour (swatch next to its number on Overview); a soft
+  analogous palette for its phases is built from it and used on every view and export.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week hours-vs-capacity grid per staff member; click a person for their per-project
   breakdown, open tasks, time off and details. Consultants listed below.

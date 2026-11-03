@@ -14,11 +14,14 @@ import { mondayOf } from '../lib/workload.ts'
 type View = 'timeline' | 'calendar' | 'board'
 type Zoom = 'all' | '12' | '6' | '3'
 
-/** First of the month, n months from the month containing iso. */
-function monthFrom(iso: string, n: number) {
+/** The same day n months later (or earlier). */
+function addMonths(iso: string, n: number) {
   const d = parseISO(iso)
-  return toISO(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1)))
+  return toISO(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, d.getUTCDate())))
 }
+
+/** Where a zoomed timeline starts by default: two weeks before this week. */
+const defaultWindowStart = () => addDays(mondayOf(today()), -14)
 
 function useSaved<T extends string>(key: string, initial: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => {
@@ -35,7 +38,7 @@ export default function Schedule() {
   const [mode, setMode] = useSaved<ChartMode>('archmgmt.chartMode', 'working')
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
-  const [winStart, setWinStart] = useState(() => monthFrom(today(), -1))
+  const [winStart, setWinStart] = useState(defaultWindowStart)
   const [editingId, setEditingId] = useState<string | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
@@ -90,9 +93,9 @@ export default function Schedule() {
 
   const months = zoom === 'all' ? 0 : Number(zoom)
   const chartWindow: [string, string] | undefined = months
-    ? [winStart, addDays(monthFrom(winStart, months), -1)]
+    ? [winStart, addDays(addMonths(winStart, months), -1)]
     : undefined
-  const step = Math.max(1, Math.round(months / 3))
+  const step = Math.round((months * 30) / 4) // arrows move a quarter of the view
 
   const hiddenCount = tasks.rows.filter((t) => !t.client_visible).length + phases.rows.filter((p) => !p.client_visible).length
 
@@ -122,7 +125,7 @@ export default function Schedule() {
             </div>
             <span className="muted small grow">
               {mode === 'working'
-                ? 'Drag a bar to move it, drag its ends to change length. Moving a phase moves its tasks. Click a task to edit it.'
+                ? `Drag a bar to move it, drag its ends to change length. Moving a phase moves its tasks. Click a task to edit it.${months ? ' Click and hold empty space to pan.' : ''}`
                 : `Only phases and tasks marked “Show in presentation view”.${hiddenCount ? ` ${hiddenCount} item${hiddenCount === 1 ? ' is' : 's are'} hidden.` : ''}`}
             </span>
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
@@ -137,15 +140,16 @@ export default function Schedule() {
             </div>
             {months > 0 && (
               <div className="toolbar">
-                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(winStart, -step))} title="Earlier">‹</button>
-                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(today(), -1))}>Today</button>
-                <button className="btn small-btn" onClick={() => setWinStart(monthFrom(winStart, step))} title="Later">›</button>
+                <button className="btn small-btn" onClick={() => setWinStart(addDays(winStart, -step))} title="Earlier">‹</button>
+                <button className="btn small-btn" onClick={() => setWinStart(defaultWindowStart())}>Today</button>
+                <button className="btn small-btn" onClick={() => setWinStart(addDays(winStart, step))} title="Later">›</button>
               </div>
             )}
           </div>
           <div className="card chart-card no-print">
             <ScheduleChart project={project} phases={phases.rows} tasks={tasks.rows} people={people.rows} mode={mode}
               firmName={FIRM_NAME} editable window={chartWindow} showHeader={false}
+              onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => plan.patchTask(t, { start_date: s, due_date: d })}
               onOpenTask={openTask} />
@@ -158,7 +162,7 @@ export default function Schedule() {
 
       {view === 'calendar' && (
         <div className="card pad no-print">
-          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows}
+          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows} root={project.color}
             onShiftTask={plan.shiftTask} onOpenTask={openTask} />
         </div>
       )}
@@ -177,7 +181,7 @@ export default function Schedule() {
                 : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
             </span>
           </div>
-          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows}
+          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows} root={project.color}
             onPatch={(t, c) => plan.patchTask(t, c)} onOpenTask={openTask} onAdd={addTask} />
         </>
       )}

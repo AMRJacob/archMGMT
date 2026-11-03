@@ -4,7 +4,8 @@ import { DateField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import TaskEditor from '../components/TaskEditor.tsx'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
-import { phaseColor } from '../lib/phases.ts'
+import ColorPicker from '../components/ColorPicker.tsx'
+import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
@@ -85,6 +86,9 @@ export default function ProjectDetail() {
     void tasks.reload()
   }
 
+  const palette = projectPalette(project.color, sortedPhases.length)
+  const phaseColor = (i: number) => palette[i]
+  const { accent, soft } = projectAccent(project.color)
   const span = start && end ? Math.max(1, daysBetween(start, end) + 1) : 1
 
   const taskRow = (x: Task) => {
@@ -112,11 +116,12 @@ export default function ProjectDetail() {
   }
 
   return (
-    <section className="overview">
+    <section className="overview" style={{ ['--p-accent' as string]: accent, ['--p-soft' as string]: soft }}>
       <Link to="/" className="back">← All projects</Link>
 
       <header className="project-head card">
         <div className="project-title">
+          <ColorPicker value={project.color} phaseCount={sortedPhases.length} onChange={(c) => projects.patch(id, { color: c })} />
           <TextField value={project.number} placeholder="Project no." className="mono number"
             onSave={(v) => projects.patch(id, { number: v })} />
           <TextField value={project.name} className="title"
@@ -148,7 +153,7 @@ export default function ProjectDetail() {
           <div className="strip-bar">
             {sortedPhases.map((p, i) => (
               <button key={p.id} className={`strip-seg${p.id === currentPhase?.id ? ' now' : ''}${p.end_date < t ? ' past' : ''}`}
-                style={{ flexGrow: daysBetween(p.start_date, p.end_date) + 1, background: phaseColor(i) }}
+                style={{ flexGrow: daysBetween(p.start_date, p.end_date) + 1, background: phaseColor(i), color: textOn(phaseColor(i)) }}
                 title={`${p.name}: ${shortDate(p.start_date)} – ${shortDate(p.end_date)}`}
                 onClick={() => { setOpenIds(new Set([...open, p.id])); document.getElementById(`phase-${p.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>
                 <span>{p.name}</span>

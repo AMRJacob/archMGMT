@@ -45,6 +45,15 @@ const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
     for (const p of s.people) p.kind ??= 'staff'
     seedV2(s, tag)
   },
+  // 2 → 3: give sample projects their own colour scheme (only sample projects with no colour yet)
+  (s, meta) => {
+    const sample = new Set(meta.sampleIds)
+    const roots: Record<string, string> = {
+      'Sample Library Renovation': '#557a99', 'Sample Fire Station No. 3': '#b8694a', 'Sample Clinic Addition': '#4d8a86',
+      'Sample Office Fit-out': '#8a77a8', 'Sample Campus Master Plan': '#6b8f71',
+    }
+    for (const p of s.projects) if (sample.has(p.id) && !p.color && roots[String(p.name)]) p.color = roots[String(p.name)]
+  },
 ]
 
 // Read fresh every time (no cache), so two open tabs never overwrite each other's changes.

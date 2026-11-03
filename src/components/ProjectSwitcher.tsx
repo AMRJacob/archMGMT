@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES } from '../lib/types.ts'
+import { projectAccent } from '../lib/colors.ts'
 
 /** The current project; click it to switch to another. Same behaviour as CAzen's switcher. */
 export default function ProjectSwitcher() {
@@ -29,7 +30,7 @@ export default function ProjectSwitcher() {
           {current ? (
             <>
               <span className="ps-number">{current.number ?? 'No number'}</span>
-              <span className="ps-name">{current.name}</span>
+              <span className="ps-name"><span className="pdot" style={{ background: projectAccent(current.color).accent }} />{current.name}</span>
             </>
           ) : (
             <span className="ps-name ps-empty">{projects.length ? 'Choose a project' : 'No projects yet'}</span>
@@ -47,7 +48,7 @@ export default function ProjectSwitcher() {
                 {p.number ?? '—'}
                 {p.status !== 'active' && <span className="ps-status"> · {statusLabel(p.status)}</span>}
               </span>
-              <span className="ps-name">{p.name}</span>
+              <span className="ps-name"><span className="pdot" style={{ background: projectAccent(p.color).accent }} />{p.name}</span>
             </button>
           ))}
           <button className="ps-all" onClick={() => { setOpen(false); navigate('/') }}>
