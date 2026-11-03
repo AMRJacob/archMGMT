@@ -194,7 +194,7 @@ select.status.done { color: var(--ok); }
 .project-title { display: flex; gap: 8px; align-items: center; }
 .project-title .number { width: 130px; flex: none; color: var(--muted); }
 .project-title .title { font-size: 22px; font-weight: 600; }
-.meta-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 20px; }
 .meta-grid label, .notes, .stat {
   display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
@@ -833,3 +833,8 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 .filter-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .filter-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .filter-pop .chip-btn { padding: 0; min-height: 0; }
+
+.field.amount { text-align: left; }
+.stat small { display: block; font-size: 12px; margin-top: 2px; }
+.np-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.phase-empty ~ .tlist .empty-row { display: none; }

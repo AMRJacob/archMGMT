@@ -35,6 +35,12 @@ export interface Project {
   start_date: string | null
   end_date: string | null
   notes: string | null
+  /** Construction budget in dollars. */
+  budget?: number | null
+  /** Gross area in square feet. */
+  gross_area?: number | null
+  /** Education, office, healthcare… (see BUILDING_TYPES). */
+  building_type?: string | null
   created_at?: string
 }
 

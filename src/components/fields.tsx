@@ -1,3 +1,4 @@
+import { parseAmount } from '../lib/amount.ts'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /** Inline fields: look like plain text until focused, save when you leave the field. */
@@ -116,5 +117,31 @@ export function Check({ checked, onChange, label }: { checked: boolean; onChange
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="sr">{label}</span>
     </label>
+  )
+}
+
+/** A number shown formatted (e.g. "$4,250,000" or "12,500 SF") that edits as plain text. */
+export function AmountField({ value, onSave, placeholder, format }: {
+  value: number | null
+  onSave: (v: number | null) => void
+  placeholder?: string
+  format: (n: number) => string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const commit = () => {
+    setEditing(false)
+    const n = parseAmount(draft)
+    if (n !== 'bad' && n !== value) onSave(n)
+  }
+  return (
+    <input className="field num amount" inputMode="decimal" placeholder={placeholder}
+      value={editing ? draft : value == null ? '' : format(value)}
+      onFocus={() => { setEditing(true); setDraft(value == null ? '' : String(value)) }}
+      onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        if (e.key === 'Escape') { setDraft(value == null ? '' : String(value)); setEditing(false); (e.target as HTMLInputElement).blur() }
+      }} />
   )
 }

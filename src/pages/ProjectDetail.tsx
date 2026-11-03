@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { SelectField, TextField } from '../components/fields.tsx'
+import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree from '../components/PlanTree.tsx'
@@ -15,6 +15,7 @@ import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
+import { area, BUILDING_TYPES, money } from '../lib/amount.ts'
 import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
 
 export default function ProjectDetail() {
@@ -150,6 +151,7 @@ export default function ProjectDetail() {
         </div>
         <div className="meta-grid">
           <label>Owner<TextField value={project.client} placeholder="Owner" onSave={(v) => projects.patch(id, { client: v })} /></label>
+          <label>Building type<BuildingTypeField value={project.building_type ?? null} onSave={(v) => projects.patch(id, { building_type: v })} /></label>
           <label>Project manager
             <SelectField value={project.pm_id} onSave={(v) => projects.patch(id, { pm_id: v })}>
               <PersonOptions people={staff} includeConsultants={false} />
@@ -160,8 +162,20 @@ export default function ProjectDetail() {
               {PROJECT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </SelectField>
           </label>
-          <div className="stat"><span>Schedule</span>{formatDate(start)} – {formatDate(end)}</div>
-          <div className="stat"><span>Open work</span>{openTaskRows.length} task{openTaskRows.length === 1 ? '' : 's'}</div>
+          <label>Budget
+            <AmountField value={project.budget ?? null} placeholder="e.g. 4.25m" format={money}
+              onSave={(v) => projects.patch(id, { budget: v })} />
+          </label>
+          <label>Gross area
+            <AmountField value={project.gross_area ?? null} placeholder="e.g. 12,500" format={area}
+              onSave={(v) => projects.patch(id, { gross_area: v })} />
+          </label>
+          <div className="stat" title="Budget divided by gross area"><span>Cost per SF</span>
+            {project.budget && project.gross_area ? money(project.budget / project.gross_area, 2) : <span className="muted">Add budget and area</span>}
+          </div>
+          <div className="stat"><span>Schedule</span>{formatDate(start)} – {formatDate(end)}
+            <small className="muted">{openTaskRows.length} open task{openTaskRows.length === 1 ? '' : 's'}</small>
+          </div>
         </div>
         <label className="notes">Notes<TextField multiline value={project.notes} placeholder="Scope, contract notes…" onSave={(v) => projects.patch(id, { notes: v })} /></label>
       </header>
@@ -279,5 +293,24 @@ export default function ProjectDetail() {
         )
       })()}
     </section>
+  )
+}
+
+/** Building type: the usual list, or type your own under Other. */
+function BuildingTypeField({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+  const known = !value || BUILDING_TYPES.includes(value)
+  const [other, setOther] = useState(!known)
+  if (other) {
+    return <TextField value={value} placeholder="Building type" autoFocus={known} onSave={(v) => { onSave(v); if (!v) setOther(false) }} onEscape={() => setOther(false)} />
+  }
+  return (
+    <select className="field" value={value ?? ''} onChange={(e) => {
+      if (e.target.value === '__other') { setOther(true); return }
+      onSave(e.target.value || null)
+    }}>
+      <option value="">Not set</option>
+      {BUILDING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+      <option value="__other">Other…</option>
+    </select>
   )
 }

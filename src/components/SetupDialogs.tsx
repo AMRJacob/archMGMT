@@ -2,12 +2,15 @@ import { useState } from 'react'
 import Modal from './Modal.tsx'
 import { addDays, daysBetween, formatDate, nextMonday, shortDate } from '../lib/dates.ts'
 import { ROOT_PRESETS } from '../lib/colors.ts'
+import { BUILDING_TYPES, parseAmount } from '../lib/amount.ts'
 import { milestoneType } from '../lib/milestones.ts'
 import { PHASE_TEMPLATES, templateFor, type TemplateTask } from '../lib/phaseTemplates.ts'
 import { nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { DEFAULT_PHASES, type Phase, type Project, type Task } from '../lib/types.ts'
 
 // ---------- new project ----------
+
+const num = (v: string) => { const n = parseAmount(v); return n === 'bad' ? null : n }
 
 type DraftPhase = { key: string; name: string; weeks: number; on: boolean; alongside?: string }
 
@@ -36,6 +39,9 @@ export function NewProjectDialog({ onCreate, onClose }: {
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
   const [client, setClient] = useState('')
+  const [buildingType, setBuildingType] = useState('')
+  const [grossArea, setGrossArea] = useState('')
+  const [budget, setBudget] = useState('')
   const [color, setColor] = useState(ROOT_PRESETS[0]?.hex ?? '#4d8a86')
   const [start, setStart] = useState(nextMonday())
   const [phases, setPhases] = useState<DraftPhase[]>(startingPhases)
@@ -60,7 +66,10 @@ export function NewProjectDialog({ onCreate, onClose }: {
     setBusy(true)
     try {
       await onCreate(
-        { name: name.trim(), number: number.trim() || null, client: client.trim() || null, color, color_scheme: 'balanced', status: 'active' },
+        {
+          name: name.trim(), number: number.trim() || null, client: client.trim() || null, color, color_scheme: 'balanced', status: 'active',
+          building_type: buildingType || null, gross_area: num(grossArea), budget: num(budget),
+        },
         chosen.map((p, i) => ({ name: p.name.trim(), sort_order: i, start_date: dated.get(p.key)!.s, end_date: dated.get(p.key)!.e, client_visible: true })),
         setupFirst && chosen.length > 0,
       )
@@ -86,6 +95,14 @@ export function NewProjectDialog({ onCreate, onClose }: {
           <label className="span2">Project name<input className="field boxed" autoFocus value={name} placeholder="e.g. Riverside Branch Library" onChange={(e) => setName(e.target.value)} /></label>
           <label>Number<input className="field boxed mono" value={number} placeholder="2026-014" onChange={(e) => setNumber(e.target.value)} /></label>
           <label>Owner<input className="field boxed" value={client} placeholder="Owner or agency" onChange={(e) => setClient(e.target.value)} /></label>
+          <label>Building type
+            <input className="field boxed" list="building-types" value={buildingType} placeholder="Choose or type" onChange={(e) => setBuildingType(e.target.value)} />
+            <datalist id="building-types">{BUILDING_TYPES.map((t) => <option key={t} value={t} />)}</datalist>
+          </label>
+          <div className="np-pair">
+            <label>Gross area (SF)<input className="field boxed" inputMode="decimal" value={grossArea} placeholder="12,500" onChange={(e) => setGrossArea(e.target.value)} /></label>
+            <label>Budget<input className="field boxed" inputMode="decimal" value={budget} placeholder="$4.25m" onChange={(e) => setBudget(e.target.value)} /></label>
+          </div>
         </div>
         <div className="np-colors" role="radiogroup" aria-label="Project colour">
           {ROOT_PRESETS.slice(0, 10).map((c) => (
