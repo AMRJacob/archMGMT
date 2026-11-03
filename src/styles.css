@@ -838,3 +838,18 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 .stat small { display: block; font-size: 12px; margin-top: 2px; }
 .np-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .phase-empty ~ .tlist .empty-row { display: none; }
+
+/* All projects: filters, columns, sorting */
+.list-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.list-filters .search { width: 260px; }
+.th-sort { border: none; background: none; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
+.th-sort:hover, .th-sort.on { color: var(--ink); }
+th.num .th-sort { width: 100%; text-align: right; }
+.table-scroll { overflow-x: auto; }
+.table tfoot td { border-top: 1px solid var(--line-strong); background: var(--subtle); }
+.budget-range { display: flex; gap: 8px; padding: 6px; }
+.budget-range label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.budget-range .field { width: 120px; color: var(--ink); }
+.list-filters .grow { flex: 1; }
+.table-scroll td .mono, .table-scroll td .small { white-space: nowrap; }
+.table-scroll .chip { white-space: nowrap; }
