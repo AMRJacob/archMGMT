@@ -85,7 +85,7 @@ export default function ScheduleChart({
   const byStart = (a: Task, b: Task) =>
     (a.start_date ?? a.due_date ?? '').localeCompare(b.start_date ?? b.due_date ?? '') || a.sort_order - b.sort_order
 
-  const palette = projectPalette(project.color, sorted.length)
+  const palette = projectPalette(project.color, sorted.length, project.color_scheme)
   const rows: Row[] = []
   sorted.forEach((phase, i) => {
     if (pres && !phase.client_visible) return

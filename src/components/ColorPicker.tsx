@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { projectAccent, projectPalette, ROOT_PRESETS } from '../lib/colors.ts'
+import { projectAccent, projectPalette, ROOT_PRESETS, SCHEMES, textOn } from '../lib/colors.ts'
 
-/** Pick a project's root colour; shows the phase palette it builds. */
-export default function ColorPicker({ value, phaseCount, onChange }: {
+/** Pick a project's root colour and scheme; previews the phase colours they build. */
+export default function ColorPicker({ value, scheme, phaseNames, onChange, onScheme }: {
   value: string | null
-  phaseCount: number
+  scheme: string | null
+  phaseNames: string[]
   onChange: (hex: string | null) => void
+  onScheme: (scheme: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -19,15 +21,17 @@ export default function ColorPicker({ value, phaseCount, onChange }: {
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc) }
   }, [open])
 
-  const preview = projectPalette(value, Math.max(phaseCount, 6))
+  const names = phaseNames.length ? phaseNames : ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5', 'Phase 6']
+  const current = scheme ?? 'balanced'
   const accent = projectAccent(value).accent
+  const short = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()
 
   return (
     <div className="color-pick" ref={box}>
-      <button className="swatch-btn" title="Project colour" onClick={() => setOpen(!open)} style={{ background: accent }} aria-label="Project colour" />
+      <button className="swatch-btn" title="Project colours" onClick={() => setOpen(!open)} style={{ background: accent }} aria-label="Project colours" />
       {open && (
         <div className="color-pop">
-          <div className="cp-label">Project colour</div>
+          <div className="cp-label">Root colour</div>
           <div className="cp-presets">
             {ROOT_PRESETS.map((c) => (
               <button key={c.hex} title={c.name} className={value?.toLowerCase() === c.hex ? 'on' : ''}
@@ -41,8 +45,26 @@ export default function ColorPicker({ value, phaseCount, onChange }: {
             </label>
             {value && <button className="btn ghost" onClick={() => onChange(null)}>Use default</button>}
           </div>
-          <div className="cp-label">Phase colours it builds</div>
-          <div className="cp-preview">{preview.map((c, i) => <i key={i} style={{ background: c }} />)}</div>
+
+          {value && (
+            <>
+              <div className="cp-label">Scheme</div>
+              <div className="cp-schemes">
+                {SCHEMES.map((s) => {
+                  const pal = projectPalette(value, names.length, s.id)
+                  return (
+                    <button key={s.id} className={`cp-scheme${current === s.id ? ' on' : ''}`} onClick={() => onScheme(s.id)} title={s.hint}>
+                      <span className="cp-scheme-name">{s.name}</span>
+                      <span className="cp-preview">
+                        {pal.map((c, i) => <i key={i} style={{ background: c, color: textOn(c) }}>{short(names[i])}</i>)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="cp-hint">{SCHEMES.find((s) => s.id === current)?.hint} The first phase always uses the root colour.</p>
+            </>
+          )}
         </div>
       )}
     </div>

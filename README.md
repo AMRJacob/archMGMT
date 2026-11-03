@@ -36,8 +36,9 @@ Workload = each person's open task hours spread over the weekdays they run, comp
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
     drag cards between columns.
   - Undo (button or Ctrl+Z) reverses drags and moves.
-- **Project colours**: each project picks one root colour (swatch next to its number on Overview); a soft
-  analogous palette for its phases is built from it and used on every view and export.
+- **Project colours**: each project picks one root colour and a scheme (swatch next to its number on Overview).
+  Every phase gets a different hue that harmonises with the root (Balanced, Triad or Complementary), all at one
+  soft lightness and chroma (computed in OKLCH). The first phase is the root colour. Used on every view and export.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week hours-vs-capacity grid per staff member; click a person for their per-project
   breakdown, open tasks, time off and details. Consultants listed below.

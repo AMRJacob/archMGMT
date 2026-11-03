@@ -1,6 +1,5 @@
 import { useState, type DragEvent } from 'react'
 import { addDays, daysBetween, parseISO, shortDate, today } from '../lib/dates.ts'
-import { projectPalette } from '../lib/colors.ts'
 import { TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 import { shiftDates } from '../lib/useProjectPlan.ts'
 import { mondayOf, weekStarts } from '../lib/workload.ts'
@@ -18,14 +17,14 @@ const WEEK_COLS = 8
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
 
 export default function BoardView({
-  group, phases, tasks, people, root, onPatch, onOpenTask, onAdd,
+  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd,
 }: {
   group: BoardGroup
   phases: Phase[]
   tasks: Task[]
   people: Person[]
-  /** The project's root colour, for phase colours. */
-  root: string | null
+  /** Phase colours, in phase order. */
+  palette: string[]
   onPatch: (task: Task, changes: Partial<Task>) => void
   onOpenTask: (task: Task) => void
   onAdd: (defaults: Partial<Task>) => void
@@ -36,8 +35,7 @@ export default function BoardView({
 
   const sortedPhases = [...phases].sort((a, b) => a.sort_order - b.sort_order)
   const phaseIndex = new Map(sortedPhases.map((p, i) => [p.id, i]))
-  const palette = projectPalette(root, sortedPhases.length)
-  const phaseColor = (i: number) => palette[i]
+  const phaseColor = (i: number) => palette[i] ?? '#8b8f94'
   const staffOrder = [...people].sort((a, b) => a.name.localeCompare(b.name))
   const personColor = (id: string | null) => {
     const i = staffOrder.findIndex((p) => p.id === id)

@@ -1,8 +1,18 @@
 /**
- * Project colour schemes. Each project picks one root colour; its phases get a calm palette built
- * from it: neighbouring hues (a gentle analogous spread), saturation kept soft, and lightness moving
- * from lighter early phases to deeper later ones.
+ * Project colour schemes. Each project picks one root colour and a scheme. Phases get DIFFERENT hues
+ * (so phases read apart at a glance), chosen to harmonise with the root, all at one soft lightness
+ * and chroma so they sit together calmly. The first phase is always the root colour itself.
+ *
+ * Colour maths is done in OKLCH, where equal lightness looks equally light to the eye.
  */
+
+export type SchemeId = 'balanced' | 'triad' | 'complementary'
+
+export const SCHEMES: { id: SchemeId; name: string; hint: string }[] = [
+  { id: 'balanced', name: 'Balanced', hint: 'Hues spread evenly around the wheel; neighbouring phases contrast.' },
+  { id: 'triad', name: 'Triad', hint: 'Three hue families, each used at two depths.' },
+  { id: 'complementary', name: 'Complementary', hint: 'The root and its opposite, with close neighbours of each.' },
+]
 
 /** Soft starting points to choose from (any colour can also be picked). */
 export const ROOT_PRESETS: { name: string; hex: string }[] = [
@@ -19,65 +29,103 @@ export const ROOT_PRESETS: { name: string; hex: string }[] = [
 /** The app's original phase colours, used when a project has no root colour yet. */
 const DEFAULT = ['#8b9a96', '#6f8fa6', '#5f7a61', '#b5502d', '#c08a3e', '#4a5a78', '#8a6f9e', '#5a8a8a']
 
-interface HSL { h: number; s: number; l: number }
+// ---------- sRGB ⇄ OKLCH ----------
 
-export function hexToHsl(hex: string): HSL {
+interface LCH { l: number; c: number; h: number }
+
+function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
   const n = m ? parseInt(m[1], 16) : 0x6b8f71
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  const l = (max + min) / 2
-  let h = 0, s = 0
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
-    h *= 60
-  }
-  return { h, s, l }
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+}
+const toLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+const toGamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)
+
+export function hexToOklch(hex: string): LCH {
+  const [r, g, b] = hexToRgb(hex).map(toLinear)
+  const l_ = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m_ = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s_ = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  const L = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_
+  const A = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_
+  const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+  return { l: L, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 }
 }
 
-export function hslToHex({ h, s, l }: HSL): string {
-  h = ((h % 360) + 360) % 360
-  const c = (1 - Math.abs(2 * l - 1)) * s
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = l - c / 2
-  const [r, g, b] =
-    h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
-  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
-  return `#${to(r)}${to(g)}${to(b)}`
+function oklchToRgb({ l, c, h }: LCH): [number, number, number] {
+  const a = c * Math.cos((h * Math.PI) / 180), b = c * Math.sin((h * Math.PI) / 180)
+  const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s_ = (l - 0.0894841775 * a - 1.291485548 * b) ** 3
+  return [
+    4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+    -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+    -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
+  ]
+}
+
+/** OKLCH to hex, easing chroma down until the colour fits in sRGB. */
+export function oklchToHex(lch: LCH): string {
+  let c = lch.c
+  let rgb = oklchToRgb({ ...lch, c })
+  while (rgb.some((v) => v < -0.0005 || v > 1.0005) && c > 0) { c -= 0.004; rgb = oklchToRgb({ ...lch, c: Math.max(0, c) }) }
+  const to = (v: number) => Math.round(Math.min(1, Math.max(0, toGamma(Math.min(1, Math.max(0, v))))) * 255).toString(16).padStart(2, '0')
+  return `#${rgb.map(to).join('')}`
 }
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 
-/** n phase colours from a root colour (or the default set when there's no root). */
-export function projectPalette(root: string | null | undefined, n: number): string[] {
+/** Yellows and olives look muddy at mid lightness; lift them a little (strongest around 95°). */
+function yellowLift(h: number): number {
+  const d = Math.abs((((h - 95) % 360) + 540) % 360 - 180)
+  return d < 40 ? 0.07 * (1 - d / 40) : 0
+}
+
+// ---------- schemes ----------
+
+/** Hue offsets (degrees from the root) for n phases, in phase order. */
+function hueOffsets(scheme: SchemeId, n: number): { dh: number; depth: number }[] {
+  if (scheme === 'triad') {
+    const fam = [0, 120, 240]
+    return Array.from({ length: n }, (_, i) => ({ dh: fam[i % 3] + (i >= 3 ? 12 : 0), depth: Math.floor(i / 3) }))
+  }
+  if (scheme === 'complementary') {
+    const seq = [0, 180, 35, 215, -35, 145, 70, 250]
+    return Array.from({ length: n }, (_, i) => ({ dh: seq[i % seq.length] + Math.floor(i / seq.length) * 15, depth: i % 2 }))
+  }
+  // balanced: evenly spaced hues, ordered so each phase sits far from the one before it
+  const step = 360 / Math.max(n, 3)
+  const half = Math.ceil(Math.max(n, 3) / 2)
+  return Array.from({ length: n }, (_, i) => ({ dh: (i % 2 === 0 ? i / 2 : half + (i - 1) / 2) * step, depth: i % 2 }))
+}
+
+/** n phase colours from a root colour and scheme (or the default set when there's no root). */
+export function projectPalette(root: string | null | undefined, n: number, scheme?: string | null): string[] {
   const count = Math.max(1, n)
   if (!root) return Array.from({ length: count }, (_, i) => DEFAULT[i % DEFAULT.length])
-  const base = hexToHsl(root)
-  const s = clamp(base.s, 0.2, 0.46)
-  const spread = count <= 3 ? 24 : 40 // total hue range across all phases, in degrees
-  return Array.from({ length: count }, (_, i) => {
-    const t = count === 1 ? 0.5 : i / (count - 1)
-    return hslToHex({
-      h: base.h + (t - 0.5) * spread,
-      s: clamp(s * (0.85 + 0.3 * t), 0.16, 0.5),
-      l: clamp(0.62 - 0.24 * t, 0.34, 0.66),
-    })
-  })
+  const base = hexToOklch(root)
+  const id = (SCHEMES.some((s) => s.id === scheme) ? scheme : 'balanced') as SchemeId
+  // One soft lightness and chroma for the whole set, taken from the root but kept in a calm range.
+  const L = clamp(base.l, 0.56, 0.68)
+  const C = clamp(base.c, 0.06, 0.1)
+  return hueOffsets(id, count).map(({ dh, depth }, i) =>
+    i === 0
+      ? oklchToHex({ l: clamp(base.l, 0.45, 0.72), c: clamp(base.c, 0.04, 0.13), h: base.h }) // the root itself
+      : oklchToHex({ l: L + (depth ? -0.07 : 0.02) + yellowLift(base.h + dh), c: C * (depth ? 0.95 : 1), h: base.h + dh }),
+  )
 }
 
 /** The project's own accent and a pale tint of it (for chips and highlights). */
 export function projectAccent(root: string | null | undefined) {
   if (!root) return { accent: '#b5502d', soft: '#f6e6df' }
-  const b = hexToHsl(root)
+  const b = hexToOklch(root)
   return {
-    accent: hslToHex({ h: b.h, s: clamp(b.s, 0.25, 0.5), l: clamp(b.l, 0.36, 0.48) }),
-    soft: hslToHex({ h: b.h, s: clamp(b.s * 0.6, 0.15, 0.35), l: 0.93 }),
+    accent: oklchToHex({ l: clamp(b.l, 0.45, 0.58), c: clamp(b.c, 0.06, 0.12), h: b.h }),
+    soft: oklchToHex({ l: 0.95, c: clamp(b.c * 0.35, 0.015, 0.035), h: b.h }),
   }
 }
 
 /** Dark or light text, whichever reads better on a colour. */
 export function textOn(hex: string): string {
-  return hexToHsl(hex).l > 0.6 ? '#1c1f23' : '#ffffff'
+  return hexToOklch(hex).l > 0.72 ? '#1c1f23' : '#ffffff'
 }

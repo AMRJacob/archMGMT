@@ -86,7 +86,7 @@ export default function ProjectDetail() {
     void tasks.reload()
   }
 
-  const palette = projectPalette(project.color, sortedPhases.length)
+  const palette = projectPalette(project.color, sortedPhases.length, project.color_scheme)
   const phaseColor = (i: number) => palette[i]
   const { accent, soft } = projectAccent(project.color)
   const span = start && end ? Math.max(1, daysBetween(start, end) + 1) : 1
@@ -121,7 +121,8 @@ export default function ProjectDetail() {
 
       <header className="project-head card">
         <div className="project-title">
-          <ColorPicker value={project.color} phaseCount={sortedPhases.length} onChange={(c) => projects.patch(id, { color: c })} />
+          <ColorPicker value={project.color} scheme={project.color_scheme ?? null} phaseNames={sortedPhases.map((p) => p.name)}
+            onChange={(c) => projects.patch(id, { color: c })} onScheme={(s) => projects.patch(id, { color_scheme: s })} />
           <TextField value={project.number} placeholder="Project no." className="mono number"
             onSave={(v) => projects.patch(id, { number: v })} />
           <TextField value={project.name} className="title"

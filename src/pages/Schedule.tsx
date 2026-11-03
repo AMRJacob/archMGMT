@@ -5,6 +5,7 @@ import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode } from '../components/ScheduleChart.tsx'
 import TaskEditor from '../components/TaskEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
+import { projectPalette } from '../lib/colors.ts'
 import { addDays, parseISO, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
 import type { Task } from '../lib/types.ts'
@@ -97,6 +98,8 @@ export default function Schedule() {
     : undefined
   const step = Math.round((months * 30) / 4) // arrows move a quarter of the view
 
+  const palette = projectPalette(project.color, phases.rows.length, project.color_scheme)
+
   const hiddenCount = tasks.rows.filter((t) => !t.client_visible).length + phases.rows.filter((p) => !p.client_visible).length
 
   return (
@@ -162,7 +165,7 @@ export default function Schedule() {
 
       {view === 'calendar' && (
         <div className="card pad no-print">
-          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows} root={project.color}
+          <CalendarView phases={phases.rows} tasks={tasks.rows} people={people.rows} palette={palette}
             onShiftTask={plan.shiftTask} onOpenTask={openTask} />
         </div>
       )}
@@ -181,7 +184,7 @@ export default function Schedule() {
                 : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
             </span>
           </div>
-          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows} root={project.color}
+          <BoardView group={group} phases={phases.rows} tasks={tasks.rows} people={people.rows} palette={palette}
             onPatch={(t, c) => plan.patchTask(t, c)} onOpenTask={openTask} onAdd={addTask} />
         </>
       )}

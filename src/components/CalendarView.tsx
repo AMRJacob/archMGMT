@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { addDays, daysBetween, parseISO, toISO, today } from '../lib/dates.ts'
-import { projectPalette } from '../lib/colors.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 
 /**
@@ -14,12 +13,13 @@ interface Placed extends Item { col: number; span: number; lane: number; clipped
 function monthStart(iso: string) { return iso.slice(0, 8) + '01' }
 
 export default function CalendarView({
-  phases, tasks, people, root, onShiftTask, onOpenTask,
+  phases, tasks, people, palette, onShiftTask, onOpenTask,
 }: {
   phases: Phase[]
   tasks: Task[]
   people: Person[]
-  root: string | null
+  /** Phase colours, in phase order. */
+  palette: string[]
   onShiftTask: (task: Task, days: number) => void
   onOpenTask: (task: Task) => void
 }) {
@@ -36,7 +36,6 @@ export default function CalendarView({
   const t = today()
 
   const sortedPhases = [...phases].sort((a, b) => a.sort_order - b.sort_order)
-  const palette = projectPalette(root, sortedPhases.length)
   const colorOfPhase = new Map(sortedPhases.map((p, i) => [p.id, palette[i]]))
   const initials = (id: string | null) => {
     const p = people.find((x) => x.id === id)

@@ -423,7 +423,7 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .color-pick { position: relative; flex: none; }
 .swatch-btn { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; padding: 0; }
 .swatch-btn:hover { box-shadow: 0 0 0 2px var(--ink); }
-.color-pop { position: absolute; top: 34px; left: 0; z-index: 40; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); padding: 12px; width: 250px; display: flex; flex-direction: column; gap: 8px; }
+.color-pop { position: absolute; top: 34px; left: 0; z-index: 40; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); padding: 14px; width: 320px; display: flex; flex-direction: column; gap: 8px; }
 .cp-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .cp-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
 .cp-presets button { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); cursor: pointer; padding: 0; }
@@ -431,8 +431,14 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .cp-row { display: flex; align-items: center; justify-content: space-between; }
 .cp-custom { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 .cp-custom input { width: 26px; height: 26px; border: none; padding: 0; background: none; cursor: pointer; }
-.cp-preview { display: flex; gap: 3px; height: 18px; }
-.cp-preview i { flex: 1; border-radius: 3px; }
+.cp-preview { display: flex; gap: 3px; height: 22px; }
+.cp-preview i { flex: 1; border-radius: 3px; font-style: normal; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; letter-spacing: 0.03em; }
+.cp-schemes { display: flex; flex-direction: column; gap: 6px; }
+.cp-scheme { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 8px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; text-align: left; }
+.cp-scheme:hover { border-color: var(--line-strong); }
+.cp-scheme.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.cp-scheme-name { font-size: 12.5px; font-weight: 600; }
+.cp-hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
 .overview .chip { background: var(--p-soft); color: var(--p-accent); }
 .overview .project-head { border-top: 3px solid var(--p-accent); }
 .overview .strip-seg.now { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--p-accent); }

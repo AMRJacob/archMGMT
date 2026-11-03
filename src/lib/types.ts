@@ -23,6 +23,8 @@ export interface Project {
   status: ProjectStatus
   pm_id: string | null
   color: string | null
+  /** How phase colours are built from `color`: balanced | triad | complementary. */
+  color_scheme?: string | null
   start_date: string | null
   end_date: string | null
   notes: string | null
