@@ -9,16 +9,13 @@ import { isPresented, ruleMatch, rulesOf, togglePresented, type PresentationRule
 import PresentationFilter from '../components/PresentationFilter.tsx'
 import { chartColors, useTheme } from '../lib/theme.ts'
 import TaskEditor from '../components/TaskEditor.tsx'
-import { NoteEditor } from '../components/MeetingNotes.tsx'
-import { newNote } from '../lib/notes.ts'
-import { useRows } from '../lib/data.ts'
-import { useAuth } from '../auth/authContext.ts'
+import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import { projectPalette } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { KIND_RANK, type MeetingNote, type Phase, type Task } from '../lib/types.ts'
+import { KIND_RANK, type Phase, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
 import { asShown, buildTree, DETAIL_LEVELS, movedBy, visibleAtLevel, type DetailLevel, type ShownTask } from '../lib/tree.ts'
@@ -46,10 +43,8 @@ export default function Schedule() {
   const { current: project, patch: patchProject } = useProject()
   const theme = useTheme()
   const plan = useProjectPlan(project?.id ?? '')
-  const notes = useRows<MeetingNote>('meeting_notes', { project_id: project?.id ?? '' })
-  const { session } = useAuth()
-  const [noteId, setNoteId] = useState<string | null>(null)
   const { phases, tasks, people } = plan
+  const nh = useNotes(project?.id ?? '', tasks.rows, phases.rows, people.rows, () => void tasks.reload())
   const [view, setView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
   const [mode, setMode] = useSaved<ChartMode>('archmgmt.chartMode', 'working')
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
@@ -174,11 +169,8 @@ export default function Schedule() {
         'sep' as const,
         { label: `Open “${task.title.slice(0, 30)}”`, run: () => openTask(task) },
         { label: presented(task) ? 'Hide from presentation' : 'Show in presentation', run: () => togglePres(task) },
-        { label: task.is_milestone ? 'Add meeting notes' : 'Add notes', run: () => void notes.add(newNote(project!.id, task, session?.user.email ?? null)).then((n) => setNoteId(n.id)) },
-        ...(() => {
-          const ns = notes.rows.filter((n) => n.task_id === task.id).sort((a, b) => b.meeting_date.localeCompare(a.meeting_date))
-          return ns.length ? [{ label: `Open notes (${ns.length})`, run: () => setNoteId(ns[0].id) }] : []
-        })(),
+        { label: task.is_milestone ? 'Add meeting notes' : 'Add notes', run: () => void nh.add(task) },
+        ...(nh.forTask(task).length ? [{ label: `Open notes (${nh.forTask(task).length})`, run: () => { const n = nh.latestFor(task); if (n) nh.open(n.id) } }] : []),
         { label: task.status === 'done' ? 'Mark not done' : 'Mark done', run: () => plan.patchTask(task, { status: task.status === 'done' ? 'todo' : 'done' }) },
         { label: 'Delete', danger: true, run: () => { if (window.confirm(`Delete "${task.title}"?`)) void tasks.drop(task.id) } },
       ] : []),
@@ -352,10 +344,7 @@ export default function Schedule() {
             onClose={() => setPhaseEdit(null)} />
         ) : null
       })()}
-      {noteId && (() => {
-        const n = notes.rows.find((x) => x.id === noteId)
-        return n ? <NoteEditor key={n.id} note={n} tasks={tasks.rows} onPatch={(c) => void notes.patch(n.id, c)} onDelete={() => void notes.drop(n.id)} onClose={() => setNoteId(null)} /> : null
-      })()}
+      {nh.editor}
       {spot && <ContextMenu x={spot.clientX} y={spot.clientY} items={spotItems(spot)} onClose={() => setSpot(null)} />}
 
       {editing && (

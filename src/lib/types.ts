@@ -139,12 +139,38 @@ export interface MeetingNote {
   task_id: string | null
   meeting_date: string
   title: string
+  /** Guests who aren't on the Team list (owner reps, contractors…), comma separated. */
   attendees: string | null
+  /** People from the Team list who were there. */
+  attendee_ids?: string[]
+  meeting_type?: string | null
+  location?: string | null
   body: string | null
+  decisions?: string | null
+  actions?: ActionItem[]
   author: string | null
   created_at?: string
   updated_at?: string
 }
+
+/** An action item from a meeting; can be turned into a task in the project. */
+export interface ActionItem {
+  id: string
+  text: string
+  who: string | null
+  due: string | null
+  done: boolean
+  task_id?: string | null
+}
+
+export const MEETING_TYPES: { value: string; label: string; color: string }[] = [
+  { value: 'owner', label: 'Owner meeting', color: '#d9480f' },
+  { value: 'coordination', label: 'Consultant coordination', color: '#1c7ed6' },
+  { value: 'internal', label: 'Internal', color: '#495057' },
+  { value: 'site', label: 'Site visit', color: '#2b8a3e' },
+  { value: 'agency', label: 'Agency / permit', color: '#7048e8' },
+  { value: 'other', label: 'Other', color: '#868e96' },
+]
 
 /** A saved set of brand colours (a campus or company standard) that a project's phases can use. */
 export interface BrandPalette {

@@ -14,12 +14,9 @@ import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDa
 import ColorPicker from '../components/ColorPicker.tsx'
 import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { PROJECT_STATUSES, type MeetingNote, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
+import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
-import { MeetingNotesSection, NoteEditor } from '../components/MeetingNotes.tsx'
-import { newNote } from '../lib/notes.ts'
-import { useRows } from '../lib/data.ts'
-import { useAuth } from '../auth/authContext.ts'
+import { useNotes } from '../lib/useNotes.tsx'
 import { area, BUILDING_TYPES, money } from '../lib/amount.ts'
 import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
 
@@ -31,14 +28,7 @@ export default function ProjectDetail() {
   const project = projects.current
   const id = project?.id ?? ''
   const { phases, tasks, people, patchTask, patchMany } = useProjectPlan(id)
-  const notes = useRows<MeetingNote>('meeting_notes', { project_id: id })
-  const { session } = useAuth()
-  const [noteId, setNoteId] = useState<string | null>(null)
-  const addNote = async (t: Task | null) => {
-    const n = await notes.add(newNote(id, t, session?.user.email ?? null))
-    setNoteId(n.id)
-  }
-  const notesFor = (t: Task) => notes.rows.filter((n) => n.task_id === t.id)
+  const nh = useNotes(id, tasks.rows, phases.rows, people.rows, () => void tasks.reload())
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
@@ -274,9 +264,9 @@ export default function ProjectDetail() {
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
                     onPatch={patchTask} onPatchMany={patchMany}
                     presented={(x) => isPresented(rulesOf(project), x)}
-                    onAddNote={(x) => void addNote(x)}
-                    noteCount={(x) => notesFor(x).length}
-                    onOpenNotes={(x) => { const ns = notesFor(x); if (ns.length) setNoteId([...ns].sort((a, b) => b.meeting_date.localeCompare(a.meeting_date))[0].id) }}
+                    onAddNote={(x) => void nh.add(x)}
+                    noteCount={(x) => nh.forTask(x).length}
+                    onOpenNotes={(x) => { const n = nh.latestFor(x); if (n) nh.open(n.id) }}
                     onTogglePresented={(x) => { const c = togglePresented(rulesOf(project), x); if (c.task) patchTask(x, c.task); if (c.rules) void projects.patch(id, { presentation: c.rules }) }}
                     onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
@@ -294,8 +284,6 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      <MeetingNotesSection notes={notes.rows} tasks={tasks.rows} onAdd={() => void addNote(null)} onOpen={(n) => setNoteId(n.id)} />
-
       <div className="footer-actions">
         <button className="btn" onClick={addPhase}>+ Add phase</button>
         {project.archived_at
@@ -303,13 +291,7 @@ export default function ProjectDetail() {
           : <button className="btn" onClick={() => void archiveProject(true)} title="Hide it from lists and workload; everything is kept and it can be restored">Archive project</button>}
       </div>
 
-      {noteId && (() => {
-        const n = notes.rows.find((x) => x.id === noteId)
-        return n ? (
-          <NoteEditor key={n.id} note={n} tasks={tasks.rows} onPatch={(c) => void notes.patch(n.id, c)}
-            onDelete={() => void notes.drop(n.id)} onClose={() => setNoteId(null)} />
-        ) : null
-      })()}
+      {nh.editor}
       {phaseMenu && (
         <ContextMenu x={phaseMenu.x} y={phaseMenu.y} onClose={() => setPhaseMenu(null)} items={phaseItems(phaseMenu.phase)} />
       )}

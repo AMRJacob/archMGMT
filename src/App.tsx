@@ -8,6 +8,7 @@ import { usingSampleData } from './lib/data.ts'
 import { useProject } from './lib/projectContext.ts'
 import Projects from './pages/Projects.tsx'
 import ProjectDetail from './pages/ProjectDetail.tsx'
+import Notes from './pages/Notes.tsx'
 import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
@@ -43,6 +44,7 @@ function Shell() {
             <span className="nav-label">Project</span>
             <NavLink to="/overview">Overview</NavLink>
             <NavLink to="/schedule">Schedule</NavLink>
+            <NavLink to="/notes">Meeting notes</NavLink>
             <span className="nav-label">Office</span>
             <NavLink to="/" end>All projects</NavLink>
             <NavLink to="/team">Team &amp; workload</NavLink>
@@ -68,6 +70,7 @@ function Shell() {
             <Route path="/" element={<Projects />} />
             <Route path="/overview" element={<ProjectDetail />} />
             <Route path="/schedule" element={<Schedule />} />
+            <Route path="/notes" element={<Notes />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/projects/:id" element={<OpenProject />} />
