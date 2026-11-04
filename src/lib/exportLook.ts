@@ -4,7 +4,7 @@ import type { Project } from './types.ts'
 
 /** How a schedule export looks on the page: paper size, background, and whether it's squeezed onto one page. */
 export type ExportBg = 'white' | 'tint' | 'dark'
-export type ExportPage = 'letter' | 'tabloid'
+export type ExportPage = 'letter' | 'tabloid' | 'arch-b'
 export type ExportFit = 'fit' | 'width'
 
 export const EXPORT_BGS: { id: ExportBg; name: string; hint: string }[] = [
@@ -15,6 +15,7 @@ export const EXPORT_BGS: { id: ExportBg; name: string; hint: string }[] = [
 export const EXPORT_PAGES: { id: ExportPage; name: string; w: number; h: number }[] = [
   { id: 'letter', name: 'Letter (11 × 8.5)', w: 11, h: 8.5 },
   { id: 'tabloid', name: 'Tabloid (17 × 11)', w: 17, h: 11 },
+  { id: 'arch-b', name: 'Arch B (18 × 12)', w: 18, h: 12 },
 ]
 /** Margin round the drawing, in inches (the background colour runs to the paper's edge). */
 export const PAGE_MARGIN = 0.35
