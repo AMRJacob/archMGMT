@@ -151,3 +151,31 @@ export function projectAccent(root: string | null | undefined) {
 export function textOn(hex: string): string {
   return hexToOklch(hex).l > 0.72 ? '#1c1f23' : '#ffffff'
 }
+
+/**
+ * Each phase's colour. A phase keeps the palette slot it was given (color_slot), so reordering phases
+ * doesn't repaint them; phases without one take the free slots in phase order.
+ */
+export function phaseSlots(phases: { id: string; sort_order: number; start_date: string; color_slot?: number | null }[]): Map<string, number> {
+  const sorted = [...phases].sort((a, b) => a.sort_order - b.sort_order || a.start_date.localeCompare(b.start_date))
+  const slots = new Map<string, number>()
+  const used = new Set<number>()
+  for (const p of sorted) if (p.color_slot != null && !used.has(p.color_slot)) { slots.set(p.id, p.color_slot); used.add(p.color_slot) }
+  let next = 0
+  for (const p of sorted) {
+    if (slots.has(p.id)) continue
+    while (used.has(next)) next++
+    slots.set(p.id, next); used.add(next)
+  }
+  return slots
+}
+
+export function phaseColors(
+  project: { color: string | null; color_scheme?: string | null },
+  phases: { id: string; sort_order: number; start_date: string; color_slot?: number | null }[],
+): Map<string, string> {
+  const slots = phaseSlots(phases)
+  const n = Math.max(phases.length, ...[...slots.values()].map((s) => s + 1))
+  const pal = projectPalette(project.color, n, project.color_scheme)
+  return new Map([...slots].map(([id, s]) => [id, pal[s]]))
+}

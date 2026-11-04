@@ -54,6 +54,8 @@ export interface Phase {
   start_date: string
   end_date: string
   client_visible: boolean
+  /** Its place in the project's colour palette; stays put when phases are reordered. */
+  color_slot?: number | null
 }
 
 export type TaskKind = 'sheet' | 'view' | 'task' | 'item'

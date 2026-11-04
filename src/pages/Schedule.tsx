@@ -12,7 +12,7 @@ import TaskEditor from '../components/TaskEditor.tsx'
 import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
-import { projectPalette } from '../lib/colors.ts'
+import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { KIND_RANK, type Phase, type Task } from '../lib/types.ts'
@@ -218,7 +218,9 @@ export default function Schedule() {
   const winDays = chartWindow ? daysBetween(chartWindow[0], chartWindow[1]) : 0
   const scrollMax = spanStart && spanEnd ? Math.max(0, daysBetween(spanStart, spanEnd) - winDays + 14) : 0
 
-  const palette = projectPalette(project.color, phases.rows.length, project.color_scheme)
+  // One colour per phase, in phase order (each phase keeps its own colour when phases are reordered).
+  const colorOf = phaseColors(project, phases.rows)
+  const palette = [...phases.rows].sort((a, b) => a.sort_order - b.sort_order).map((p) => colorOf.get(p.id)!)
 
 
   return (

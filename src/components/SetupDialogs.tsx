@@ -70,7 +70,7 @@ export function NewProjectDialog({ onCreate, onClose }: {
           name: name.trim(), number: number.trim() || null, client: client.trim() || null, color, color_scheme: 'balanced', status: 'active',
           building_type: buildingType || null, gross_area: num(grossArea), budget: num(budget),
         },
-        chosen.map((p, i) => ({ name: p.name.trim(), sort_order: i, start_date: dated.get(p.key)!.s, end_date: dated.get(p.key)!.e, client_visible: true })),
+        chosen.map((p, i) => ({ name: p.name.trim(), sort_order: i, color_slot: i, start_date: dated.get(p.key)!.s, end_date: dated.get(p.key)!.e, client_visible: true })),
         setupFirst && chosen.length > 0,
       )
     } finally { setBusy(false) }

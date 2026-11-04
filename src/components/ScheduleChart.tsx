@@ -1,6 +1,6 @@
 import { useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react'
 import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
-import { projectPalette } from '../lib/colors.ts'
+import { phaseColors } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
 import type { ShownTask } from '../lib/tree.ts'
 import { STUDIO_CHART, type ChartColors } from '../lib/theme.ts'
@@ -105,7 +105,8 @@ export default function ScheduleChart({
   const byStart = (a: Task, b: Task) =>
     (a.start_date ?? a.due_date ?? '').localeCompare(b.start_date ?? b.due_date ?? '') || a.sort_order - b.sort_order
 
-  const palette = projectPalette(project.color, sorted.length, project.color_scheme)
+  const colorOf = phaseColors(project, sorted)
+  const palette = sorted.map((p) => colorOf.get(p.id)!)
   const rows: Row[] = []
   sorted.forEach((phase, i) => {
     if (pres && !phase.client_visible) return

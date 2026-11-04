@@ -13,7 +13,7 @@ import { insertMany } from '../lib/data.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
 import ColorPicker from '../components/ColorPicker.tsx'
-import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
+import { phaseColors, phaseSlots, projectAccent, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
@@ -83,7 +83,7 @@ export default function ProjectDetail() {
   async function addPhase() {
     const last = sortedPhases[sortedPhases.length - 1]
     const s = last ? addDays(last.end_date, 1) : nextMonday()
-    const p = await phases.add({ project_id: id, name: 'New phase', sort_order: (last?.sort_order ?? -1) + 1, start_date: s, end_date: addDays(s, 27), client_visible: true })
+    const p = await phases.add({ project_id: id, name: 'New phase', sort_order: (last?.sort_order ?? -1) + 1, start_date: s, end_date: addDays(s, 27), client_visible: true, color_slot: nextSlot() })
     setOpenIds(new Set([...open, p.id]))
   }
 
@@ -112,7 +112,14 @@ export default function ProjectDetail() {
     if (!moving) return
     const at = order.findIndex((x) => x.id === targetId) + (side === 'after' ? 1 : 0)
     order.splice(at, 0, moving)
-    order.forEach((x, i) => { if (x.sort_order !== i) void phases.patch(x.id, { sort_order: i }) })
+    // Pin every phase's colour first, so the new order doesn't repaint them.
+    const slots = phaseSlots(sortedPhases)
+    order.forEach((x, i) => {
+      const c: Partial<Phase> = {}
+      if (x.sort_order !== i) c.sort_order = i
+      if (x.color_slot == null) c.color_slot = slots.get(x.id)
+      if (Object.keys(c).length) void phases.patch(x.id, c)
+    })
   }
 
   function phaseItems(p: Phase): MenuItem[] {
@@ -132,15 +139,18 @@ export default function ProjectDetail() {
     ]
   }
 
+  const nextSlot = () => Math.max(-1, ...phaseSlots(sortedPhases).values()) + 1
+
   async function addPhaseAfter(p: Phase) {
     const later = sortedPhases.filter((x) => x.sort_order > p.sort_order)
     for (const x of later) void phases.patch(x.id, { sort_order: x.sort_order + 1 })
     const s = addDays(p.end_date, 1)
-    const n = await phases.add({ project_id: id, name: 'New phase', sort_order: p.sort_order + 1, start_date: s, end_date: addDays(s, 27), client_visible: true })
+    const n = await phases.add({ project_id: id, name: 'New phase', sort_order: p.sort_order + 1, start_date: s, end_date: addDays(s, 27), client_visible: true, color_slot: nextSlot() })
     setEditingPhase(n.id)
   }
 
-  const palette = projectPalette(project.color, sortedPhases.length, project.color_scheme)
+  const colorOf = phaseColors(project, sortedPhases)
+  const palette = sortedPhases.map((p) => colorOf.get(p.id)!)
   const phaseColor = (i: number) => palette[i]
   const { accent, soft } = projectAccent(project.color)
   const span = start && end ? Math.max(1, daysBetween(start, end) + 1) : 1
