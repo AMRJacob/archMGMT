@@ -154,7 +154,7 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
 
       <table className="table access-table">
         <thead>
-          <tr><th style={{ width: 210 }}>Name</th><th>Email</th><th style={{ width: 150 }}>On Team</th><th style={{ width: 180 }}>Status</th><th style={{ width: 250 }} /></tr>
+          <tr><th style={{ width: 210 }}>Name</th><th>Email</th><th style={{ width: 150 }}>On Team</th><th style={{ width: 200 }}>Activity</th><th style={{ width: 250 }} /></tr>
         </thead>
         <tbody>
           {(rows ?? []).map((u) => (
@@ -170,7 +170,21 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
                 </select>
               </td>
               <td className="small">
-                {u.last_sign_in_at ? <span className="muted" title={new Date(u.last_sign_in_at).toString()}>Last signed in {signedIn(u.last_sign_in_at)}</span> : <span className="pending">Link sent, not signed in yet</span>}
+                {u.last_sign_in_at ? (() => {
+                  // Most recent sign of life: opening the app, an edit, or signing in.
+                  const last = [u.last_seen_at, u.last_edit_at, u.last_sign_in_at].filter((x): x is string => Boolean(x)).sort().pop()!
+                  const tip = [
+                    u.last_seen_at && `Last opened the app: ${new Date(u.last_seen_at).toLocaleString()}`,
+                    `Last edit: ${u.last_edit_at ? new Date(u.last_edit_at).toLocaleString() : 'none recorded yet'}`,
+                    `Last signed in: ${new Date(u.last_sign_in_at).toLocaleString()}`,
+                  ].filter(Boolean).join('\n')
+                  return (
+                    <span className="access-activity" title={tip}>
+                      <span className="muted">Active {signedIn(last)}</span>
+                      <span className="faint">{u.last_edit_at ? `Last edit ${signedIn(u.last_edit_at)}` : 'No edits recorded yet'}</span>
+                    </span>
+                  )
+                })() : <span className="pending">Link sent, not signed in yet</span>}
               </td>
               <td className="right-actions">
                 <button className="btn ghost" disabled={busy} onClick={() => makeLink(u.email, u.email)}>{u.last_sign_in_at ? 'Password reset link' : 'New link'}</button>

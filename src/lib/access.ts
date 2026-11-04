@@ -20,4 +20,8 @@ export async function createSignInLink(email: string): Promise<LinkResult> {
   return { link: `${appUrl()}?token_hash=${encodeURIComponent(r.token_hash)}&type=${r.type}#/`, type: r.type, addedToAccessList: r.addedToAccessList }
 }
 
-export interface AccountRow { email: string; created_at: string; last_sign_in_at: string | null; admin: boolean }
+export interface AccountRow {
+  email: string; created_at: string; last_sign_in_at: string | null; admin: boolean
+  /** When they last opened the app (reported about once an hour) and last changed something. */
+  last_seen_at?: string | null; last_edit_at?: string | null
+}

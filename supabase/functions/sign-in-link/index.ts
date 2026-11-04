@@ -1,6 +1,6 @@
 // sign-in-link: archMGMT account management for admins (emails in app_admins), with no email sent.
 //   { action: 'link',   email }  → one-time invite (new) or password-reset (existing) token
-//   { action: 'list' }          → everyone with an account, plus the outside-AMR access list
+//   { action: 'list' }          → everyone with an account (with last sign-in, last opened, last edit), plus the outside-AMR access list
 //   { action: 'remove', email } → delete that account and take them off the access list
 // The app turns a token into a link the admin sends however they like. The service-role key used
 // here never leaves the server.
@@ -44,9 +44,16 @@ Deno.serve(async (req) => {
     const { data: admins } = await admin.from('app_admins').select('email')
     const { data: access } = await admin.from('app_access').select('email, note, added_at')
     const adminSet = new Set((admins ?? []).map((a) => a.email))
+    // Activity beyond sign-in: when they last opened the app, and when they last changed something.
+    const { data: seen } = await admin.from('user_activity').select('email, last_seen_at')
+    const { data: edits } = await admin.rpc('last_edits')
+    const seenBy = new Map((seen ?? []).map((r: { email: string; last_seen_at: string }) => [r.email, r.last_seen_at]))
+    const editBy = new Map((edits ?? []).map((r: { user_id: string; last_edit_at: string }) => [r.user_id, r.last_edit_at]))
     return json({
       users: data.users.map((u) => ({
         email: u.email, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
+        last_seen_at: seenBy.get((u.email ?? '').toLowerCase()) ?? null,
+        last_edit_at: editBy.get(u.id) ?? null,
         admin: adminSet.has((u.email ?? '').toLowerCase()),
       })).sort((a, b) => (a.email ?? '').localeCompare(b.email ?? '')),
       access: access ?? [],

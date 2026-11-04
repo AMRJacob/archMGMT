@@ -9,6 +9,7 @@ import { FIT_WIDTH, usePageWidth } from './lib/prefs.ts'
 import ProjectProvider from './components/ProjectProvider.tsx'
 import ProjectSwitcher from './components/ProjectSwitcher.tsx'
 import { usingSampleData } from './lib/data.ts'
+import { supabase } from './lib/supabase.ts'
 import { useProject } from './lib/projectContext.ts'
 import Projects from './pages/Projects.tsx'
 import ProjectDetail from './pages/ProjectDetail.tsx'
@@ -36,9 +37,31 @@ function Gate() {
   return <Shell />
 }
 
+/**
+ * Tells the database this person has the app open (for "Active …" in Settings → Access), at most about
+ * once an hour per browser, checked when the app opens and every ten minutes while it stays open.
+ */
+function useNoteActivity(email: string | undefined) {
+  useEffect(() => {
+    if (!supabase || !email) return
+    const KEY = 'archmgmt.activityNoted'
+    const ping = () => {
+      let last = 0
+      try { last = Number(localStorage.getItem(KEY) ?? 0) } catch { /* private mode */ }
+      if (Date.now() - last < 55 * 60 * 1000) return
+      try { localStorage.setItem(KEY, String(Date.now())) } catch { /* ignore */ }
+      void supabase!.rpc('note_activity')
+    }
+    ping()
+    const id = window.setInterval(ping, 10 * 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [email])
+}
+
 function Shell() {
   const { session, signOut } = useAuth()
   const pageW = usePageWidth()
+  useNoteActivity(session?.user.email)
   return (
     <ProjectProvider>
       <PresenceProvider>
