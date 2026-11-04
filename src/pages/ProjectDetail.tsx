@@ -275,7 +275,7 @@ export default function ProjectDetail() {
                 </button>
               )
             })}
-            {t >= start! && end && t <= end && <i className="strip-today" style={{ left: `${(daysBetween(start!, t) / span) * 100}%` }} />}
+            {t >= start! && end && t <= end && <i className="strip-today" title={`Today, ${formatDate(t)}`} style={{ left: `${((daysBetween(start!, t) + 0.5) / span) * 100}%` }}><b>TODAY</b></i>}
           </div>
           <div className="strip-foot muted small">
             <span>{currentPhase ? <>Now in <strong>{currentPhase.name}</strong>, through {formatDate(currentPhase.end_date)}</> : ''}</span>

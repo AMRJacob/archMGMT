@@ -406,7 +406,10 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .strip-seg:hover { opacity: 0.85; }
 .strip-seg.past { opacity: 0.35; }
 .strip-seg.now { opacity: 1; box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
-.strip-today { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--ink); border-radius: 1px; pointer-events: none; }
+/* Today, as on the schedule timeline: a dashed accent line with a TODAY tag, kept to about the bars' height. */
+.strip-today { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; font-style: normal; pointer-events: none; z-index: 2;
+  background: repeating-linear-gradient(to bottom, var(--accent) 0 4px, transparent 4px 7px); filter: drop-shadow(0 0 1.5px var(--paper)) drop-shadow(0 0 1px var(--paper)); }
+.strip-today b { position: absolute; top: -9px; left: 0; transform: translateX(-50%); background: var(--accent); color: var(--on-accent); font-size: 9px; font-weight: 700; letter-spacing: .04em; line-height: 13px; padding: 0 6px; border-radius: 7px; white-space: nowrap; font-style: normal; }
 .strip-foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 8px; }
 .strip-foot strong { color: var(--ink); font-weight: 600; }
 
