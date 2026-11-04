@@ -83,7 +83,7 @@ export default function Schedule() {
 
   // What each view shows at the chosen detail level. Parents carry their children's dates.
   const tree = buildTree(tasks.rows)
-  // Show: everything, only tasks (sheets and their views filtered out), or only sheets. Milestones always show.
+  // Show: everything, only general tasks (sheets and their views filtered out), or only sheets. Milestones always show.
   const shown = visibleAtLevel(tree, level).filter((v) => passesWork(tree, v.task, work))
   const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
   const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
@@ -117,8 +117,8 @@ export default function Schedule() {
 
   const levelControl = (
     <>
-    <div className="segmented small-seg" aria-label="Show" title="Show everything, only tasks, or only sheets (milestones always show)">
-      {([['all', 'All'], ['tasks', 'Tasks'], ['sheets', 'Sheets']] as [WorkFilter, string][]).map(([w, label]) => (
+    <div className="segmented small-seg" aria-label="Show" title="Show everything, only general tasks, or only sheets (milestones always show)">
+      {([['all', 'All'], ['tasks', 'General Tasks'], ['sheets', 'Sheets']] as [WorkFilter, string][]).map(([w, label]) => (
         <button key={w} className={work === w ? 'on' : ''} onClick={() => setWork(w)}>{label}</button>
       ))}
     </div>

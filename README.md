@@ -34,8 +34,9 @@ carrying about three medium tasks at once.
 
 - **Project switcher** (top of the sidebar, as in CAzen): the current project, remembered between visits.
 - **Overview**: the current project's heading, a phase strip showing where the project is, and collapsible
-  phases (current one open) with one-line summaries. Inside each phase, tasks come first and sheets after,
-  each under a quiet heading (with + to add). Click a task to edit all of its details.
+  phases (current one open) with one-line summaries. Inside each phase, general tasks come first and sheets after
+  (on a light tint), each under a quiet heading (with + to add);
+  click a heading to fold that group away. Click a task to edit all of its details.
 - **Schedule**, three views of the current project:
   - *Timeline*: drag bars to move them, drag ends to change length; moving a phase moves its tasks.
     Zoom to 12 months (month ticks), 6 months (week ticks) or 3 months (day ticks) for fine moves;
@@ -45,7 +46,7 @@ carrying about three medium tasks at once.
   - *Calendar*: month grid; drag a task to another day.
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
     drag cards between columns.
-  - **Show** All / Tasks / Sheets on all three (Tasks hides sheets and their views; milestones always show),
+  - **Show** All / General Tasks / Sheets on all three (General Tasks hides sheets and their views; milestones always show),
     and a **Detail** slider: Sheets / Views / Tasks.
   - Undo (button or Ctrl+Z) reverses drags and moves.
 - **Project colours**: each project picks one root colour and a scheme (swatch next to its number on Overview).

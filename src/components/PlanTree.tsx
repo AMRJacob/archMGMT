@@ -10,7 +10,7 @@ import {
 } from '../lib/treeEdit.ts'
 import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
-import { childrenOf, descendants, isItem, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
+import { childrenOf, descendants, isItem, isSheetWork, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
@@ -82,12 +82,25 @@ export default function PlanTree({
   }, [])
 
   const top = childrenOf(tree, null).filter((t) => t.phase_id === phase.id)
+  // Each phase's General Tasks / Sheets groups fold away separately; remembered in this browser.
+  const foldKey = `archmgmt.groupFold.${phase.id}`
+  const [folded, setFolded] = useState<{ tasks?: boolean; sheets?: boolean }>(() => {
+    try { return JSON.parse(localStorage.getItem(foldKey) ?? '{}') } catch { return {} }
+  })
+  const fold = (g: 'tasks' | 'sheets') => setFolded((f) => {
+    const next = { ...f, [g]: !f[g] }
+    try { localStorage.setItem(foldKey, JSON.stringify(next)) } catch { /* private mode */ }
+    return next
+  })
   const isSheetSide = (t: Task) => ['sheet', 'view'].includes(kindOf(t))
   const topTasks = top.filter((t) => !isSheetSide(t))
   const topSheets = top.filter(isSheetSide)
-  const groupHead = (g: 'tasks' | 'sheets', label: string, n: number) => (
-    <li key={`head-${g}`} className="tgroup-head" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, target: null, only: g }) }}>
-      <span>{label}</span><span className="count">{n}</span>
+  const groupHead = (cls: string, label: string, n: number, g = cls.split(' ')[0] as 'tasks' | 'sheets') => (
+    <li key={`head-${g}`} className={`tgroup-head ${cls}${folded[g] ? ' folded' : ''}`} role="button" tabIndex={0} aria-expanded={!folded[g]}
+      title={folded[g] ? `Show ${label.toLowerCase()}` : `Collapse ${label.toLowerCase()}`}
+      onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) fold(g) }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fold(g) } }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, target: null, only: g }) }}>
+      <span className="caret" aria-hidden="true">▾</span><span>{label}</span><span className="count">{n}</span>
       <button className="icon-btn" title={g === 'tasks' ? 'Add a task or milestone' : 'Add sheets'}
         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null, only: g }) }}>+</button>
     </li>
@@ -265,7 +278,7 @@ export default function PlanTree({
 
   const rowProps = (t: Task, className: string, depth: number) => ({
     'data-locked-by': lockedBy(t.id),
-    className: `${className}${lockedBy(t.id) ? ' locked' : ''}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
+    className: `${className}${isSheetWork(tree, t) ? ' sheet-side' : ''}${lockedBy(t.id) ? ' locked' : ''}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
     tabIndex: -1,
     'data-row': t.id,
@@ -430,10 +443,10 @@ export default function PlanTree({
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHint(null) }}
         onDrop={(e) => { e.preventDefault(); setHint(null); dropRow(e, null, 'after') }}>
         {/* Tasks first, then sheets, each under a quiet heading (only when the phase has some). */}
-        {topTasks.length > 0 && groupHead('tasks', 'Tasks', topTasks.length)}
-        {topTasks.flatMap((t) => node(t, 0))}
-        {topSheets.length > 0 && groupHead('sheets', 'Sheets', topSheets.length)}
-        {topSheets.flatMap((t) => node(t, 0))}
+        {topTasks.length > 0 && groupHead('tasks', 'General Tasks', topTasks.length)}
+        {!folded.tasks && topTasks.flatMap((t) => node(t, 0))}
+        {topSheets.length > 0 && groupHead('sheets sheet-side', 'Sheets', topSheets.length)}
+        {!folded.sheets && topSheets.flatMap((t) => node(t, 0))}
         {top.length === 0 && !addingSheet && (
           <li className="muted small empty-row">
             <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
