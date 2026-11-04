@@ -55,9 +55,9 @@ carrying about three medium tasks at once.
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
 - **Editing tasks**: every part of a task row is clickable in place (status, size, dates, assignee, ⋯ for more);
   clicking a task in the timeline, calendar or board opens the same controls in a small panel.
-- **Settings & Data**, in sections down the left: *General* (theme, your account), *Branding & Printing* (brand
+- **Settings & Data**, in sections down the left: *General* (theme), *Branding & Printing* (brand
   palettes, typed in or pulled from a client's website; meeting-notes title block), *Wishlist & Errors* (requests
-  and error reports, newest first; admins set status and reply), *Access*, and *Data* (storage, backup / restore,
+  and error reports, newest first; admins set status and reply), *Access* (your account, who can sign in), and *Data* (storage, backup / restore,
   sample data).
 
 ## Keeping data safe while iterating

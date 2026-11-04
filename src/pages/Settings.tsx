@@ -17,10 +17,10 @@ import type { Person, Project } from '../lib/types.ts'
 
 /** Settings is split into sections, each at /settings/<id>, listed down the left of the page. */
 const SECTIONS = [
-  { id: 'general', name: 'General', blurb: 'How the app looks for you, and your account.' },
+  { id: 'general', name: 'General', blurb: 'How the app looks for you.' },
   { id: 'branding', name: 'Branding & Printing', blurb: 'Client brand colours and what printed meeting notes carry.' },
   { id: 'wishlist', name: 'Wishlist & Errors', blurb: 'Ask for something the app should do, or tell us what’s not working. Everyone can see the list and its status.' },
-  { id: 'access', name: 'Access', blurb: 'Who can sign in to archMGMT.' },
+  { id: 'access', name: 'Access', blurb: 'Your account, and who can sign in to archMGMT.' },
   { id: 'data', name: 'Data', blurb: 'Where data lives, how much room it takes, backups and sample data.' },
 ] as const
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -104,17 +104,7 @@ export default function Settings() {
           ))}
         </nav>
         <div className="settings-body">
-          {show('general') && <>
-            <ThemePicker />
-          {session && (
-            <div className="card pad">
-              <h2>Your Account</h2>
-              <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
-              {session.user.email && <MyName email={session.user.email} />}
-              <ChangePassword />
-            </div>
-          )}
-          </>}
+          {show('general') && <ThemePicker />}
 
           {show('branding') && <>
             <BrandPalettes />
@@ -123,9 +113,19 @@ export default function Settings() {
 
           {show('wishlist') && <Wishlist />}
 
-          {show('access') && (session
-            ? <AccessManager myEmail={session.user.email} />
-            : <div className="card pad"><h2>Who Has Access</h2><p className="muted">Access is managed once the shared database is connected.</p></div>)}
+          {show('access') && <>
+            {session && (
+              <div className="card pad">
+                <h2>Your Account</h2>
+                <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
+                {session.user.email && <MyName email={session.user.email} />}
+                <ChangePassword />
+              </div>
+            )}
+            {session
+              ? <AccessManager myEmail={session.user.email} />
+              : <div className="card pad"><h2>Who Has Access</h2><p className="muted">Access is managed once the shared database is connected.</p></div>}
+          </>}
 
           {show('data') && <>
           <div className="card pad">
