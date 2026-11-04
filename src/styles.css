@@ -1074,12 +1074,13 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .ym-day:hover { background: var(--hover); opacity: 1; }
 .ym-day.today { outline: 2px solid var(--accent); font-weight: 700; opacity: 1; }
 .ym-bars { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 0 4px; }
-/* One phase per lane: its name inside, a tick where it starts and ends. */
+/* One phase per lane: its name inside, a bookend where it starts and ends. */
 .ym-bars i { font-style: normal; position: relative; display: flex; align-items: center; min-width: 0; height: 15px; background: var(--c); }
 .ym-bars i b { font-size: 9.5px; font-weight: 600; line-height: 1; padding: 0 5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,.35); }
 .ym-bars i.starts { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
 .ym-bars i.ends { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
-.ym-bars i.starts::before, .ym-bars i.ends::after { content: ''; position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
+/* Bookends: a darker shade of the bar, 2px taller than it top and bottom, centred on it. */
+.ym-bars i.starts::before, .ym-bars i.ends::after { content: ''; position: absolute; top: -2px; bottom: -2px; width: 3px; background: color-mix(in srgb, var(--c) 62%, #000); border-radius: 1.5px; }
 .ym-bars i.starts::before { left: 0; }
 .ym-bars i.ends::after { right: 0; }
 .ym-bars i.starts b { padding-left: 6px; }
@@ -1189,3 +1190,15 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .trow input.field:focus, .irow input.field:focus { text-overflow: clip; }
 .rh-cell { min-width: 0; }
 .rh-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wish-foot { display: flex; align-items: center; gap: 12px; }
+.wish-foot .linkbtn { font-size: 12px; }
+.brand-grip { cursor: grab; color: var(--faint); font-size: 11px; letter-spacing: -2px; padding: 0 3px 0 1px; user-select: none; }
+.brand-swatch.dragging { opacity: .45; }
+.brand-web { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.brand-found { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.brand-found-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.brand-found-row > .muted.small:first-child { width: 96px; }
+.brand-chip { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line-strong); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.brand-chip.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+.brand-chip b { font-size: 11px; color: #fff; background: rgba(0,0,0,.55); border-radius: 999px; min-width: 16px; height: 16px; line-height: 16px; }
+.brand-dot { width: 16px; height: 16px; border-radius: 4px; display: inline-block; border: 1px solid var(--line); }

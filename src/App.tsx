@@ -16,6 +16,7 @@ import Notes from './pages/Notes.tsx'
 import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
+import WishlistPage from './pages/WishlistPage.tsx'
 
 export default function App() {
   return (
@@ -70,6 +71,7 @@ function Shell() {
               <NavLink to="/team">Team &amp; workload</NavLink>
             </nav>
             <NavLink to="/settings" className="settings-link">Settings &amp; data</NavLink>
+            <NavLink to="/wishlist" className="settings-link">Wishlist &amp; problems</NavLink>
             {session && (
               <div className="signout">
                 <span>{session.user.email}</span>
@@ -87,6 +89,7 @@ function Shell() {
             <Route path="/notes" element={<Notes />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/projects/:id" element={<OpenProject />} />
             <Route path="/workload" element={<Navigate to="/team" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

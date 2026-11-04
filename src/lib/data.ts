@@ -147,28 +147,6 @@ export function removeSampleData() {
   writeMeta({ ...meta, sampleIds: [] })
 }
 
-/**
- * Everything saved in this browser (from before the shared database), for copying across.
- * Works whichever mode the app is in. Sample rows can be left out.
- */
-export function browserSnapshot(includeSamples: boolean): { backup: Backup; count: number; samples: number } | null {
-  let raw: string | null = null
-  try { raw = localStorage.getItem(KEY) } catch { return null }
-  if (!raw) return null
-  const s = readStore()
-  const sample = new Set(readMeta().sampleIds)
-  const tables = emptyStore()
-  let count = 0, samples = 0
-  for (const t of TABLES) {
-    for (const r of s[t]) {
-      if (sample.has(r.id)) { samples++; if (!includeSamples) continue }
-      tables[t].push(r)
-      count++
-    }
-  }
-  return { backup: { format: 'archmgmt-backup', exported_at: new Date().toISOString(), tables }, count, samples }
-}
-
 // ---------- backup / restore ----------
 
 export interface Backup {

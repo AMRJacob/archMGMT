@@ -1,5 +1,4 @@
 import ThemePicker from '../components/ThemePicker.tsx'
-import Wishlist from '../components/Wishlist.tsx'
 import BrandPalettes from '../components/BrandPalettes.tsx'
 import TitleBlockSettings from '../components/TitleBlockSettings.tsx'
 import StorageUsage from '../components/StorageUsage.tsx'
@@ -9,7 +8,7 @@ import { ChangePassword } from '../auth/Auth.tsx'
 import AccessManager from '../components/AccessManager.tsx'
 import { useAuth } from '../auth/authContext.ts'
 import {
-  browserSnapshot, exportAll, importAll, list, remove, removeSampleData, sampleRowCount, usingSampleData, type Backup,
+  exportAll, importAll, list, remove, removeSampleData, sampleRowCount, usingSampleData, type Backup,
 } from '../lib/data.ts'
 import { today } from '../lib/dates.ts'
 import type { Person, Project } from '../lib/types.ts'
@@ -20,9 +19,7 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [samples, setSamples] = useState(() => sampleRowCount())
-  const [withSamples, setWithSamples] = useState(true)
   const file = useRef<HTMLInputElement>(null)
-  const local = usingSampleData ? null : browserSnapshot(withSamples)
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
   const done = (m: string, reload = false) => { setMessage(m); if (reload) setTimeout(() => window.location.reload(), 900) }
@@ -48,14 +45,6 @@ export default function Settings() {
       setBusy(true)
       done(`Restored ${await importAll(b)} records. Reloading…`, true)
     } catch (e) { fail(e) } finally { setBusy(false); if (file.current) file.current.value = '' }
-  }
-
-  async function copyBrowserData() {
-    if (!local) return
-    if (!window.confirm(`Copy ${local.count} records saved in this browser into the shared database? Records already there are updated, nothing is deleted.`)) return
-    setBusy(true); setError(null)
-    try { done(`Copied ${await importAll(local.backup)} records into the shared database. Reloading…`, true) }
-    catch (e) { fail(e) } finally { setBusy(false) }
   }
 
   async function clearSamples() {
@@ -84,14 +73,13 @@ export default function Settings() {
       <header className="page-head">
         <div>
           <h1>Settings &amp; data</h1>
-          <p className="muted">Account, backups and moving data.</p>
+          <p className="muted">Account, appearance, backups and access.</p>
         </div>
       </header>
       {message && <p className="success">{message}</p>}
       {error && <p className="error">{error}</p>}
 
       <ThemePicker />
-      <Wishlist />
       <BrandPalettes />
       <TitleBlockSettings />
 
@@ -115,23 +103,6 @@ export default function Settings() {
       )}
 
       {session && <AccessManager myEmail={session.user.email} />}
-
-      {local && local.count + (withSamples ? 0 : local.samples) > 0 && (
-        <div className="card pad">
-          <h2>Bring over data from this browser</h2>
-          <p className="muted">
-            This browser still has data from before the shared database: {local.count} records
-            {local.samples ? ` (${local.samples} of them sample data)` : ''}. Copy it in so everyone can see it.
-          </p>
-          {local.samples > 0 && (
-            <label className="inline-check" style={{ marginTop: 8 }}>
-              <input type="checkbox" checked={withSamples} onChange={(e) => setWithSamples(e.target.checked)} />
-              Include the sample projects and people (handy for trying the app out; removable later)
-            </label>
-          )}
-          <div className="row-gap"><button className="btn primary" disabled={busy || local.count === 0} onClick={copyBrowserData}>Copy into shared database</button></div>
-        </div>
-      )}
 
       <div className="card pad">
         <h2>Backup and restore</h2>

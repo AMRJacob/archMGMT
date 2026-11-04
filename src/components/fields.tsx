@@ -21,7 +21,8 @@ export function TextField({
   const [shown, setShown] = useState(value)
   if (shown !== value) { setShown(value); setDraft(value ?? '') } // value changed elsewhere
   const input = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (autoFocus) { input.current?.focus(); input.current?.select() } }, [autoFocus])
+  const area = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => { if (autoFocus) { input.current?.focus(); input.current?.select(); area.current?.focus() } }, [autoFocus])
   const cancelled = useRef(false)
   const commit = () => {
     if (cancelled.current) return
@@ -30,7 +31,7 @@ export function TextField({
   }
   if (multiline) {
     return (
-      <textarea className={`field ${className}`} value={draft} placeholder={placeholder} rows={2}
+      <textarea ref={area} className={`field ${className}`} value={draft} placeholder={placeholder} rows={2}
         onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
     )
   }

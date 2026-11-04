@@ -7,8 +7,8 @@ import { supabase } from '../lib/supabase.ts'
 import { WISH_STATUSES, type WishItem, type WishStatus } from '../lib/types.ts'
 
 /**
- * Settings → Wishlist & problems: anyone can ask for something or report a problem; admins set the status
- * and reply. Open items first; closed ones (complete, infeasible, duplicate) fold away.
+ * Wishlist & problems: anyone can ask for something or report a problem; admins set the status and reply.
+ * Newest first, like a log. Open items show; closed ones (complete, infeasible, duplicate) fold away.
  */
 export default function Wishlist() {
   const items = useRows<WishItem>('wishlist')
@@ -20,6 +20,7 @@ export default function Wishlist() {
   const [details, setDetails] = useState('')
   const [showClosed, setShowClosed] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [replying, setReplying] = useState<string | null>(null) // item whose empty reply box is open
 
   useEffect(() => {
     if (!supabase) return
@@ -27,7 +28,7 @@ export default function Wishlist() {
   }, [])
 
   const closed = (s: WishStatus) => WISH_STATUSES.find((x) => x.value === s)?.closed ?? false
-  const sorted = [...items.rows].sort((a, b) => a.sort_order - b.sort_order || (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+  const sorted = [...items.rows].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
   const open = sorted.filter((x) => !closed(x.status))
   const done = sorted.filter((x) => closed(x.status))
 
@@ -65,26 +66,26 @@ export default function Wishlist() {
         {canEdit
           ? <TextField multiline value={x.details} placeholder="Details" className="wish-details" onSave={(v) => patch(x, { details: v })} />
           : x.details && <p className="wish-details">{x.details}</p>}
-        {(admin || x.response) && (
-          <div className="wish-response">
+        {(x.response || replying === x.id) && (
+          <div className="wish-response" onBlur={() => setReplying(null)}>
             <span className="muted small">Reply</span>
             {admin
-              ? <TextField multiline value={x.response} placeholder="Status notes, plans, why it’s closed…" onSave={(v) => patch(x, { response: v })} />
+              ? <TextField multiline value={x.response} placeholder="Status notes, plans, why it’s closed…"
+                  autoFocus={!x.response} onSave={(v) => patch(x, { response: v })} />
               : <p>{x.response}</p>}
           </div>
         )}
-        <div className="muted small">{x.submitted_by ?? 'Someone'}{x.created_at ? ` · ${formatDate(x.created_at.slice(0, 10))}` : ''}</div>
+        <div className="wish-foot muted small">
+          <span>{x.submitted_by ?? 'Someone'}{x.created_at ? ` · ${formatDate(x.created_at.slice(0, 10))}` : ''}</span>
+          {admin && !x.response && replying !== x.id && <button className="linkbtn" onClick={() => setReplying(x.id)}>Reply</button>}
+        </div>
       </li>
     )
   }
 
   return (
     <div className="card pad">
-      <h2>Wishlist &amp; problems</h2>
-      <p className="muted">
-        Ask for something the app should do, or tell us what’s not working. Everyone can see the list and its status.
-        {admin && <> Set an item to <strong>Approved – ready to build</strong> when it should be built next.</>}
-      </p>
+      {admin && <p className="muted">Set an item to <strong>Approved – ready to build</strong> when it should be built next.</p>}
       <div className="wish-form">
         <div className="segmented small-seg" role="radiogroup" aria-label="Kind">
           <button role="radio" aria-checked={kind === 'wish'} className={kind === 'wish' ? 'on' : ''} onClick={() => setKind('wish')}>Wish</button>
