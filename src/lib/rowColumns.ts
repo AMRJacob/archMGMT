@@ -10,7 +10,13 @@ export const ROW_COLUMNS: { key: RowColumn; label: string; width: number }[] = [
   { key: 'people', label: 'Who', width: 76 },
 ]
 
-export interface RowLayout { order: RowColumn[]; hidden: RowColumn[]; widths: Partial<Record<RowColumn, number>> }
+export interface RowLayout {
+  order: RowColumn[]
+  hidden: RowColumn[]
+  widths: Partial<Record<RowColumn, number>>
+  /** How wide rows are (px from their left edge); empty = the full width. Narrower pulls the columns toward the names. */
+  span?: number | null
+}
 
 const KEY = 'archmgmt:row-columns'
 const EVENT = 'archmgmt:row-columns'
@@ -28,7 +34,7 @@ export function getRowLayout(): RowLayout {
       const known = new Set(ROW_COLUMNS.map((c) => c.key))
       const order = (v.order ?? []).filter((k) => known.has(k))
       for (const c of ROW_COLUMNS) if (!order.includes(c.key)) order.push(c.key)
-      value = { order, hidden: (v.hidden ?? []).filter((k) => known.has(k)), widths: v.widths ?? {} }
+      value = { order, hidden: (v.hidden ?? []).filter((k) => known.has(k)), widths: v.widths ?? {}, span: typeof v.span === 'number' ? v.span : null }
     }
   } catch { /* bad saved value: use the default */ }
   cache = { raw, value }

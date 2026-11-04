@@ -1,4 +1,4 @@
-import { useState, type PointerEvent as RPointerEvent } from 'react'
+import { useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { Pop } from './TaskChips.tsx'
 import { clampW, getRowLayout, resetRowLayout, ROW_COLUMNS, setRowLayout, useRowLayout, widthOf, type RowColumn } from '../lib/rowColumns.ts'
 
@@ -30,6 +30,20 @@ export default function RowColumnsHeader() {
     window.addEventListener('pointermove', mv)
     window.addEventListener('pointerup', () => window.removeEventListener('pointermove', mv), { once: true })
   }
+  // The left edge of the first column: drag it toward the names to pull every column closer.
+  const head = useRef<HTMLDivElement>(null)
+  const resizeSpan = (e: RPointerEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const box = head.current?.parentElement?.getBoundingClientRect()
+    const x0 = e.clientX, w0 = head.current?.getBoundingClientRect().width ?? 0
+    const max = box?.width ?? w0
+    const mv = (ev: PointerEvent) => {
+      const w = Math.round(w0 + (ev.clientX - x0))
+      setRowLayout({ ...getRowLayout(), span: w >= max - 4 ? null : Math.max(560, w) })
+    }
+    window.addEventListener('pointermove', mv)
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', mv), { once: true })
+  }
   const resetWidth = (k: RowColumn) => {
     const cur = getRowLayout()
     const { [k]: _gone, ...rest } = cur.widths
@@ -38,7 +52,7 @@ export default function RowColumnsHeader() {
   }
 
   return (
-    <div className="row-head">
+    <div className="row-head" ref={head}>
       <Pop className="filter-pop" title="Show or hide columns" label={<span className="row-head-menu">Columns ▾</span>}>
         {() => (
           <>
@@ -56,6 +70,8 @@ export default function RowColumnsHeader() {
         )}
       </Pop>
       <span className="grow" />
+      <span className="rh-span" title="Drag left to bring the columns closer to the names · double-click to spread them out again"
+        onPointerDown={resizeSpan} onDoubleClick={() => setRowLayout({ ...getRowLayout(), span: null })} />
       {shown.map((k) => (
         <span key={k} draggable className={`rh-cell${drag === k ? ' dragging' : ''}${drop?.key === k ? ` drop-${drop.side}` : ''}`}
           style={{ width: widthOf(layout, k) }} title="Drag the name to move this column · drag its right edge to resize (double-click it to reset)"

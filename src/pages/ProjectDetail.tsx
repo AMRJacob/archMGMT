@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree from '../components/PlanTree.tsx'
 import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
+import { useRowLayout } from '../lib/rowColumns.ts'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { PhaseSetupDialog } from '../components/SetupDialogs.tsx'
@@ -28,6 +29,7 @@ export default function ProjectDetail() {
   const project = projects.current
   const id = project?.id ?? ''
   const { phases, tasks, people, patchTask, patchMany } = useProjectPlan(id)
+  const rowLayout = useRowLayout()
   const nh = useNotes(id, tasks.rows, phases.rows, people.rows, () => void tasks.reload())
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
@@ -251,6 +253,7 @@ export default function ProjectDetail() {
         </div>
       )}
 
+      <div className="rows-area" style={rowLayout.span ? ({ '--rows-w': `${rowLayout.span}px` } as CSSProperties) : undefined}>
       <RowColumnsHeader />
       <div className="phase-list">
         {sortedPhases.map((p, i) => {
@@ -332,6 +335,7 @@ export default function ProjectDetail() {
             <div className="phase-body"><ul className="tlist">{unphased.filter((x) => !x.parent_id).map(taskRow)}</ul></div>
           </div>
         )}
+      </div>
       </div>
 
       <div className="footer-actions">

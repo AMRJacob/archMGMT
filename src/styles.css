@@ -1038,3 +1038,9 @@ select.wish-status { border: 1px solid var(--line); }
 .phase-row[draggable='true']:active { cursor: grabbing; }
 .tc-cell .chip-btn { justify-content: flex-start; text-align: left; }
 .tc-cell .date-chip { text-align: left; }
+
+/* Narrower rows pull the columns toward the names (drag the left edge of the first column heading) */
+.rows-area .row-head, .rows-area .tlist > li { max-width: var(--rows-w, none); }
+.rh-span { flex: none; width: 10px; align-self: stretch; margin-right: 2px; cursor: col-resize; border-left: 2px solid transparent; }
+.row-head:hover .rh-span { border-left-color: var(--line-strong); }
+.rh-span:hover, .rh-span:active { border-left-color: var(--accent) !important; }
