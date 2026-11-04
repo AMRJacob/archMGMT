@@ -22,48 +22,94 @@ function savedScale(): CalScale {
   return 'month'
 }
 
-/** Twelve small months: days tinted by phase, milestones and due dates marked. */
-function YearView({ year, items, today: t, onPickMonth, onPickDay }: {
-  year: number
+/**
+ * The whole project as small months, from the month it starts to the month it ends, with a heading where
+ * a new year begins. Each week shows the phases running through it as thin bars; past days are dimmed;
+ * milestones (◆) and due dates (•) are marked.
+ */
+function YearView({ items, today: t, onPickMonth, onPickDay }: {
   items: Item[]
   today: string
   onPickMonth: (iso: string) => void
   onPickDay: (iso: string) => void
 }) {
-  const phasesOn = (d: string) => items.filter((it) => it.kind === 'phase' && it.start <= d && d <= it.end)
+  const dates = items.flatMap((it) => [it.start, it.end]).sort()
+  if (!dates.length) return <p className="muted empty">Nothing scheduled yet.</p>
+  const first = parseISO(dates[0]), last = parseISO(dates[dates.length - 1])
+  const months: string[] = []
+  for (let y = first.getUTCFullYear(), m = first.getUTCMonth(); y < last.getUTCFullYear() || (y === last.getUTCFullYear() && m <= last.getUTCMonth()); m++) {
+    if (m > 11) { m = 0; y++ }
+    months.push(toISO(new Date(Date.UTC(y, m, 1))))
+    if (months.length > 72) break // six years is plenty
+  }
+  const phases = items.filter((it) => it.kind === 'phase')
   const dueOn = (d: string) => items.filter((it) => it.kind === 'task' && it.end === d)
-  return (
-    <div className="year-grid">
-      {Array.from({ length: 12 }, (_, mi) => {
-        const first = toISO(new Date(Date.UTC(year, mi, 1)))
-        const lead = parseISO(first).getUTCDay()
-        const days = new Date(Date.UTC(year, mi + 1, 0)).getUTCDate()
-        return (
-          <div key={mi} className="ym">
-            <button className="ym-name" onClick={() => onPickMonth(first)}>{parseISO(first).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })}</button>
-            <div className="ym-days">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={`h${i}`} className="ym-dow">{d}</span>)}
-              {Array.from({ length: lead }, (_, i) => <span key={`b${i}`} />)}
-              {Array.from({ length: days }, (_, di) => {
-                const d = addDays(first, di)
-                const ph = phasesOn(d)
-                const due = dueOn(d)
-                const ms = due.filter((x) => x.milestone)
-                const tip = [...ph.map((p) => p.title), ...due.map((x) => `${x.milestone ? '◆' : '•'} ${x.title}`)].join('\n')
-                return (
-                  <button key={d} className={`ym-day${d === t ? ' today' : ''}`} title={tip || undefined} onClick={() => onPickDay(d)}
-                    style={ph[0] ? { background: `color-mix(in srgb, ${ph[0].color} ${ph.length > 1 ? 42 : 28}%, transparent)` } : undefined}>
-                    {parseISO(d).getUTCDate()}
-                    {ms.length > 0
-                      ? <i className="ym-ms" style={{ background: milestoneColor(ms[0].task?.milestone_type, 'var(--ink)') }} />
-                      : due.length > 0 && <i className="ym-dot" />}
-                  </button>
-                )
-              })}
+  const years = [...new Set(months.map((m) => m.slice(0, 4)))]
+
+  const monthCard = (mFirst: string) => {
+    const mi = parseISO(mFirst).getUTCMonth(), yr = parseISO(mFirst).getUTCFullYear()
+    const days = new Date(Date.UTC(yr, mi + 1, 0)).getUTCDate()
+    const mLast = addDays(mFirst, days - 1)
+    const gridStart = addDays(mFirst, -parseISO(mFirst).getUTCDay())
+    const weekCount = Math.ceil((daysBetween(gridStart, mLast) + 1) / 7)
+    return (
+      <div key={mFirst} className="ym">
+        <button className="ym-name" onClick={() => onPickMonth(mFirst)}>{parseISO(mFirst).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })}</button>
+        <div className="ym-dows">{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i}>{d}</span>)}</div>
+        {Array.from({ length: weekCount }, (_, wi) => {
+          const ws = addDays(gridStart, wi * 7), we = addDays(ws, 6)
+          // Phases running this week (within this month), one thin lane each.
+          const lanes = phases.filter((p) => p.start <= we && p.end >= ws && p.start <= mLast && p.end >= mFirst)
+          return (
+            <div key={ws} className="ym-week">
+              <div className="ym-days">
+                {Array.from({ length: 7 }, (_, di) => {
+                  const d = addDays(ws, di)
+                  if (d < mFirst || d > mLast) return <span key={d} />
+                  const due = dueOn(d)
+                  const ms = due.filter((x) => x.milestone)
+                  const tip = [...phases.filter((p) => p.start <= d && d <= p.end).map((p) => p.title), ...due.map((x) => `${x.milestone ? '◆' : '•'} ${x.title}`)].join('\n')
+                  return (
+                    <button key={d} className={`ym-day${d === t ? ' today' : ''}${d < t ? ' past' : ''}`} title={tip || undefined} onClick={() => onPickDay(d)}>
+                      {parseISO(d).getUTCDate()}
+                      {ms.length > 0
+                        ? <i className="ym-ms" style={{ background: milestoneColor(ms[0].task?.milestone_type, 'var(--ink)') }} />
+                        : due.length > 0 && <i className="ym-dot" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {lanes.length > 0 && (
+                <div className="ym-bars" style={{ gridTemplateRows: `repeat(${lanes.length}, 4px)` }}>
+                  {lanes.map((p, li) => {
+                    const s0 = [p.start, ws, mFirst].sort()[2], e0 = [p.end, we, mLast].sort()[0]
+                    return (
+                      <i key={p.id} title={p.title} className={e0 < t ? 'past' : ''}
+                        style={{ gridRow: li + 1, gridColumn: `${daysBetween(ws, s0) + 1} / span ${daysBetween(s0, e0) + 1}`, background: p.color,
+                          borderTopLeftRadius: s0 === p.start ? 2 : 0, borderBottomLeftRadius: s0 === p.start ? 2 : 0,
+                          borderTopRightRadius: e0 === p.end ? 2 : 0, borderBottomRightRadius: e0 === p.end ? 2 : 0 }} />
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="year-view">
+      <div className="ym-legend">
+        {phases.map((p) => <span key={p.id}><i style={{ background: p.color }} />{p.title}</span>)}
+      </div>
+      {years.map((y) => (
+        <section key={y} className="year-block">
+          <h3 className="year-head">{y}</h3>
+          <div className="year-grid">{months.filter((m) => m.startsWith(y)).map(monthCard)}</div>
+        </section>
+      ))}
     </div>
   )
 }
@@ -177,7 +223,7 @@ export default function CalendarView({
 
   const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => parseISO(iso).toLocaleDateString('en-US', { ...o, timeZone: 'UTC' })
   const weekEnd = addDays(weekStart, 6)
-  const monthLabel = scale === 'year' ? focus.slice(0, 4)
+  const monthLabel = scale === 'year' ? 'Whole project'
     : scale === 'week'
       ? `${fmt(weekStart, { month: 'short', day: 'numeric' })} – ${weekStart.slice(5, 7) === weekEnd.slice(5, 7) ? Number(weekEnd.slice(8)) : fmt(weekEnd, { month: 'short', day: 'numeric' })}, ${weekEnd.slice(0, 4)}`
       : m.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
@@ -198,13 +244,17 @@ export default function CalendarView({
               <button key={v} className={scale === v ? 'on' : ''} onClick={() => setScale(v)}>{v[0].toUpperCase() + v.slice(1)}</button>
             ))}
           </div>
-          <button className="btn" onClick={() => shift(-1)} title="Earlier">‹</button>
-          <button className="btn" onClick={() => setFocus(today())} disabled={isNow}>Today</button>
-          <button className="btn" onClick={() => shift(1)} title="Later">›</button>
+          {scale !== 'year' && (
+            <>
+              <button className="btn" onClick={() => shift(-1)} title="Earlier">‹</button>
+              <button className="btn" onClick={() => setFocus(today())} disabled={isNow}>Today</button>
+              <button className="btn" onClick={() => shift(1)} title="Later">›</button>
+            </>
+          )}
         </div>
       </div>
       {scale === 'year' ? (
-        <YearView year={Number(focus.slice(0, 4))} items={items} today={t}
+        <YearView items={items} today={t}
           onPickMonth={(d) => { setFocus(d); setScale('month') }} onPickDay={(d) => { setFocus(d); setScale('week') }} />
       ) : (<>
       <div className="cal-dow">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <span key={d}>{d}</span>)}</div>
@@ -261,7 +311,7 @@ export default function CalendarView({
         })}
       </div>
       </>)}
-      <p className="muted small">{scale === 'year' ? 'Each day is tinted by its phase; ◆ marks milestones and • due dates. Click a month or day to zoom in. ' : ''}Click + on a day (or right-click) to add a task there. Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
+      <p className="muted small">{scale === 'year' ? 'Bars show the phases running each week; past days are dimmed; ◆ marks milestones and • due dates. Click a month or a day to zoom in. ' : ''}Click + on a day (or right-click) to add a task there. Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
     </div>
   )
 }

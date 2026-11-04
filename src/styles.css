@@ -1057,18 +1057,28 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .cal-head .toolbar { display: flex; gap: 6px; align-items: center; }
 .cal-week-view, .calendar.cal-week .cal-week { min-height: 440px; }
 .calendar.cal-week .cal-items { grid-auto-rows: 26px; }
-.year-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 22px; margin: 6px 0 12px; }
+.year-view { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 12px; }
+.year-head { margin: 8px 0 2px; font-size: 15px; letter-spacing: 0.04em; color: var(--ink); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.year-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 22px; }
 @media (max-width: 1100px) { .year-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ym-name { border: none; background: none; padding: 0 0 6px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+.ym-name { border: none; background: none; padding: 0 0 4px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
 .ym-name:hover { color: var(--accent); }
-.ym-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.ym-dow { font-size: 10px; color: var(--faint); text-align: center; }
-.ym-day { position: relative; border: none; background: none; border-radius: 4px; padding: 3px 0 7px; font-size: 11.5px; color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
-.ym-day:hover { outline: 1px solid var(--line-strong); }
-.ym-day.today { outline: 2px solid var(--accent); font-weight: 700; }
+.ym-dows, .ym-days { display: grid; grid-template-columns: repeat(7, 1fr); }
+.ym-dows span { font-size: 10px; color: var(--faint); text-align: center; }
+.ym-week { padding-bottom: 2px; }
+.ym-day { position: relative; border: none; background: none; border-radius: 4px; padding: 2px 0 6px; font-size: 11.5px; color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
+.ym-day.past { opacity: 0.42; }
+.ym-day:hover { background: var(--hover); opacity: 1; }
+.ym-day.today { outline: 2px solid var(--accent); font-weight: 700; opacity: 1; }
+.ym-bars { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 2px 3px; }
+.ym-bars i { display: block; height: 4px; }
+.ym-bars i.past { opacity: 0.4; }
 .ym-ms { position: absolute; left: 50%; bottom: 1px; width: 6px; height: 6px; margin-left: -3px; transform: rotate(45deg); }
 .ym-dot { position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
+.ym-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.ym-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ym-legend i { width: 14px; height: 5px; border-radius: 2px; }
 
 /* sidebar: the project (switcher + its pages) as one group at the top, office pages down by Settings */
 .project-nav { display: flex; flex-direction: column; gap: 6px; padding: 6px; margin: -4px -6px 0; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }
