@@ -398,8 +398,8 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 
 /* ---------- overview hierarchy ---------- */
 .phase-strip { margin: 0 0 18px; }
-.strip-bar { position: relative; display: flex; gap: 2px; height: 30px; }
-.strip-seg { border: none; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 600; min-width: 0; cursor: pointer; padding: 0 8px; text-align: left; opacity: 0.55; transition: opacity 0.15s; }
+.strip-bar { position: relative; height: 30px; }
+.strip-seg { position: absolute; height: 30px; border: none; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 600; min-width: 0; cursor: pointer; padding: 0 8px; text-align: left; opacity: 0.55; transition: opacity 0.15s; }
 .strip-seg span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip-seg:hover { opacity: 0.85; }
 .strip-seg.past { opacity: 0.35; }
@@ -1027,3 +1027,11 @@ select.wish-status { border: 1px solid var(--line); }
 .note-row .note-main { flex: 1; }
 @media (max-width: 1000px) { .note-grid { grid-template-columns: 1fr 1fr; } .note-sections, .notes-layout { grid-template-columns: 1fr; } }
 .note-side .note-decisions, .note-sec .note-body { width: 100% !important; box-sizing: border-box; }
+
+.phase-sec { position: relative; }
+.phase-sec.dragging { opacity: 0.45; }
+.phase-sec.drop-before::before, .phase-sec.drop-after::after { content: ''; position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 2px; background: var(--accent); z-index: 3; }
+.phase-sec.drop-before::before { top: -6px; }
+.phase-sec.drop-after::after { bottom: -6px; }
+.phase-row[draggable='true'] { cursor: grab; }
+.phase-row[draggable='true']:active { cursor: grabbing; }

@@ -35,6 +35,8 @@ export default function ProjectDetail() {
   const [phaseMenu, setPhaseMenu] = useState<{ x: number; y: number; phase: Phase } | null>(null)
   const [editingPhase, setEditingPhase] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [dragPhase, setDragPhase] = useState<string | null>(null)
+  const [dropPhase, setDropPhase] = useState<{ id: string; side: 'before' | 'after' } | null>(null)
   const [setupLocal, setSetupLocal] = useState<string | null>(null)
   // ?setup=<phase id> (from the New project dialog) opens that phase's setup.
   const setupId = setupLocal ?? params.get('setup')
@@ -100,6 +102,17 @@ export default function ProjectDetail() {
     void tasks.reload()
   }
 
+  /** Reorder phases (Overview, timeline and exports follow this order; dates don't change). */
+  function movePhaseOrder(id: string, targetId: string, side: 'before' | 'after') {
+    if (id === targetId) return
+    const order = sortedPhases.filter((x) => x.id !== id)
+    const moving = sortedPhases.find((x) => x.id === id)
+    if (!moving) return
+    const at = order.findIndex((x) => x.id === targetId) + (side === 'after' ? 1 : 0)
+    order.splice(at, 0, moving)
+    order.forEach((x, i) => { if (x.sort_order !== i) void phases.patch(x.id, { sort_order: i }) })
+  }
+
   function phaseItems(p: Phase): MenuItem[] {
     const filled = tasksFor(p.id).length > 0
     return [
@@ -107,6 +120,9 @@ export default function ProjectDetail() {
       { label: 'Rename', run: () => { setOpenIds(new Set(open)); setRenaming(p.id) } },
       { label: 'Change dates…', run: () => setEditingPhase(p.id) },
       { label: p.client_visible ? 'Hide from presentation view' : 'Show in presentation view', run: () => void phases.patch(p.id, { client_visible: !p.client_visible }) },
+      'sep',
+      { label: 'Move up', disabled: sortedPhases[0]?.id === p.id, run: () => { const i = sortedPhases.findIndex((x) => x.id === p.id); if (i > 0) movePhaseOrder(p.id, sortedPhases[i - 1].id, 'before') } },
+      { label: 'Move down', disabled: sortedPhases[sortedPhases.length - 1]?.id === p.id, run: () => { const i = sortedPhases.findIndex((x) => x.id === p.id); if (i < sortedPhases.length - 1) movePhaseOrder(p.id, sortedPhases[i + 1].id, 'after') } },
       'sep',
       { label: 'Add phase after', run: () => void addPhaseAfter(p) },
       'sep',
@@ -126,6 +142,18 @@ export default function ProjectDetail() {
   const phaseColor = (i: number) => palette[i]
   const { accent, soft } = projectAccent(project.color)
   const span = start && end ? Math.max(1, daysBetween(start, end) + 1) : 1
+  // Lanes for the phase strip: each phase takes the first lane where it doesn't overlap another.
+  const stripLanes = (() => {
+    const lane = new Map<string, number>()
+    const ends: string[] = []
+    for (const p of sortedPhases) {
+      let l = ends.findIndex((e) => e < p.start_date)
+      if (l < 0) { l = ends.length; ends.push('') }
+      ends[l] = p.end_date
+      lane.set(p.id, l)
+    }
+    return { lane, count: Math.max(1, ends.length) }
+  })()
 
   const taskRow = (x: Task) => (
     <li key={x.id} className={`trow${x.status === 'done' ? ' done' : ''}`}>
@@ -200,16 +228,21 @@ export default function ProjectDetail() {
       {/* Where the project is: all phases at a glance */}
       {sortedPhases.length > 0 && start && (
         <div className="phase-strip">
-          <div className="strip-bar">
-            {sortedPhases.map((p, i) => (
-              <button key={p.id} className={`strip-seg${p.id === currentPhase?.id ? ' now' : ''}${p.end_date < t ? ' past' : ''}`}
-                style={{ flexGrow: daysBetween(p.start_date, p.end_date) + 1, background: phaseColor(i), color: textOn(phaseColor(i)) }}
-                title={`${p.name}: ${shortDate(p.start_date)} – ${shortDate(p.end_date)}`}
-                onClick={() => { setOpenIds(new Set([...open, p.id])); document.getElementById(`phase-${p.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>
-                <span>{p.name}</span>
-              </button>
-            ))}
-            {t >= start && end && t <= end && <i className="strip-today" style={{ left: `${(daysBetween(start, t) / span) * 100}%` }} />}
+          {/* Phases placed by their dates; phases that run at the same time (e.g. a grant process beside design) get their own lane. */}
+          <div className="strip-bar" style={{ height: stripLanes.count * 30 + (stripLanes.count - 1) * 4 }}>
+            {sortedPhases.map((p, i) => {
+              const left = (daysBetween(start!, p.start_date) / span) * 100
+              const width = ((daysBetween(p.start_date, p.end_date) + 1) / span) * 100
+              return (
+                <button key={p.id} className={`strip-seg${p.id === currentPhase?.id ? ' now' : ''}${p.end_date < t ? ' past' : ''}`}
+                  style={{ left: `calc(${left}% + 1px)`, width: `calc(${width}% - 2px)`, top: (stripLanes.lane.get(p.id) ?? 0) * 34, background: phaseColor(i), color: textOn(phaseColor(i)) }}
+                  title={`${p.name}: ${shortDate(p.start_date)} – ${shortDate(p.end_date)}`}
+                  onClick={() => { setOpenIds(new Set([...open, p.id])); document.getElementById(`phase-${p.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>
+                  <span>{p.name}</span>
+                </button>
+              )
+            })}
+            {t >= start! && end && t <= end && <i className="strip-today" style={{ left: `${(daysBetween(start!, t) / span) * 100}%` }} />}
           </div>
           <div className="strip-foot muted small">
             <span>{currentPhase ? <>Now in <strong>{currentPhase.name}</strong>, through {formatDate(currentPhase.end_date)}</> : ''}</span>
@@ -227,8 +260,25 @@ export default function ProjectDetail() {
           const isOpen = open.has(p.id)
           const isNow = p.id === currentPhase?.id && p.start_date <= t
           return (
-            <div key={p.id} id={`phase-${p.id}`} className={`phase-sec${isOpen ? ' open' : ''}${p.end_date < t ? ' past' : ''}`}>
+            <div key={p.id} id={`phase-${p.id}`}
+              className={`phase-sec${isOpen ? ' open' : ''}${p.end_date < t ? ' past' : ''}${dragPhase === p.id ? ' dragging' : ''}${dropPhase?.id === p.id ? ` drop-${dropPhase.side}` : ''}`}
+              onDragOver={(e) => {
+                if (!dragPhase || dragPhase === p.id) return
+                e.preventDefault()
+                const r = e.currentTarget.getBoundingClientRect()
+                const side = e.clientY < r.top + Math.min(r.height, 60) / 2 ? 'before' : 'after'
+                if (dropPhase?.id !== p.id || dropPhase.side !== side) setDropPhase({ id: p.id, side })
+              }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPhase(null) }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragPhase && dropPhase) movePhaseOrder(dragPhase, dropPhase.id, dropPhase.side)
+                setDragPhase(null); setDropPhase(null)
+              }}>
               <div className="phase-row" role="button" tabIndex={0} onClick={() => toggle(p.id)} aria-expanded={isOpen}
+                draggable={renaming !== p.id} title="Drag to reorder phases"
+                onDragStart={(e) => { setDragPhase(p.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p.name) }}
+                onDragEnd={() => { setDragPhase(null); setDropPhase(null) }}
                 onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(p.id) } }}
                 onContextMenu={(e) => { e.preventDefault(); setPhaseMenu({ x: e.clientX, y: e.clientY, phase: p }) }}>
                 <svg className="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
