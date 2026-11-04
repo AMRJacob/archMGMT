@@ -3,6 +3,7 @@ import { addDays, daysBetween, parseISO, toISO, today } from '../lib/dates.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 import { whoLabel } from '../lib/assignees.ts'
 import { MilestoneMark } from './TaskChips.tsx'
+import { milestoneColor } from '../lib/milestones.ts'
 
 /**
  * Month calendar. Tasks show as bars across the days they run, milestones on their date,
@@ -13,6 +14,59 @@ interface Item { kind: 'phase' | 'task'; id: string; title: string; start: strin
 interface Placed extends Item { col: number; span: number; lane: number; clippedL: boolean; clippedR: boolean }
 
 function monthStart(iso: string) { return iso.slice(0, 8) + '01' }
+
+type CalScale = 'week' | 'month' | 'year'
+const SCALE_KEY = 'archmgmt:calendar-scale'
+function savedScale(): CalScale {
+  try { const v = localStorage.getItem(SCALE_KEY); if (v === 'week' || v === 'month' || v === 'year') return v } catch { /* storage unavailable */ }
+  return 'month'
+}
+
+/** Twelve small months: days tinted by phase, milestones and due dates marked. */
+function YearView({ year, items, today: t, onPickMonth, onPickDay }: {
+  year: number
+  items: Item[]
+  today: string
+  onPickMonth: (iso: string) => void
+  onPickDay: (iso: string) => void
+}) {
+  const phasesOn = (d: string) => items.filter((it) => it.kind === 'phase' && it.start <= d && d <= it.end)
+  const dueOn = (d: string) => items.filter((it) => it.kind === 'task' && it.end === d)
+  return (
+    <div className="year-grid">
+      {Array.from({ length: 12 }, (_, mi) => {
+        const first = toISO(new Date(Date.UTC(year, mi, 1)))
+        const lead = parseISO(first).getUTCDay()
+        const days = new Date(Date.UTC(year, mi + 1, 0)).getUTCDate()
+        return (
+          <div key={mi} className="ym">
+            <button className="ym-name" onClick={() => onPickMonth(first)}>{parseISO(first).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })}</button>
+            <div className="ym-days">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={`h${i}`} className="ym-dow">{d}</span>)}
+              {Array.from({ length: lead }, (_, i) => <span key={`b${i}`} />)}
+              {Array.from({ length: days }, (_, di) => {
+                const d = addDays(first, di)
+                const ph = phasesOn(d)
+                const due = dueOn(d)
+                const ms = due.filter((x) => x.milestone)
+                const tip = [...ph.map((p) => p.title), ...due.map((x) => `${x.milestone ? '◆' : '•'} ${x.title}`)].join('\n')
+                return (
+                  <button key={d} className={`ym-day${d === t ? ' today' : ''}`} title={tip || undefined} onClick={() => onPickDay(d)}
+                    style={ph[0] ? { background: `color-mix(in srgb, ${ph[0].color} ${ph.length > 1 ? 42 : 28}%, transparent)` } : undefined}>
+                    {parseISO(d).getUTCDate()}
+                    {ms.length > 0
+                      ? <i className="ym-ms" style={{ background: milestoneColor(ms[0].task?.milestone_type, 'var(--ink)') }} />
+                      : due.length > 0 && <i className="ym-dot" />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function CalendarView({
   phases, tasks, people, palette, onShiftTask, onOpenTask, onAddOn, onContextAt,
@@ -29,7 +83,11 @@ export default function CalendarView({
   onShiftTask: (task: Task, days: number) => void
   onOpenTask: (task: Task) => void
 }) {
-  const [month, setMonth] = useState(() => monthStart(today()))
+  const [scale, setScaleState] = useState<CalScale>(savedScale)
+  const setScale = (v: CalScale) => { setScaleState(v); try { localStorage.setItem(SCALE_KEY, v) } catch { /* storage unavailable */ } }
+  // The day the view is centred on; month and year views show the month / year it falls in.
+  const [focus, setFocus] = useState(() => today())
+  const month = monthStart(focus)
   // The day under the pointer (tasks sit on top of the days, so CSS :hover can't tell), for its + button.
   const [hoverDay, setHoverDay] = useState<string | null>(null)
   const [drag, setDrag] = useState<{ id: string; grab: string; over: string; moved: boolean } | null>(null)
@@ -40,7 +98,8 @@ export default function CalendarView({
   const gridStart = addDays(month, -m.getUTCDay()) // Sunday on or before the 1st
   const monthEnd = toISO(new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0)))
   const weekCount = Math.ceil((daysBetween(gridStart, monthEnd) + 1) / 7)
-  const weeks = Array.from({ length: weekCount }, (_, i) => addDays(gridStart, i * 7))
+  const weekStart = addDays(focus, -parseISO(focus).getUTCDay())
+  const weeks = scale === 'week' ? [weekStart] : Array.from({ length: weekCount }, (_, i) => addDays(gridStart, i * 7))
   const t = today()
 
   const sortedPhases = [...phases].sort((a, b) => a.sort_order - b.sort_order)
@@ -116,19 +175,38 @@ export default function CalendarView({
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
   }, [drag?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- listeners read the latest drag from dragRef
 
-  const monthLabel = m.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-  const shiftMonth = (n: number) => setMonth(toISO(new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + n, 1))))
+  const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => parseISO(iso).toLocaleDateString('en-US', { ...o, timeZone: 'UTC' })
+  const weekEnd = addDays(weekStart, 6)
+  const monthLabel = scale === 'year' ? focus.slice(0, 4)
+    : scale === 'week'
+      ? `${fmt(weekStart, { month: 'short', day: 'numeric' })} – ${weekStart.slice(5, 7) === weekEnd.slice(5, 7) ? Number(weekEnd.slice(8)) : fmt(weekEnd, { month: 'short', day: 'numeric' })}, ${weekEnd.slice(0, 4)}`
+      : m.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const shift = (n: number) => {
+    if (scale === 'week') return setFocus(addDays(focus, 7 * n))
+    const f = parseISO(focus)
+    setFocus(toISO(new Date(Date.UTC(f.getUTCFullYear() + (scale === 'year' ? n : 0), f.getUTCMonth() + (scale === 'month' ? n : 0), 1))))
+  }
+  const isNow = scale === 'week' ? weekStart === addDays(t, -parseISO(t).getUTCDay()) : scale === 'year' ? focus.slice(0, 4) === t.slice(0, 4) : month === monthStart(t)
 
   return (
-    <div className="calendar">
+    <div className={`calendar cal-${scale}`}>
       <div className="cal-head">
         <h2>{monthLabel}</h2>
         <div className="toolbar">
-          <button className="btn" onClick={() => shiftMonth(-1)}>‹</button>
-          <button className="btn" onClick={() => setMonth(monthStart(today()))} disabled={month === monthStart(t)}>Today</button>
-          <button className="btn" onClick={() => shiftMonth(1)}>›</button>
+          <div className="segmented small-seg" aria-label="Calendar view">
+            {(['week', 'month', 'year'] as CalScale[]).map((v) => (
+              <button key={v} className={scale === v ? 'on' : ''} onClick={() => setScale(v)}>{v[0].toUpperCase() + v.slice(1)}</button>
+            ))}
+          </div>
+          <button className="btn" onClick={() => shift(-1)} title="Earlier">‹</button>
+          <button className="btn" onClick={() => setFocus(today())} disabled={isNow}>Today</button>
+          <button className="btn" onClick={() => shift(1)} title="Later">›</button>
         </div>
       </div>
+      {scale === 'year' ? (
+        <YearView year={Number(focus.slice(0, 4))} items={items} today={t}
+          onPickMonth={(d) => { setFocus(d); setScale('month') }} onPickDay={(d) => { setFocus(d); setScale('week') }} />
+      ) : (<>
       <div className="cal-dow">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <span key={d}>{d}</span>)}</div>
       <div className={`cal-grid${drag?.moved ? ' dragging' : ''}`}
         onPointerMove={onAddOn ? (e) => { const d = dayAt(e.clientX, e.clientY); if (d !== hoverDay) setHoverDay(d) } : undefined}
@@ -182,7 +260,8 @@ export default function CalendarView({
           )
         })}
       </div>
-      <p className="muted small">Click + on a day (or right-click) to add a task there. Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
+      </>)}
+      <p className="muted small">{scale === 'year' ? 'Each day is tinted by its phase; ◆ marks milestones and • due dates. Click a month or day to zoom in. ' : ''}Click + on a day (or right-click) to add a task there. Drag a task to another day to move it (its length stays the same). Click a task to edit it.</p>
     </div>
   )
 }
