@@ -61,6 +61,7 @@ export default function Schedule() {
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [dayMarks, setDayMarks] = useSaved<'on' | 'off'>('archmgmt.dayMarks', 'on')
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
   const [xPage, setXPage] = useSaved<ExportPage>('archmgmt.exportPage', 'letter')
   const [xFit, setXFit] = useSaved<ExportFit>('archmgmt.exportFit', 'fit')
@@ -274,6 +275,12 @@ export default function Schedule() {
                 <button key={z} className={zoom === z ? 'on' : ''} onClick={() => setZoom(z)}>{label}</button>
               ))}
             </div>
+            {months === 3 && (
+              <label className="inline-check" title="A line and weekday letter for every day, with weekends shaded. Off: Mondays only.">
+                <input type="checkbox" checked={dayMarks === 'on'} onChange={(e) => setDayMarks(e.target.checked ? 'on' : 'off')} />
+                Day marks
+              </label>
+            )}
             {months > 0 && (
               <div className="toolbar">
                 <button className="btn small-btn" onClick={() => setWinStart(addDays(winStart, -step))} title="Earlier">‹</button>
@@ -293,7 +300,7 @@ export default function Schedule() {
           </div>
           <div className="card chart-card no-print" ref={chartBox}>
             <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
-              firmName={FIRM_NAME} editable window={chartWindow} width={chartW} colors={chartColors(theme)} showHeader={false} keepOrder
+              firmName={FIRM_NAME} editable window={chartWindow} dayMarks={dayMarks === 'on'} width={chartW} colors={chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}

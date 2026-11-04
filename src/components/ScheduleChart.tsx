@@ -59,8 +59,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true,
 }: {
+  /** At day scale (3-month zoom): draw a line and weekday letter for every day and shade weekends. Off: Mondays only. */
+  dayMarks?: boolean
   /** Width to draw at, in screen pixels (on screen). Exports leave it out. */
   width?: number
   /** In presentation mode, whether a task is shown (rules plus hand-picked items). */
@@ -277,7 +279,8 @@ export default function ScheduleChart({
   const dow = (iso: string) => parseISO(iso).getUTCDay()
 
   const axisTop = HEADER
-  const rowsTop = axisTop + (scale === 'day' ? AXIS + 12 : AXIS)
+  const daily = scale === 'day' && dayMarks
+  const rowsTop = axisTop + (daily ? AXIS + 12 : AXIS)
   const rowY: number[] = []
   let y = rowsTop
   for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : r.kind === 'add' ? ROW_ADD : ROW_PHASE }
@@ -387,7 +390,13 @@ export default function ScheduleChart({
         </>
       ) : (
         <>
-          {scale === 'day' && dayList.map((d) => {
+          {scale === 'day' && !dayMarks && dayList.filter((d) => dow(d) === 1).map((d) => (
+            <g key={d}>
+              <line x1={x(d)} x2={x(d)} y1={axisTop + 22} y2={rowsBottom} stroke={C.lineStrong} />
+              <text x={x(d) + 3} y={axisTop + 36} fontSize={10.5} fontWeight={500} fill={C.ink}>{parseISO(d).getUTCDate()}</text>
+            </g>
+          ))}
+          {daily && dayList.map((d) => {
             // Days: a line per day, the date on each Monday, and a weekday letter under every day.
             const w = dow(d)
             const weekend = w === 0 || w === 6
@@ -468,7 +477,7 @@ export default function ScheduleChart({
         )
       })}
 
-      {scale === 'day' && (
+      {daily && (
         <g pointerEvents="none">
           {dayList.filter((d) => dow(d) === 0 || dow(d) === 6).map((d) => (
             <rect key={d} x={x(d)} y={rowsTop} width={dayW} height={rowsBottom - rowsTop} fill={C.ink} opacity={0.035} />
