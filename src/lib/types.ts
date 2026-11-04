@@ -182,10 +182,11 @@ export interface BrandPalette {
   notes: string | null
 }
 
-export type WishStatus = 'new' | 'under_review' | 'planned' | 'in_progress' | 'complete' | 'infeasible' | 'duplicate'
+export type WishStatus = 'new' | 'under_review' | 'approved' | 'planned' | 'in_progress' | 'complete' | 'infeasible' | 'duplicate'
 export const WISH_STATUSES: { value: WishStatus; label: string; closed: boolean }[] = [
   { value: 'new', label: 'New', closed: false },
   { value: 'under_review', label: 'Under review', closed: false },
+  { value: 'approved', label: 'Approved – ready to build', closed: false },
   { value: 'planned', label: 'Planned', closed: false },
   { value: 'in_progress', label: 'In progress', closed: false },
   { value: 'complete', label: 'Complete – closed', closed: true },

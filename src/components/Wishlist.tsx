@@ -81,7 +81,10 @@ export default function Wishlist() {
   return (
     <div className="card pad">
       <h2>Wishlist &amp; problems</h2>
-      <p className="muted">Ask for something the app should do, or tell us what’s not working. Everyone can see the list and its status.</p>
+      <p className="muted">
+        Ask for something the app should do, or tell us what’s not working. Everyone can see the list and its status.
+        {admin && <> Set an item to <strong>Approved – ready to build</strong> when it should be built next.</>}
+      </p>
       <div className="wish-form">
         <div className="segmented small-seg" role="radiogroup" aria-label="Kind">
           <button role="radio" aria-checked={kind === 'wish'} className={kind === 'wish' ? 'on' : ''} onClick={() => setKind('wish')}>Wish</button>

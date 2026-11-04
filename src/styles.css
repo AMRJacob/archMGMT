@@ -1077,3 +1077,4 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .office-nav { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .office-nav .nav-label { padding-top: 0; }
 .sidebar-foot .settings-link { margin-top: -6px; }
+.wish-status.st-approved { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
