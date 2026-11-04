@@ -58,7 +58,7 @@ carrying about three medium tasks at once.
 - **Settings & Data**, in sections down the left: *General* (theme, your account), *Branding & Printing* (brand
   palettes, typed in or pulled from a client's website; meeting-notes title block), *Wishlist & Errors* (requests
   and error reports, newest first; admins set status and reply), *Access*, and *Data* (storage, backup / restore,
-  sample data). A small *Wishlist & Errors* link under Settings in the sidebar goes straight to the list.
+  sample data).
 
 ## Keeping data safe while iterating
 

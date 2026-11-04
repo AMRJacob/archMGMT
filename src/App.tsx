@@ -68,9 +68,8 @@ function Shell() {
               <span className="nav-label">Office</span>
               <NavLink to="/" end>All Projects</NavLink>
               <NavLink to="/team">Team &amp; Workload</NavLink>
+              <NavLink to="/settings">Settings &amp; Data</NavLink>
             </nav>
-            <NavLink to="/settings" className="settings-link">Settings &amp; Data</NavLink>
-            <NavLink to="/settings/wishlist" className="settings-link subtle-link">Wishlist &amp; Errors</NavLink>
             {session && (
               <div className="signout">
                 <span>{session.user.email}</span>
