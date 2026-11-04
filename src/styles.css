@@ -1061,26 +1061,43 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .calendar.cal-week .cal-items { grid-auto-rows: 26px; }
 .year-view { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 12px; }
 .year-head { margin: 8px 0 2px; font-size: 15px; letter-spacing: 0.04em; color: var(--ink); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
-.year-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 22px; }
-@media (max-width: 1100px) { .year-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ym-name { border: none; background: none; padding: 0 0 4px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+.year-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 30px; }
+@media (max-width: 1100px) { .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .year-grid { grid-template-columns: minmax(0, 1fr); } }
+.ym-name { border: none; background: none; padding: 0 0 6px; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .ym-name:hover { color: var(--accent); }
 .ym-dows, .ym-days { display: grid; grid-template-columns: repeat(7, 1fr); }
-.ym-dows span { font-size: 10px; color: var(--faint); text-align: center; }
-.ym-week { padding-bottom: 2px; }
-.ym-day { position: relative; border: none; background: none; border-radius: 4px; padding: 2px 0 6px; font-size: 11.5px; color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
+.ym-dows span { font-size: 11px; color: var(--faint); text-align: center; }
+.ym-week { padding-bottom: 3px; }
+.ym-day { position: relative; border: none; background: none; border-radius: 4px; padding: 4px 0 8px; font-size: 13px; color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
 .ym-day.past { opacity: 0.42; }
 .ym-day:hover { background: var(--hover); opacity: 1; }
 .ym-day.today { outline: 2px solid var(--accent); font-weight: 700; opacity: 1; }
-.ym-bars { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 2px 3px; }
-.ym-bars i { display: block; height: 4px; }
-.ym-bars i.past { opacity: 0.4; }
+.ym-bars { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 0 4px; }
+/* One phase per lane: its name inside, a tick where it starts and ends. */
+.ym-bars i { font-style: normal; position: relative; display: flex; align-items: center; min-width: 0; height: 15px; background: var(--c); }
+.ym-bars i b { font-size: 9.5px; font-weight: 600; line-height: 1; padding: 0 5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,.35); }
+.ym-bars i.starts { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.ym-bars i.ends { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+.ym-bars i.starts::before, .ym-bars i.ends::after { content: ''; position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
+.ym-bars i.starts::before { left: 0; }
+.ym-bars i.ends::after { right: 0; }
+.ym-bars i.starts b { padding-left: 6px; }
+/* Done: half-tone. Not started: hatched. */
+.ym-bars i.done, .ym-legend i.done { background: color-mix(in srgb, var(--c) 45%, var(--panel)); }
+.ym-bars i.done b { color: var(--ink); text-shadow: none; opacity: .75; }
+.ym-bars i.future, .ym-legend i.future {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 70%, var(--panel)) 0 2px, color-mix(in srgb, var(--c) 18%, var(--panel)) 2px 5px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 60%, var(--panel));
+}
+.ym-bars i.future b { color: var(--ink); text-shadow: 0 0 3px var(--panel), 0 0 3px var(--panel); }
+.ym-bars i.now, .ym-legend i.now { background: var(--c); }
 .ym-ms { position: absolute; left: 50%; bottom: 1px; width: 6px; height: 6px; margin-left: -3px; transform: rotate(45deg); }
 .ym-dot { position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
 .ym-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
 .ym-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.ym-legend i { width: 14px; height: 5px; border-radius: 2px; }
+.ym-legend i { width: 18px; height: 9px; border-radius: 2px; }
+.ym-key { margin-left: auto; font-size: 11.5px; }
 
 /* sidebar: the project (switcher + its pages) as one group at the top, office pages down by Settings */
 .project-nav { display: flex; flex-direction: column; gap: 6px; padding: 6px; margin: -4px -6px 0; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { addDays, daysBetween, parseISO, toISO, today } from '../lib/dates.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 import { whoLabel } from '../lib/assignees.ts'
@@ -43,6 +43,8 @@ function YearView({ items, today: t, onPickMonth, onPickDay }: {
     if (months.length > 72) break // six years is plenty
   }
   const phases = items.filter((it) => it.kind === 'phase')
+  // Finished phases are half-tone, ones not started yet hatched, the current one solid.
+  const phaseState = (p: Item) => (p.end < t ? 'done' : p.start > t ? 'future' : 'now')
   const dueOn = (d: string) => items.filter((it) => it.kind === 'task' && it.end === d)
   const years = [...new Set(months.map((m) => m.slice(0, 4)))]
 
@@ -80,14 +82,16 @@ function YearView({ items, today: t, onPickMonth, onPickDay }: {
                 })}
               </div>
               {lanes.length > 0 && (
-                <div className="ym-bars" style={{ gridTemplateRows: `repeat(${lanes.length}, 4px)` }}>
+                <div className="ym-bars" style={{ gridTemplateRows: `repeat(${lanes.length}, 15px)` }}>
                   {lanes.map((p, li) => {
                     const s0 = [p.start, ws, mFirst].sort()[2], e0 = [p.end, we, mLast].sort()[0]
+                    const span = daysBetween(s0, e0) + 1
                     return (
-                      <i key={p.id} title={p.title} className={e0 < t ? 'past' : ''}
-                        style={{ gridRow: li + 1, gridColumn: `${daysBetween(ws, s0) + 1} / span ${daysBetween(s0, e0) + 1}`, background: p.color,
-                          borderTopLeftRadius: s0 === p.start ? 2 : 0, borderBottomLeftRadius: s0 === p.start ? 2 : 0,
-                          borderTopRightRadius: e0 === p.end ? 2 : 0, borderBottomRightRadius: e0 === p.end ? 2 : 0 }} />
+                      <i key={p.id} title={`${p.title}: ${p.start} – ${p.end}`}
+                        className={`${phaseState(p)}${s0 === p.start ? ' starts' : ''}${e0 === p.end ? ' ends' : ''}`}
+                        style={{ gridRow: li + 1, gridColumn: `${daysBetween(ws, s0) + 1} / span ${span}`, '--c': p.color } as CSSProperties}>
+                        {span >= 2 && <b>{p.title}</b>}
+                      </i>
                     )
                   })}
                 </div>
@@ -102,7 +106,8 @@ function YearView({ items, today: t, onPickMonth, onPickDay }: {
   return (
     <div className="year-view">
       <div className="ym-legend">
-        {phases.map((p) => <span key={p.id}><i style={{ background: p.color }} />{p.title}</span>)}
+        {phases.map((p) => <span key={p.id}><i className={phaseState(p)} style={{ '--c': p.color } as CSSProperties} />{p.title}</span>)}
+        <span className="ym-key muted">Solid: under way · half-tone: done · hatched: not started</span>
       </div>
       {years.map((y) => (
         <section key={y} className="year-block">
