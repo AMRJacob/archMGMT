@@ -1079,16 +1079,16 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .ym-day:hover { background: var(--hover); opacity: 1; }
 .ym-day.today { outline: 2px solid var(--accent); font-weight: 700; opacity: 1; }
 .ym-bars { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; margin: 0 0 4px; }
-/* One phase per lane: its name inside, a bookend where it starts and ends. */
+/* One phase per lane: its name inside, darker rounded ends where it starts and ends. */
 .ym-bars i { font-style: normal; position: relative; display: flex; align-items: center; min-width: 0; height: 15px; background: var(--c); }
 .ym-bars i b { font-size: 9.5px; font-weight: 600; line-height: 1; padding: 0 5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,.35); }
-.ym-bars i.starts { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
-.ym-bars i.ends { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
-/* Bookends: a darker shade of the bar, 2px taller than it top and bottom, centred on it. */
-.ym-bars i.starts::before, .ym-bars i.ends::after { content: ''; position: absolute; top: -2px; bottom: -2px; width: 3px; background: color-mix(in srgb, var(--c) 62%, #000); border-radius: 1.5px; }
-.ym-bars i.starts::before { left: 0; }
-.ym-bars i.ends::after { right: 0; }
-.ym-bars i.starts b { padding-left: 6px; }
+.ym-bars i.starts { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.ym-bars i.ends { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+/* Ends: rounded corners, with the end of the bar a darker shade of its colour (inside the bar, not sticking out). */
+.ym-bars i.starts::before, .ym-bars i.ends::after { content: ''; position: absolute; top: 0; bottom: 0; width: 4px; background: color-mix(in srgb, var(--c) 62%, #000); }
+.ym-bars i.starts::before { left: 0; border-radius: 4px 0 0 4px; }
+.ym-bars i.ends::after { right: 0; border-radius: 0 4px 4px 0; }
+.ym-bars i.starts b { padding-left: 8px; }
 /* Done: half-tone. Not started: hatched. */
 .ym-bars i.done, .ym-legend i.done { background: color-mix(in srgb, var(--c) 45%, var(--panel)); }
 .ym-bars i.done b { color: var(--ink); text-shadow: none; opacity: .75; }
