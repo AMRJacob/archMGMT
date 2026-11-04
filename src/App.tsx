@@ -4,6 +4,7 @@ import { useAuth } from './auth/authContext.ts'
 import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import PageEdge from './components/PageEdge.tsx'
 import GlobalSearch from './components/GlobalSearch.tsx'
+import { Notices, PresenceProvider, WhosHere } from './components/Presence.tsx'
 import { FIT_WIDTH, usePageWidth } from './lib/prefs.ts'
 import ProjectProvider from './components/ProjectProvider.tsx'
 import ProjectSwitcher from './components/ProjectSwitcher.tsx'
@@ -40,6 +41,7 @@ function Shell() {
   const pageW = usePageWidth()
   return (
     <ProjectProvider>
+      <PresenceProvider>
       <div className="shell">
         <aside className="sidebar no-print">
           <div className="brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
@@ -47,6 +49,7 @@ function Shell() {
           {/* The project you're in, with its pages, as one group. */}
           <section className="project-nav" aria-label="This project">
             <ProjectSwitcher />
+            <WhosHere />
             <nav>
               <NavLink to="/overview">Overview</NavLink>
               <NavLink to="/schedule">Schedule</NavLink>
@@ -89,7 +92,9 @@ function Shell() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
+        <Notices />
       </div>
+      </PresenceProvider>
     </ProjectProvider>
   )
 }

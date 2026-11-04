@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { markMine, me, nameOf, noteRemote, notify, wasMine } from './live.ts'
 import { supabase } from './supabase.ts'
 import { seedSheets, seedV1, seedV2, type Row, type Store } from './sample.ts'
 import { TABLES, type TableName } from './types.ts'
@@ -272,7 +273,9 @@ export async function list<T>(table: TableName, match: Match = {}): Promise<T[]>
 
 export async function insert<T>(table: TableName, row: Partial<T>): Promise<T> {
   if (supabase) {
-    const { data, error } = await supabase.from(table).insert(row as never).select().single()
+    const withId = { id: crypto.randomUUID(), ...row }
+    markMine(withId.id)
+    const { data, error } = await supabase.from(table).insert(withId as never).select().single()
     if (error) throw error
     return data as T
   }
@@ -289,6 +292,7 @@ export async function insertMany<T>(table: TableName, rows: Partial<T>[]): Promi
     // up front and let columns a row leaves out take their database default instead of NULL; otherwise
     // the whole batch fails (e.g. a NULL id or assignee list).
     const withIds = rows.map((r) => ({ id: crypto.randomUUID(), ...r }))
+    for (const r of withIds) markMine(r.id)
     const { data, error } = await supabase.from(table).insert(withIds as never, { defaultToNull: false }).select()
     if (error) throw error
     return data as T[]
@@ -300,11 +304,42 @@ export async function insertMany<T>(table: TableName, rows: Partial<T>[]): Promi
   return created as unknown as T[]
 }
 
-export async function update<T>(table: TableName, id: string, patch: Partial<T>): Promise<void> {
+/** Tables that record when and by whom each row last changed (migration 0020): saves to these are checked. */
+const GUARDED = new Set<TableName>(['projects', 'phases', 'tasks', 'people', 'meeting_notes'])
+
+/** Someone else saved this row after we loaded it; our change was not written. */
+export class StaleError extends Error {
+  by: string | null
+  constructor(by: string | null) { super('changed by someone else'); this.by = by }
+}
+
+/**
+ * Save changes to one row. With `seen` (the row's updated_at when we loaded it), the save only goes through
+ * if nobody else has changed the row since; otherwise it throws StaleError. Returns the row's new updated_at.
+ */
+export async function update<T>(table: TableName, id: string, patch: Partial<T>, seen?: string): Promise<string | undefined> {
   if (supabase) {
-    const { error } = await supabase.from(table).update(patch as never).eq('id', id)
-    if (error) throw error
-    return
+    markMine(id)
+    if (!seen) {
+      const { error } = await supabase.from(table).update(patch as never).eq('id', id)
+      if (error) throw error
+      return
+    }
+    let expect = seen
+    for (let i = 0; i < 4; i++) {
+      const { data, error } = await supabase.from(table).update(patch as never).eq('id', id).eq('updated_at', expect).select('updated_at')
+      if (error) throw error
+      const row = (data as { updated_at: string }[])[0]
+      if (row) return row.updated_at
+      // Not saved: see who changed it. Our own earlier save (two quick edits) is fine: try again on top of it.
+      const cur = await supabase.from(table).select('updated_at, updated_by').eq('id', id).maybeSingle()
+      if (cur.error) throw cur.error
+      if (!cur.data) return // deleted meanwhile
+      const c = cur.data as { updated_at: string; updated_by: string | null }
+      if (c.updated_by !== me()) throw new StaleError(c.updated_by)
+      expect = c.updated_at
+    }
+    throw new StaleError(null)
   }
   const s = readStore()
   s[table] = s[table].map((r) => (r.id === id ? { ...r, ...patch } : r))
@@ -313,6 +348,7 @@ export async function update<T>(table: TableName, id: string, patch: Partial<T>)
 
 export async function remove(table: TableName, id: string): Promise<void> {
   if (supabase) {
+    markMine(id)
     const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) throw error
     return
@@ -328,6 +364,8 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
   const [rows, setRows] = useState<T[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const rowsRef = useRef(rows)
+  useEffect(() => { rowsRef.current = rows }, [rows])
 
   const reload = useCallback(async () => {
     try {
@@ -346,14 +384,49 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
     void reload()
   }, [reload])
 
-  /** Update one row on screen immediately, then save it. */
+  // Shared database: other people's changes come in live, with a short notice.
+  useEffect(() => {
+    if (!supabase) return
+    const m = JSON.parse(key) as Match
+    if (Object.values(m).some((v) => v === '')) return
+    const keys = Object.keys(m)
+    // Realtime filters take one column; anything else is checked here.
+    const filter = keys.length ? `${keys[0]}=eq.${String(m[keys[0]])}` : undefined
+    const wait: { t?: ReturnType<typeof setTimeout> } = {}
+    const later = () => { clearTimeout(wait.t); wait.t = setTimeout(() => void reload(), 400) }
+    const changed = (row: Record<string, unknown>, verb: 'added' | 'changed') => {
+      if (!keys.every((k) => row[k] === m[k])) return
+      const by = (row.updated_by as string | null | undefined) ?? null
+      if (by === me() || wasMine(String(row.id ?? ''))) return
+      noteRemote(table, by, String(row.id ?? ''), verb)
+      later()
+    }
+    const channel = supabase
+      .channel(`rows:${table}:${key}:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table, ...(filter ? { filter } : {}) }, (payload) => changed(payload.new as Record<string, unknown>, 'added'))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, ...(filter ? { filter } : {}) }, (payload) => changed(payload.new as Record<string, unknown>, 'changed'))
+      // Deletes can't be filtered and only carry the id: act on the ones that were on screen.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, (payload) => {
+        const id = String((payload.old as { id?: string }).id ?? '')
+        if (!rowsRef.current.some((r) => r.id === id) || wasMine(id)) return
+        noteRemote(table, null, id, 'removed')
+        later()
+      })
+      .subscribe()
+    return () => { clearTimeout(wait.t); void supabase!.removeChannel(channel) }
+  }, [table, key, reload])
+
+  /** Update one row on screen immediately, then save it (unless someone else changed it first). */
   const patch = useCallback(
     async (id: string, changes: Partial<T>) => {
+      const seen = GUARDED.has(table) ? (rowsRef.current.find((r) => r.id === id) as { updated_at?: string } | undefined)?.updated_at : undefined
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...changes } : r)))
       try {
-        await update<T>(table, id, changes)
+        const at = await update<T>(table, id, changes, seen)
+        if (at) setRows((rs) => rs.map((r) => (r.id === id ? { ...r, updated_at: at } : r)))
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        if (e instanceof StaleError) notify(`${nameOf(e.by)} changed this just before you, so your edit wasn't saved. You're now seeing their version.`, 'warn')
+        else setError(e instanceof Error ? e.message : String(e))
         void reload()
       }
     },

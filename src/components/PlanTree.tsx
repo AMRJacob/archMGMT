@@ -1,3 +1,4 @@
+import { lockHolder, usePresence } from '../lib/live.ts'
 import { useSearchParams } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import ContextMenu, { type MenuItem } from './ContextMenu.tsx'
@@ -48,6 +49,9 @@ export default function PlanTree({
   onAddMany: (rows: Partial<Task>[]) => Promise<void>
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set())
+  // Rows someone else is editing right now: shown with their name and not editable here until they're done.
+  const presence = usePresence()
+  const lockedBy = (id: string) => lockHolder(presence, id) ?? undefined
   // Search sends ?find=<id>: open the rows above it so it's on screen.
   const [params] = useSearchParams()
   const findId = params.get('find')
@@ -250,7 +254,8 @@ export default function PlanTree({
   }
 
   const rowProps = (t: Task, className: string, depth: number) => ({
-    className: `${className}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
+    'data-locked-by': lockedBy(t.id),
+    className: `${className}${lockedBy(t.id) ? ' locked' : ''}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
     tabIndex: -1,
     'data-row': t.id,

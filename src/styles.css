@@ -1141,3 +1141,34 @@ body.resizing-page { cursor: col-resize; user-select: none; }
   .np-actions tr { break-inside: avoid; }
   .np-foot { display: flex; justify-content: space-between; gap: 20px; margin-top: 26px; padding-top: 6px; border-top: 1px solid #999; font-size: 9.5px; color: #555; }
 }
+
+/* ---------- Working together ---------- */
+.whos-here { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px 2px; }
+.whos-here .muted { color: rgba(255,255,255,.5); }
+.wh-faces { display: flex; }
+.wh-face { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; color: #fff; background: var(--accent); border: 2px solid var(--sidebar); margin-left: -5px; cursor: default; }
+.wh-face.more { background: #57636a; }
+.notices { position: fixed; right: 18px; bottom: 18px; z-index: 450; display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
+.notice-toast { display: flex; align-items: flex-start; gap: 10px; background: var(--ink); color: var(--panel); padding: 10px 12px; border-radius: 9px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); animation: toast-in .18s ease-out; }
+.notice-toast.warn { background: var(--warn); color: #fff; }
+.notice-toast .linkbtn { color: inherit; opacity: .7; font-size: 16px; line-height: 1; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+[data-row].locked { position: relative; background: var(--warn-soft); }
+[data-row].locked input, [data-row].locked button, [data-row].locked select, [data-row].locked textarea, [data-row].locked .pop { pointer-events: none; }
+[data-row].locked::after { content: attr(data-locked-by) ' is editing'; position: absolute; right: 44px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--warn); background: var(--panel); border: 1px solid var(--warn); border-radius: 10px; padding: 1px 8px; pointer-events: none; }
+.quick-panel.locked > :not(.lock-banner):not(.qp-head) { pointer-events: none; opacity: .65; }
+.lock-banner { margin: 0 0 10px; padding: 7px 10px; border-radius: 7px; background: var(--warn-soft); color: var(--ink); font-size: 12.5px; border-left: 3px solid var(--warn); }
+.plain-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.usage-bar { height: 10px; border-radius: 5px; background: var(--chip); overflow: hidden; margin: 6px 0 10px; max-width: 520px; }
+.usage-bar span { display: block; height: 100%; background: var(--ok); border-radius: 5px; }
+.usage-bar.high span { background: var(--danger); }
+.usage-table { max-width: 520px; margin-top: 8px; }
+
+/* ---------- Overview: show "…" wherever text is cut off ---------- */
+.trow input.field, .irow input.field, .trow-title input, .phase-name, .tc-cell .chip-btn, .tc-cell .chip, .tc-cell .date-chip, .tc-cell .type-chip,
+.tc-cell > span, .rc-label, .ph-summary span, .strip-seg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-cell .chip-btn, .tc-cell .pop, .tc-cell .chip, .tc-cell .date-chip { min-width: 0; max-width: 100%; }
+.tc-cell .chip-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.trow input.field:focus, .irow input.field:focus { text-overflow: clip; }
+.rh-cell { min-width: 0; }
+.rh-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

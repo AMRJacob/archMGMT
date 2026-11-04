@@ -2,6 +2,7 @@ import ThemePicker from '../components/ThemePicker.tsx'
 import Wishlist from '../components/Wishlist.tsx'
 import BrandPalettes from '../components/BrandPalettes.tsx'
 import TitleBlockSettings from '../components/TitleBlockSettings.tsx'
+import StorageUsage from '../components/StorageUsage.tsx'
 import { MyName } from '../components/AccessManager.tsx'
 import { useRef, useState } from 'react'
 import { ChangePassword } from '../auth/Auth.tsx'
@@ -102,6 +103,7 @@ export default function Settings() {
           <p><strong>In the shared database.</strong> Everyone signed in with an @amr-architects.com address (or added to the access list) sees the same data.</p>
         )}
       </div>
+      <StorageUsage />
 
       {session && (
         <div className="card pad">

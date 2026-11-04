@@ -1,3 +1,4 @@
+import { useLockedBy } from '../lib/live.ts'
 import { useEffect, useRef } from 'react'
 import { TextField } from './fields.tsx'
 import { TaskControls } from './TaskChips.tsx'
@@ -33,10 +34,12 @@ export default function TaskEditor({
     return () => { document.removeEventListener('keydown', esc); document.removeEventListener('mousedown', away) }
   }, [onClose, onDelete, isNew])
 
+  const lockedBy = useLockedBy(task.id)
   const phase = phases.find((p) => p.id === task.phase_id)
 
   return (
-    <div className="quick-panel" ref={box} role="dialog" aria-label="Task">
+    <div className={`quick-panel${lockedBy ? ' locked' : ''}`} ref={box} role="dialog" aria-label="Task" data-lock={lockedBy ? undefined : task.id} tabIndex={-1}>
+      {lockedBy && <p className="lock-banner">{lockedBy} is editing this. It opens for editing when they're done.</p>}
       <div className="qp-head">
         {task.is_milestone && <span className="diamond" title="Milestone" />}
         <TextField value={task.title} className="qp-title" autoFocus={isNew} onSave={(v) => v && onPatch({ title: v })}

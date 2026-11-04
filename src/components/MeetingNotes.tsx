@@ -1,5 +1,6 @@
 import { useCallback, useState, type KeyboardEvent } from 'react'
 import NotePrint from './NotePrint.tsx'
+import { useLockedBy } from '../lib/live.ts'
 import Modal from './Modal.tsx'
 import { MilestoneMark } from './TaskChips.tsx'
 import { initialsOf } from '../lib/assignees.ts'
@@ -135,6 +136,13 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
   const [location, setLocation] = useState(note.location ?? '')
   const [body, setBody] = useState(note.body ?? '')
   const [decisions, setDecisions] = useState(note.decisions ?? '')
+  // Someone else has this note open: show theirs as it changes, read-only, until they close it.
+  const lockedBy = useLockedBy(note.id)
+  const [shownAt, setShownAt] = useState(note.updated_at)
+  if (lockedBy && note.updated_at !== shownAt) {
+    setShownAt(note.updated_at)
+    setTitle(note.title); setLocation(note.location ?? ''); setBody(note.body ?? ''); setDecisions(note.decisions ?? '')
+  }
   const [newAction, setNewAction] = useState('')
   const [printing, setPrinting] = useState(false)
   const actions = note.actions ?? []
@@ -164,17 +172,17 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
   const mt = typeOf(note.meeting_type)
 
   return (
-    <Modal size="wide" onClose={close}
+    <Modal size="wide" onClose={close} lock={lockedBy ? undefined : note.id}
       title={
         <div className="note-head">
           <span className="note-kicker" style={mt ? { color: mt.color } : undefined}>{mt?.label ?? 'Meeting notes'}</span>
-          <input className="field note-title" value={title} placeholder="Meeting title, e.g. Owner SD review" autoFocus={!note.title}
+          <input className="field note-title" disabled={Boolean(lockedBy)} value={title} placeholder="Meeting title, e.g. Owner SD review" autoFocus={!note.title}
             onChange={(e) => setTitle(e.target.value)} onBlur={() => title !== note.title && save({ title })} />
         </div>
       }
       footer={
         <>
-          <button className="btn danger" onClick={() => { if (window.confirm('Delete this meeting note?')) { onDelete(); onClose() } }}>Delete note</button>
+          <button className="btn danger" disabled={Boolean(lockedBy)} onClick={() => { if (window.confirm('Delete this meeting note?')) { onDelete(); onClose() } }}>Delete note</button>
           <span className="grow" />
           <span className="muted small">{note.author ? `Started by ${note.author}. ` : ''}Saved as you go.</span>
           <button className="btn" title="Opens the print dialog: choose Save as PDF" onClick={() => {
@@ -194,6 +202,8 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
           )}
         </>
       }>
+      {lockedBy && <p className="lock-banner">{lockedBy} is editing this note. You can read along; it opens for editing when they close it.</p>}
+      <fieldset className="plain-fieldset" disabled={Boolean(lockedBy)}>
       <div className="note-grid">
         <label>Type
           <select className="field boxed" value={note.meeting_type ?? ''} onChange={(e) => save({ meeting_type: e.target.value || null })}>
@@ -260,6 +270,7 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
           </section>
         </aside>
       </div>
+      </fieldset>
     </Modal>
   )
 }
