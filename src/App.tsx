@@ -42,16 +42,15 @@ function Shell() {
       <div className="shell">
         <aside className="sidebar no-print">
           <div className="brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
-          <ProjectSwitcher />
-          <nav>
-            <span className="nav-label">Project</span>
-            <NavLink to="/overview">Overview</NavLink>
-            <NavLink to="/schedule">Schedule</NavLink>
-            <NavLink to="/notes">Meeting notes</NavLink>
-            <span className="nav-label">Office</span>
-            <NavLink to="/" end>All projects</NavLink>
-            <NavLink to="/team">Team &amp; workload</NavLink>
-          </nav>
+          {/* The project you're in, with its pages, as one group. */}
+          <section className="project-nav" aria-label="This project">
+            <ProjectSwitcher />
+            <nav>
+              <NavLink to="/overview">Overview</NavLink>
+              <NavLink to="/schedule">Schedule</NavLink>
+              <NavLink to="/notes">Meeting notes</NavLink>
+            </nav>
+          </section>
           <div className="sidebar-foot">
             {usingSampleData && (
               <p className="notice">
@@ -59,6 +58,12 @@ function Shell() {
                 Data is saved in this browser only until the shared database is connected. Back it up from Settings.
               </p>
             )}
+            {/* Office-wide pages, apart from the project. */}
+            <nav className="office-nav" aria-label="Office">
+              <span className="nav-label">Office</span>
+              <NavLink to="/" end>All projects</NavLink>
+              <NavLink to="/team">Team &amp; workload</NavLink>
+            </nav>
             <NavLink to="/settings" className="settings-link">Settings &amp; data</NavLink>
             {session && (
               <div className="signout">
