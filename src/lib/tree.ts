@@ -57,6 +57,23 @@ export function treeOrder(a: Task, b: Task): number {
 }
 
 export const childrenOf = (tree: Tree, id: string | null) => tree.children.get(id) ?? []
+
+/** Sheet work vs. other tasks: a sheet, a view, or anything under one belongs to the sheets side. */
+export function isSheetWork(tree: Tree, t: Task): boolean {
+  let cur: Task | undefined = t, d = 0
+  while (cur && d < 12) {
+    const k = kindOf(cur)
+    if (k === 'sheet' || k === 'view') return true
+    cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined
+    d++
+  }
+  return false
+}
+
+/** What the schedule shows: everything, only tasks (no sheets), or only sheets. Milestones always show. */
+export type WorkFilter = 'all' | 'tasks' | 'sheets'
+export const passesWork = (tree: Tree, t: Task, f: WorkFilter) =>
+  f === 'all' || t.is_milestone || (f === 'sheets') === isSheetWork(tree, t)
 export const scheduledChildren = (tree: Tree, id: string) => childrenOf(tree, id).filter((c) => !isItem(c))
 
 export function descendants(tree: Tree, id: string): Task[] {

@@ -20,7 +20,7 @@ import { useProject } from '../lib/projectContext.ts'
 import { KIND_RANK, type Phase, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
-import { asShown, buildTree, DETAIL_LEVELS, movedBy, visibleAtLevel, type DetailLevel, type ShownTask } from '../lib/tree.ts'
+import { asShown, buildTree, DETAIL_LEVELS, movedBy, passesWork, visibleAtLevel, type DetailLevel, type ShownTask, type WorkFilter } from '../lib/tree.ts'
 
 type View = 'timeline' | 'calendar' | 'board'
 type Zoom = 'all' | '12' | '6' | '3'
@@ -61,6 +61,7 @@ export default function Schedule() {
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [work, setWork] = useSaved<WorkFilter>('archmgmt.workFilter', 'all')
   const [dayMarks, setDayMarks] = useSaved<'on' | 'off'>('archmgmt.dayMarks', 'on')
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
   const [xPage, setXPage] = useSaved<ExportPage>('archmgmt.exportPage', 'letter')
@@ -82,7 +83,8 @@ export default function Schedule() {
 
   // What each view shows at the chosen detail level. Parents carry their children's dates.
   const tree = buildTree(tasks.rows)
-  const shown = visibleAtLevel(tree, level)
+  // Show: everything, only tasks (sheets and their views filtered out), or only sheets. Milestones always show.
+  const shown = visibleAtLevel(tree, level).filter((v) => passesWork(tree, v.task, work))
   const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
   const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
   const real = (t: Task) => tree.byId.get(t.id) ?? t
@@ -97,7 +99,7 @@ export default function Schedule() {
     if (c.rules) setRules(c.rules)
   }
   const chartRows: ShownTask[] = mode === 'presentation'
-    ? visibleAtLevel(tree, 3).map((v) => asShown(tree, v.task, 0))
+    ? visibleAtLevel(tree, 3).filter((v) => passesWork(tree, v.task, work)).map((v) => asShown(tree, v.task, 0))
     : treeRows
   /** A drag on a shown copy: whole branches move together; plain tasks take the new dates. */
   const moveShown = (t: ShownTask, s: string | null, d: string | null) => {
@@ -114,12 +116,19 @@ export default function Schedule() {
   const openTask = (t: Task) => { setEditingId(t.id); setNewTaskId(null) }
 
   const levelControl = (
+    <>
+    <div className="segmented small-seg" aria-label="Show" title="Show everything, only tasks, or only sheets (milestones always show)">
+      {([['all', 'All'], ['tasks', 'Tasks'], ['sheets', 'Sheets']] as [WorkFilter, string][]).map(([w, label]) => (
+        <button key={w} className={work === w ? 'on' : ''} onClick={() => setWork(w)}>{label}</button>
+      ))}
+    </div>
     <div className="level-ctl" title="How much detail to show">
       <span className="muted small">Detail</span>
       <input type="range" min={0} max={3} step={1} value={level} aria-label="Detail level"
         onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
       <span className="level-name">{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
     </div>
+    </>
   )
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 

@@ -20,7 +20,7 @@ const ghostName = (t: Task) =>
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
 
-type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam'; place?: Place }
+type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam' | 'tasks' | 'sheets'; place?: Place }
 
 /**
  * One phase's work as a tree: sheets → views → tasks → items (checklist lines / info).
@@ -82,6 +82,16 @@ export default function PlanTree({
   }, [])
 
   const top = childrenOf(tree, null).filter((t) => t.phase_id === phase.id)
+  const isSheetSide = (t: Task) => ['sheet', 'view'].includes(kindOf(t))
+  const topTasks = top.filter((t) => !isSheetSide(t))
+  const topSheets = top.filter(isSheetSide)
+  const groupHead = (g: 'tasks' | 'sheets', label: string, n: number) => (
+    <li key={`head-${g}`} className="tgroup-head" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, target: null, only: g }) }}>
+      <span>{label}</span><span className="count">{n}</span>
+      <button className="icon-btn" title={g === 'tasks' ? 'Add a task or milestone' : 'Add sheets'}
+        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null, only: g }) }}>+</button>
+    </li>
+  )
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const expand = (id: string | null | undefined) => { if (id) setOpen((o) => new Set([...o, id])) }
   const cutIds = new Set(clip?.mode === 'cut' ? clip.rows.map((r) => r.id) : [])
@@ -419,7 +429,11 @@ export default function PlanTree({
         onDragOver={(e) => { if (dragging) { e.preventDefault(); setHint({ id: `end-${phase.id}`, place: 'after' }) } }}
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHint(null) }}
         onDrop={(e) => { e.preventDefault(); setHint(null); dropRow(e, null, 'after') }}>
-        {top.flatMap((t) => node(t, 0))}
+        {/* Tasks first, then sheets, each under a quiet heading (only when the phase has some). */}
+        {topTasks.length > 0 && groupHead('tasks', 'Tasks', topTasks.length)}
+        {topTasks.flatMap((t) => node(t, 0))}
+        {topSheets.length > 0 && groupHead('sheets', 'Sheets', topSheets.length)}
+        {topSheets.flatMap((t) => node(t, 0))}
         {top.length === 0 && !addingSheet && (
           <li className="muted small empty-row">
             <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
@@ -439,7 +453,9 @@ export default function PlanTree({
       </ul>
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}
-          items={menu.only === 'add-inside' ? insideItems(menu.target!) : menu.only === 'seam' ? seamItems(menu.target!, menu.place ?? 'after') : menuItems(menu.target)} />
+          items={menu.only === 'add-inside' ? insideItems(menu.target!) : menu.only === 'seam' ? seamItems(menu.target!, menu.place ?? 'after')
+            : menu.only === 'tasks' || menu.only === 'sheets' ? menuItems(null).filter((m) => m === 'sep' || (menu.only === 'tasks') === !/sheet/i.test(m.label)).filter((m, i, a) => m !== 'sep' || (i > 0 && i < a.length - 1))
+            : menuItems(menu.target)} />
       )}
     </>
   )
