@@ -100,8 +100,30 @@ function hueOffsets(scheme: SchemeId, n: number): { dh: number; depth: number }[
 }
 
 /** n phase colours from a root colour and scheme (or the default set when there's no root). */
+/** A brand palette stored on a project as its scheme: "brand:Name|#aaa,#bbb,…". */
+export function encodeBrand(name: string, colors: string[]) {
+  return `brand:${name.replace(/[|]/g, '/')}|${colors.join(',')}`
+}
+export function decodeBrand(scheme: string | null | undefined): { name: string; colors: string[] } | null {
+  if (!scheme?.startsWith('brand:')) return null
+  const [name, list] = scheme.slice(6).split('|')
+  const colors = (list ?? '').split(',').filter((c) => /^#[0-9a-f]{6}$/i.test(c))
+  return colors.length ? { name, colors } : null
+}
+
 export function projectPalette(root: string | null | undefined, n: number, scheme?: string | null): string[] {
   const count = Math.max(1, n)
+  // Brand palettes use their colours exactly, in order; past the end, lighter then darker versions of them.
+  const brand = decodeBrand(scheme)
+  if (brand) {
+    return Array.from({ length: count }, (_, i) => {
+      const c = brand.colors[i % brand.colors.length]
+      const round = Math.floor(i / brand.colors.length)
+      if (!round) return c
+      const o = hexToOklch(c)
+      return oklchToHex({ ...o, l: clamp(o.l + (round % 2 ? 0.14 : -0.12) * Math.ceil(round / 2), 0.25, 0.9) })
+    })
+  }
   if (!root) return Array.from({ length: count }, (_, i) => DEFAULT[i % DEFAULT.length])
   const base = hexToOklch(root)
   const id = (SCHEMES.some((s) => s.id === scheme) ? scheme : 'balanced') as SchemeId

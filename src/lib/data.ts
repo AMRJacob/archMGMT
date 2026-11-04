@@ -26,7 +26,7 @@ const KEY = 'archmgmt:sample-data:v1' // historical name: this holds all browser
 const META_KEY = 'archmgmt:meta'
 interface Meta { version: number; sampleIds: string[] }
 
-const emptyStore = (): Store => ({ people: [], projects: [], phases: [], tasks: [], time_off: [], meeting_notes: [] })
+const emptyStore = (): Store => ({ people: [], projects: [], phases: [], tasks: [], time_off: [], meeting_notes: [], brand_palettes: [], wishlist: [] })
 
 const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
   // 0 → 1: first visit, add the original sample project
@@ -231,6 +231,8 @@ const onDelete: Record<TableName, { table: TableName; column: string; action: 'c
   ],
   time_off: [],
   meeting_notes: [],
+  brand_palettes: [],
+  wishlist: [],
 }
 
 function deleteLocal(s: Store, table: TableName, id: string) {

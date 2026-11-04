@@ -126,10 +126,11 @@ export const DEFAULT_PHASES: { name: string; weeks: number }[] = [
   { name: 'Construction Administration', weeks: 40 },
 ]
 
-export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off' | 'meeting_notes'
+export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off' | 'meeting_notes' | 'brand_palettes' | 'wishlist'
 
 /** Tables in the order they can be restored (parents before children). */
-export const TABLES: TableName[] = ['people', 'projects', 'phases', 'tasks', 'time_off', 'meeting_notes']
+export const TABLES: TableName[] = ['people', 'projects', 'phases', 'tasks', 'time_off', 'meeting_notes', 'brand_palettes']
+// The wishlist isn't project data, so it's not in backups.
 
 /** Notes from a meeting, kept with the project; optionally tied to a milestone or task. */
 export interface MeetingNote {
@@ -141,6 +142,39 @@ export interface MeetingNote {
   attendees: string | null
   body: string | null
   author: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+/** A saved set of brand colours (a campus or company standard) that a project's phases can use. */
+export interface BrandPalette {
+  id: string
+  name: string
+  colors: string[]
+  notes: string | null
+}
+
+export type WishStatus = 'new' | 'under_review' | 'planned' | 'in_progress' | 'complete' | 'infeasible' | 'duplicate'
+export const WISH_STATUSES: { value: WishStatus; label: string; closed: boolean }[] = [
+  { value: 'new', label: 'New', closed: false },
+  { value: 'under_review', label: 'Under review', closed: false },
+  { value: 'planned', label: 'Planned', closed: false },
+  { value: 'in_progress', label: 'In progress', closed: false },
+  { value: 'complete', label: 'Complete – closed', closed: true },
+  { value: 'infeasible', label: 'Infeasible – closed', closed: true },
+  { value: 'duplicate', label: 'Duplicate – closed', closed: true },
+]
+
+/** A wish or problem report from Settings → Wishlist & problems. */
+export interface WishItem {
+  id: string
+  kind: 'wish' | 'problem'
+  title: string
+  details: string | null
+  status: WishStatus
+  response: string | null
+  submitted_by: string | null
+  sort_order: number
   created_at?: string
   updated_at?: string
 }

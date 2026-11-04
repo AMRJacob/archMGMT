@@ -1,4 +1,6 @@
 import ThemePicker from '../components/ThemePicker.tsx'
+import Wishlist from '../components/Wishlist.tsx'
+import BrandPalettes from '../components/BrandPalettes.tsx'
 import { MyName } from '../components/AccessManager.tsx'
 import { useRef, useState } from 'react'
 import { ChangePassword } from '../auth/Auth.tsx'
@@ -87,6 +89,8 @@ export default function Settings() {
       {error && <p className="error">{error}</p>}
 
       <ThemePicker />
+      <Wishlist />
+      <BrandPalettes />
 
       <div className="card pad">
         <h2>Where data is stored</h2>

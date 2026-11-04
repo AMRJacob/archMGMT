@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { projectAccent, projectPalette, ROOT_PRESETS, SCHEMES, textOn } from '../lib/colors.ts'
+import { decodeBrand, encodeBrand, projectAccent, projectPalette, ROOT_PRESETS, SCHEMES, textOn } from '../lib/colors.ts'
+import { useRows } from '../lib/data.ts'
+import type { BrandPalette } from '../lib/types.ts'
 
 /** Pick a project's root colour and scheme; previews the phase colours they build. */
 export default function ColorPicker({ value, scheme, phaseNames, onChange, onScheme }: {
@@ -10,6 +12,8 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
   onScheme: (scheme: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const brands = useRows<BrandPalette>('brand_palettes')
+  const brand = decodeBrand(scheme)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,6 +35,24 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
       <button className="swatch-btn" title="Project colours" onClick={() => setOpen(!open)} style={{ background: accent }} aria-label="Project colours" />
       {open && (
         <div className="color-pop">
+          {brands.rows.length > 0 && (
+            <>
+              <div className="cp-label">Brand palettes</div>
+              <div className="cp-brands">
+                {[...brands.rows].sort((a, b) => a.name.localeCompare(b.name)).map((b) => {
+                  const on = brand?.name === b.name
+                  return (
+                    <button key={b.id} className={`cp-brand${on ? ' on' : ''}`} title={b.notes ?? b.name}
+                      onClick={() => { if (b.colors[0]) onChange(b.colors[0]); onScheme(encodeBrand(b.name, b.colors)) }}>
+                      <span className="cp-preview">{b.colors.map((c, i) => <i key={i} style={{ background: c }} />)}</span>
+                      <span className="cp-scheme-name">{b.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {brand && <p className="cp-hint">Phases use the {brand.name} colours in order. Pick a scheme below to go back to generated colours.</p>}
+            </>
+          )}
           <div className="cp-label">Root colour</div>
           <div className="cp-presets">
             {ROOT_PRESETS.map((c) => (
@@ -48,7 +70,7 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
 
           {value && (
             <>
-              <div className="cp-label">Scheme</div>
+              <div className="cp-label">{brand ? 'Or a generated scheme' : 'Scheme'}</div>
               <div className="cp-schemes">
                 {SCHEMES.map((s) => {
                   const pal = projectPalette(value, names.length, s.id)
@@ -62,7 +84,8 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
                   )
                 })}
               </div>
-              <p className="cp-hint">{SCHEMES.find((s) => s.id === current)?.hint} The first phase always uses the root colour.</p>
+              {!brand && <p className="cp-hint">{SCHEMES.find((s) => s.id === current)?.hint} The first phase always uses the root colour.</p>}
+              {brands.rows.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Brand palettes to use them here.</p>}
             </>
           )}
         </div>
