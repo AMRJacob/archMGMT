@@ -26,7 +26,7 @@ export default function TaskEditor({
     const away = (e: MouseEvent) => {
       const t = e.target as HTMLElement
       // Clicking another task re-targets the panel; anything else outside closes it.
-      if (!box.current?.contains(t) && !t.closest('[data-drag], .cal-task, .card-task, .trow')) onClose()
+      if (!box.current?.contains(t) && !t.closest('[data-drag], .cal-task, .card-task, .trow, .pop-menu, .ctx-menu')) onClose()
     }
     document.addEventListener('keydown', esc)
     document.addEventListener('mousedown', away)

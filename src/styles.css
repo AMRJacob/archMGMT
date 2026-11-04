@@ -976,3 +976,6 @@ select.wish-status { border: 1px solid var(--line); }
 .cp-brand .cp-preview i { width: 16px; }
 .chart-scroll { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; max-width: 720px; }
 .chart-scroll input[type='range'] { flex: 1; accent-color: var(--accent); }
+
+/* Pop menus float at the top of the page (see Pop in TaskChips) */
+.pop-menu.floating { position: fixed; top: 0; left: 0; z-index: 95; max-height: calc(100vh - 16px); overflow: auto; }

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { shortDate, today } from '../lib/dates.ts'
 import { assigneesOf, assignPatch, initialsOf } from '../lib/assignees.ts'
 import { MILESTONE_TYPES, milestoneType } from '../lib/milestones.ts'
@@ -10,7 +11,10 @@ import { EFFORTS, TASK_STATUSES, type Person, type Phase, type Task, type TaskSt
  * Used in Overview rows and in the quick panel that opens from the timeline, calendar and board.
  */
 
-/** A button that opens a small floating menu under itself. */
+/**
+ * A button that opens a small floating menu under itself. The menu is drawn at the top of the page
+ * (fixed to the button's position), so table cells, panels and cards can never clip it.
+ */
 export function Pop({ label, title, className = '', children, align = 'left' }: {
   label: ReactNode
   title?: string
@@ -21,31 +25,50 @@ export function Pop({ label, title, className = '', children, align = 'left' }: 
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLSpanElement>(null)
   const menu = useRef<HTMLDivElement>(null)
-  const [flip, setFlip] = useState(false)
+  const [pos, setPos] = useState<CSSProperties>({})
 
   useEffect(() => {
     if (!open) return
-    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const away = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!box.current?.contains(t) && !menu.current?.contains(t)) setOpen(false)
+    }
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }
+    const gone = (e: Event) => { if (!menu.current?.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', esc, true)
-    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc, true) }
+    window.addEventListener('scroll', gone, true)
+    window.addEventListener('resize', gone)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc, true)
+      window.removeEventListener('scroll', gone, true)
+      window.removeEventListener('resize', gone)
+    }
   }, [open])
 
-  // Open upward when there isn't room below.
+  // Place it under the button (or above, when there isn't room), lined up left or right, inside the window.
   useLayoutEffect(() => {
-    if (!open || !menu.current) return
-    const r = menu.current.getBoundingClientRect()
-    if (r.bottom > window.innerHeight - 8) setFlip(true)
-  }, [open])
+    if (!open || !box.current || !menu.current) return
+    const b = box.current.getBoundingClientRect(), m = menu.current.getBoundingClientRect()
+    const below = b.bottom + 4 + m.height <= window.innerHeight - 8
+    const top = below ? b.bottom + 4 : Math.max(8, b.top - 4 - m.height)
+    let left = align === 'right' ? b.right - m.width : b.left
+    left = Math.max(8, Math.min(left, window.innerWidth - m.width - 8))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measured placement must happen before paint
+    setPos({ top, left, visibility: 'visible' })
+  }, [open, align])
 
   return (
     <span className={`pop ${className}`} ref={box} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className={`chip-btn${open ? ' open' : ''}`} title={title} onClick={() => { setFlip(false); setOpen(!open) }}>{label}</button>
-      {open && (
-        <div ref={menu} className={`pop-menu ${align}${flip ? ' up' : ''}`} role="menu">
+      <button type="button" className={`chip-btn${open ? ' open' : ''}`} title={title}
+        onClick={() => { setPos({ visibility: 'hidden' }); setOpen(!open) }}>{label}</button>
+      {open && createPortal(
+        <div ref={menu} className={`pop-menu floating ${className}-menu`} role="menu" style={pos}
+          onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
           {children(() => setOpen(false))}
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   )
@@ -183,7 +206,7 @@ export function MoreMenu({ task, phases, onPatch, onDelete }: {
 /** A milestone's diamond, coloured by its type. With onPatch it opens a menu to pick the type. */
 export function MilestoneMark({ task, onPatch }: { task: Task; onPatch?: (c: Partial<Task>) => void }) {
   const mt = milestoneType(task.milestone_type)
-  const mark = <span className="diamond" style={mt ? { background: mt.color } : undefined} title={mt ? `${mt.label} milestone` : 'Milestone'} />
+  const mark = <span className="diamond" style={{ background: mt ? mt.color : 'var(--ink)' }} title={mt ? `${mt.label} milestone` : 'Milestone'} />
   if (!onPatch) return mark
   return (
     <Pop className="ms-pop" title={mt ? `${mt.label} milestone: change type` : 'Milestone: set a type'} label={mark}>
