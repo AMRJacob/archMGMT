@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import ContextMenu, { type MenuItem } from './ContextMenu.tsx'
 import { TextField } from './fields.tsx'
@@ -47,6 +48,19 @@ export default function PlanTree({
   onAddMany: (rows: Partial<Task>[]) => Promise<void>
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set())
+  // Search sends ?find=<id>: open the rows above it so it's on screen.
+  const [params] = useSearchParams()
+  const findId = params.get('find')
+  const [foundFor, setFoundFor] = useState<string | null>(null)
+  if (findId && findId !== foundFor) {
+    const byId = tree.byId
+    if (byId.has(findId)) {
+      const up: string[] = []
+      for (let p = byId.get(findId)?.parent_id; p; p = byId.get(p)?.parent_id) up.push(p)
+      setFoundFor(findId)
+      if (up.some((u) => !open.has(u))) setOpen(new Set([...open, ...up]))
+    }
+  }
   const [newId, setNewId] = useState<string | null>(null)
   const [addingSheet, setAddingSheet] = useState(false)
   const [planning, setPlanning] = useState(false)
@@ -239,6 +253,7 @@ export default function PlanTree({
     className: `${className}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
     tabIndex: -1,
+    'data-row': t.id,
     onFocus: () => setSelected(t.id),
     onMouseDown: (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('input, button, select, textarea, .pop')) (e.currentTarget as HTMLElement).focus() },
     onKeyDown: rowKeys(t),

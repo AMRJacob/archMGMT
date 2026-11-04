@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { NoteRow } from '../components/MeetingNotes.tsx'
 import { useProject } from '../lib/projectContext.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
@@ -13,6 +13,14 @@ export default function Notes() {
   const nh = useNotes(project?.id ?? '', plan.tasks.rows, plan.phases.rows, plan.people.rows, () => void plan.tasks.reload())
   const [q, setQ] = useState('')
   const [type, setType] = useState('')
+  // ?open=<note id> (from search) opens that note.
+  const [params, setParams] = useSearchParams()
+  const openId = params.get('open')
+  const { open: openNote } = nh
+  useEffect(() => {
+    if (!openId || !nh.notes.rows.some((n) => n.id === openId)) return
+    openNote(openId); params.delete('open'); setParams(params, { replace: true })
+  }, [openId, nh.notes.rows]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return <p>No project chosen. <Link to="/">See all projects</Link></p>
 
   const query = q.trim().toLowerCase()

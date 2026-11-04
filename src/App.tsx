@@ -3,6 +3,7 @@ import { AuthProvider, CreatePassword, SignIn } from './auth/Auth.tsx'
 import { useAuth } from './auth/authContext.ts'
 import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import PageEdge from './components/PageEdge.tsx'
+import GlobalSearch from './components/GlobalSearch.tsx'
 import { FIT_WIDTH, usePageWidth } from './lib/prefs.ts'
 import ProjectProvider from './components/ProjectProvider.tsx'
 import ProjectSwitcher from './components/ProjectSwitcher.tsx'
@@ -42,6 +43,7 @@ function Shell() {
       <div className="shell">
         <aside className="sidebar no-print">
           <div className="brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
+          <GlobalSearch />
           {/* The project you're in, with its pages, as one group. */}
           <section className="project-nav" aria-label="This project">
             <ProjectSwitcher />

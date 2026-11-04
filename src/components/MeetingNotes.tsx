@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useCallback, useState, type KeyboardEvent } from 'react'
+import NotePrint from './NotePrint.tsx'
 import Modal from './Modal.tsx'
 import { MilestoneMark } from './TaskChips.tsx'
 import { initialsOf } from '../lib/assignees.ts'
 import { formatDate } from '../lib/dates.ts'
-import { MEETING_TYPES, type ActionItem, type MeetingNote, type Person, type Task } from '../lib/types.ts'
+import { MEETING_TYPES, type ActionItem, type MeetingNote, type Person, type Project, type Task } from '../lib/types.ts'
 
 const typeOf = (v: string | null | undefined) => MEETING_TYPES.find((m) => m.value === v) ?? null
 
@@ -119,7 +120,8 @@ function AttendeePicker({ ids, guests, people, onChange }: {
  * A meeting note: what kind of meeting, when and where, who was there (Team list + guests), what it's for,
  * then the notes, the decisions, and action items that can become tasks. Saves as you go.
  */
-export function NoteEditor({ note, tasks, people, onPatch, onDelete, onClose, onMakeTask }: {
+export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, onClose, onMakeTask }: {
+  project?: Project | null
   note: MeetingNote
   tasks: Task[]
   people: Person[]
@@ -134,7 +136,9 @@ export function NoteEditor({ note, tasks, people, onPatch, onDelete, onClose, on
   const [body, setBody] = useState(note.body ?? '')
   const [decisions, setDecisions] = useState(note.decisions ?? '')
   const [newAction, setNewAction] = useState('')
+  const [printing, setPrinting] = useState(false)
   const actions = note.actions ?? []
+  const donePrinting = useCallback(() => setPrinting(false), [])
   const save = (c: Partial<MeetingNote>) => onPatch({ ...c, updated_at: new Date().toISOString() })
   const setActions = (a: ActionItem[]) => save({ actions: a })
   const close = () => {
@@ -173,7 +177,21 @@ export function NoteEditor({ note, tasks, people, onPatch, onDelete, onClose, on
           <button className="btn danger" onClick={() => { if (window.confirm('Delete this meeting note?')) { onDelete(); onClose() } }}>Delete note</button>
           <span className="grow" />
           <span className="muted small">{note.author ? `Started by ${note.author}. ` : ''}Saved as you go.</span>
+          <button className="btn" title="Opens the print dialog: choose Save as PDF" onClick={() => {
+            // Save what's typed first, so the PDF has it.
+            const c: Partial<MeetingNote> = {}
+            if (title !== note.title) c.title = title
+            if (location !== (note.location ?? '')) c.location = location || null
+            if (body !== (note.body ?? '')) c.body = body || null
+            if (decisions !== (note.decisions ?? '')) c.decisions = decisions || null
+            if (Object.keys(c).length) save(c)
+            setPrinting(true)
+          }}>Export PDF</button>
           <button className="btn primary" onClick={close}>Done</button>
+          {printing && (
+            <NotePrint note={{ ...note, title, location: location || null, body: body || null, decisions: decisions || null }}
+              project={project ?? null} people={people} tasks={tasks} onDone={donePrinting} />
+          )}
         </>
       }>
       <div className="note-grid">

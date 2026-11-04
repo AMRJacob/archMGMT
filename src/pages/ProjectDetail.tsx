@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
@@ -52,9 +52,30 @@ export default function ProjectDetail() {
   const currentPhase = sortedPhases.find((p) => p.start_date <= t && t <= p.end_date)
     ?? sortedPhases.find((p) => p.start_date > t) ?? sortedPhases[sortedPhases.length - 1]
 
+  // ?find=<task id> (from search): open its phase, scroll to it, flash it.
+  const findId = params.get('find')
   // Which phases are expanded: the current one by default, reset when switching projects.
   if (openFor !== id) { setOpenFor(id); setOpenIds(null) }
-  const open = openIds ?? new Set(currentPhase ? [currentPhase.id] : [])
+  const findPhase = findId ? tasks.rows.find((x) => x.id === findId)?.phase_id : null
+  const open = new Set([...(openIds ?? (currentPhase ? [currentPhase.id] : [])), ...(findPhase ? [findPhase] : [])])
+  useEffect(() => {
+    if (!findId) return
+    const t = tasks.rows.find((x) => x.id === findId)
+    if (!t) return
+    // Keep its phase open once the search link is gone.
+    const opened = setTimeout(() => { if (t.phase_id) setOpenIds(new Set([...open, t.phase_id!])) }, 0)
+    // The phase may take a render or two to open: look for the row for up to two seconds.
+    const until = Date.now() + 2000
+    const timer = setInterval(() => {
+      const el = document.querySelector<HTMLElement>(`[data-row="${findId}"]`)
+      if (!el && Date.now() < until) return
+      clearInterval(timer)
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('found'); el.focus({ preventScroll: true }); setTimeout(() => el.classList.remove('found'), 2200) }
+      params.delete('find'); setParams(params, { replace: true })
+    }, 100)
+    return () => { clearTimeout(opened); clearInterval(timer) }
+  }, [findId, tasks.rows]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggle = (pid: string) => {
     const next = new Set(open)
     if (next.has(pid)) next.delete(pid)

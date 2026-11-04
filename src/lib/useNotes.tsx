@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NoteEditor } from '../components/MeetingNotes.tsx'
 import { useAuth } from '../auth/authContext.ts'
+import { useProject } from './projectContext.ts'
 import { insert, useRows } from './data.ts'
 import { newNote } from './notes.ts'
 import { today } from './dates.ts'
@@ -14,6 +15,7 @@ import type { MeetingNote, Person, Phase, Task } from './types.ts'
 export function useNotes(projectId: string, tasks: Task[], phases: Phase[], people: Person[], reloadTasks?: () => void) {
   const notes = useRows<MeetingNote>('meeting_notes', { project_id: projectId })
   const { session } = useAuth()
+  const projects = useProject()
   const [openId, setOpenId] = useState<string | null>(null)
 
   const add = async (task: Task | null) => {
@@ -29,7 +31,7 @@ export function useNotes(projectId: string, tasks: Task[], phases: Phase[], peop
 
   const note = openId ? notes.rows.find((n) => n.id === openId) : undefined
   const editor = note ? (
-    <NoteEditor key={note.id} note={note} tasks={tasks} people={people}
+    <NoteEditor key={note.id} note={note} tasks={tasks} people={people} project={projects.current}
       onPatch={(c) => void notes.patch(note.id, c)} onDelete={() => void notes.drop(note.id)} onClose={() => setOpenId(null)}
       onMakeTask={async (a) => {
         // The phase the due date falls in, else the one under way, else the first.
