@@ -1044,3 +1044,11 @@ select.wish-status { border: 1px solid var(--line); }
 .rh-span { flex: none; width: 10px; align-self: stretch; margin-right: 2px; cursor: col-resize; border-left: 2px solid transparent; }
 .row-head:hover .rh-span { border-left-color: var(--line-strong); }
 .rh-span:hover, .rh-span:active { border-left-color: var(--accent) !important; }
+
+/* draggable right edge of the page */
+.content { position: relative; }
+.page-edge { position: absolute; top: 0; right: 0; width: 12px; height: 100%; cursor: col-resize; z-index: 5; display: flex; justify-content: center; }
+.page-edge span { width: 2px; height: 100%; background: transparent; transition: background 0.15s; }
+.page-edge:hover span, body.resizing-page .page-edge span { background: var(--line-strong); }
+body.resizing-page { cursor: col-resize; user-select: none; }
+@media print { .page-edge { display: none; } }

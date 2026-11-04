@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { AuthProvider, CreatePassword, SignIn } from './auth/Auth.tsx'
 import { useAuth } from './auth/authContext.ts'
 import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import PageEdge from './components/PageEdge.tsx'
+import { FIT_WIDTH, usePageWidth } from './lib/prefs.ts'
 import ProjectProvider from './components/ProjectProvider.tsx'
 import ProjectSwitcher from './components/ProjectSwitcher.tsx'
 import { usingSampleData } from './lib/data.ts'
@@ -34,6 +36,7 @@ function Gate() {
 
 function Shell() {
   const { session, signOut } = useAuth()
+  const pageW = usePageWidth()
   return (
     <ProjectProvider>
       <div className="shell">
@@ -65,7 +68,8 @@ function Shell() {
             )}
           </div>
         </aside>
-        <main className="content">
+        <main className="content" style={pageW === 'full' ? undefined : { maxWidth: pageW === 'fit' ? FIT_WIDTH : pageW }}>
+          <PageEdge />
           <Routes>
             <Route path="/" element={<Projects />} />
             <Route path="/overview" element={<ProjectDetail />} />
