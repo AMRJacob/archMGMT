@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { shortDate, today } from '../lib/dates.ts'
 import { assigneesOf, assignPatch, initialsOf } from '../lib/assignees.ts'
 import { MILESTONE_TYPES, milestoneType } from '../lib/milestones.ts'
+import { useRowLayout, widthOf, type RowColumn } from '../lib/rowColumns.ts'
 import { EFFORTS, TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 
 /**
@@ -202,18 +203,26 @@ export function MilestoneMark({ task, onPatch }: { task: Task; onPatch?: (c: Par
   )
 }
 
-/** The full set of chips for one task, in reading order. */
-export function TaskControls({ task, people, phases, onPatch, onDelete, isParent = false }: {
+/** The full set of chips for one task, in reading order. `columnar` lays them out in the Overview's columns. */
+export function TaskControls({ task, people, phases, onPatch, onDelete, isParent = false, columnar = false }: {
   task: Task; people: Person[]; phases: Phase[]; onPatch: (c: Partial<Task>) => void; onDelete: () => void
   /** Has scheduled work under it: dates roll up and its size doesn't count. */
   isParent?: boolean
+  columnar?: boolean
 }) {
+  const layout = useRowLayout()
+  const chip = (k: RowColumn) => {
+    if (k === 'status') return <StatusChip task={task} onPatch={onPatch} />
+    if (k === 'size') return isParent ? <span className="chip-spacer" /> : <SizeChip task={task} onPatch={onPatch} />
+    if (k === 'dates') return <DateChip task={task} onPatch={onPatch} locked={isParent} />
+    return <AssigneeChip task={task} people={people} onPatch={onPatch} />
+  }
+  const keys: RowColumn[] = columnar ? layout.order.filter((k) => !layout.hidden.includes(k)) : ['status', 'size', 'dates', 'people']
   return (
-    <span className="task-controls">
-      <StatusChip task={task} onPatch={onPatch} />
-      {isParent ? <span className="chip-spacer" /> : <SizeChip task={task} onPatch={onPatch} />}
-      <DateChip task={task} onPatch={onPatch} locked={isParent} />
-      <AssigneeChip task={task} people={people} onPatch={onPatch} />
+    <span className={`task-controls${columnar ? ' columnar' : ''}`}>
+      {keys.map((k) => (
+        <span key={k} className={`tc-cell tc-${k}`} style={columnar ? { width: widthOf(layout, k) } : undefined}>{chip(k)}</span>
+      ))}
       <MoreMenu task={task} phases={phases} onPatch={onPatch} onDelete={onDelete} />
     </span>
   )

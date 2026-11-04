@@ -4,6 +4,7 @@ import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree from '../components/PlanTree.tsx'
+import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { PhaseSetupDialog } from '../components/SetupDialogs.tsx'
@@ -13,8 +14,12 @@ import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDa
 import ColorPicker from '../components/ColorPicker.tsx'
 import { projectAccent, projectPalette, textOn } from '../lib/colors.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
+import { PROJECT_STATUSES, type MeetingNote, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
+import { MeetingNotesSection, NoteEditor } from '../components/MeetingNotes.tsx'
+import { newNote } from '../lib/notes.ts'
+import { useRows } from '../lib/data.ts'
+import { useAuth } from '../auth/authContext.ts'
 import { area, BUILDING_TYPES, money } from '../lib/amount.ts'
 import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
 
@@ -26,6 +31,14 @@ export default function ProjectDetail() {
   const project = projects.current
   const id = project?.id ?? ''
   const { phases, tasks, people, patchTask, patchMany } = useProjectPlan(id)
+  const notes = useRows<MeetingNote>('meeting_notes', { project_id: id })
+  const { session } = useAuth()
+  const [noteId, setNoteId] = useState<string | null>(null)
+  const addNote = async (t: Task | null) => {
+    const n = await notes.add(newNote(id, t, session?.user.email ?? null))
+    setNoteId(n.id)
+  }
+  const notesFor = (t: Task) => notes.rows.filter((n) => n.task_id === t.id)
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
@@ -135,7 +148,7 @@ export default function ProjectDetail() {
         <TextField value={x.title} autoFocus={x.id === newId} onSave={(v) => { if (v) patchTask(x, { title: v }, false); if (x.id === newId) setNewId(null) }}
           onEscape={x.id === newId ? () => { setNewId(null); void tasks.drop(x.id) } : undefined} />
       </div>
-      <TaskControls task={x} people={people.rows} phases={phases.rows}
+      <TaskControls columnar task={x} people={people.rows} phases={phases.rows}
         onPatch={(c) => patchTask(x, c)} onDelete={() => void tasks.drop(x.id)} />
     </li>
   )
@@ -215,6 +228,7 @@ export default function ProjectDetail() {
         </div>
       )}
 
+      <RowColumnsHeader />
       <div className="phase-list">
         {sortedPhases.map((p, i) => {
           const leaves = work(tasksFor(p.id))
@@ -260,6 +274,9 @@ export default function ProjectDetail() {
                   <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
                     onPatch={patchTask} onPatchMany={patchMany}
                     presented={(x) => isPresented(rulesOf(project), x)}
+                    onAddNote={(x) => void addNote(x)}
+                    noteCount={(x) => notesFor(x).length}
+                    onOpenNotes={(x) => { const ns = notesFor(x); if (ns.length) setNoteId([...ns].sort((a, b) => b.meeting_date.localeCompare(a.meeting_date))[0].id) }}
                     onTogglePresented={(x) => { const c = togglePresented(rulesOf(project), x); if (c.task) patchTask(x, c.task); if (c.rules) void projects.patch(id, { presentation: c.rules }) }}
                     onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
@@ -277,6 +294,8 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      <MeetingNotesSection notes={notes.rows} tasks={tasks.rows} onAdd={() => void addNote(null)} onOpen={(n) => setNoteId(n.id)} />
+
       <div className="footer-actions">
         <button className="btn" onClick={addPhase}>+ Add phase</button>
         {project.archived_at
@@ -284,6 +303,13 @@ export default function ProjectDetail() {
           : <button className="btn" onClick={() => void archiveProject(true)} title="Hide it from lists and workload; everything is kept and it can be restored">Archive project</button>}
       </div>
 
+      {noteId && (() => {
+        const n = notes.rows.find((x) => x.id === noteId)
+        return n ? (
+          <NoteEditor key={n.id} note={n} tasks={tasks.rows} onPatch={(c) => void notes.patch(n.id, c)}
+            onDelete={() => void notes.drop(n.id)} onClose={() => setNoteId(null)} />
+        ) : null
+      })()}
       {phaseMenu && (
         <ContextMenu x={phaseMenu.x} y={phaseMenu.y} onClose={() => setPhaseMenu(null)} items={phaseItems(phaseMenu.phase)} />
       )}

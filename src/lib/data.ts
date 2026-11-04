@@ -26,7 +26,7 @@ const KEY = 'archmgmt:sample-data:v1' // historical name: this holds all browser
 const META_KEY = 'archmgmt:meta'
 interface Meta { version: number; sampleIds: string[] }
 
-const emptyStore = (): Store => ({ people: [], projects: [], phases: [], tasks: [], time_off: [] })
+const emptyStore = (): Store => ({ people: [], projects: [], phases: [], tasks: [], time_off: [], meeting_notes: [] })
 
 const UPGRADES: ((s: Store, meta: Meta) => void)[] = [
   // 0 → 1: first visit, add the original sample project
@@ -222,10 +222,15 @@ const onDelete: Record<TableName, { table: TableName; column: string; action: 'c
   projects: [
     { table: 'phases', column: 'project_id', action: 'cascade' },
     { table: 'tasks', column: 'project_id', action: 'cascade' },
+    { table: 'meeting_notes', column: 'project_id', action: 'cascade' },
   ],
   phases: [{ table: 'tasks', column: 'phase_id', action: 'null' }],
-  tasks: [{ table: 'tasks', column: 'parent_id', action: 'cascade' }],
+  tasks: [
+    { table: 'tasks', column: 'parent_id', action: 'cascade' },
+    { table: 'meeting_notes', column: 'task_id', action: 'null' },
+  ],
   time_off: [],
+  meeting_notes: [],
 }
 
 function deleteLocal(s: Store, table: TableName, id: string) {
@@ -278,7 +283,11 @@ export async function insert<T>(table: TableName, row: Partial<T>): Promise<T> {
 
 export async function insertMany<T>(table: TableName, rows: Partial<T>[]): Promise<T[]> {
   if (supabase) {
-    const { data, error } = await supabase.from(table).insert(rows as never).select()
+    // Rows in one batch can have different fields (a task and its checklist items). Give every row an id
+    // up front and let columns a row leaves out take their database default instead of NULL; otherwise
+    // the whole batch fails (e.g. a NULL id or assignee list).
+    const withIds = rows.map((r) => ({ id: crypto.randomUUID(), ...r }))
+    const { data, error } = await supabase.from(table).insert(withIds as never, { defaultToNull: false }).select()
     if (error) throw error
     return data as T[]
   }

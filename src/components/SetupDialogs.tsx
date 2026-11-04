@@ -175,6 +175,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
   const [own, setOwn] = useState('')
   const [autoNumber, setAutoNumber] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   function applyTemplate(key: string) {
     const t = PHASE_TEMPLATES.find((x) => x.key === key) ?? null
@@ -228,8 +229,11 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
           rows.push(sheet, ...items)
         }
       }
+      setError(null)
       if (rows.length) await onCreate(rows)
       onClose()
+    } catch (e) {
+      setError(`Couldn’t add them: ${e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e)}`)
     } finally { setBusy(false) }
   }
 
@@ -238,7 +242,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
     <Modal title={`Set up ${phase.name}`} onClose={onClose} size="wide"
       footer={
         <>
-          <span className="muted small grow">Everything can be changed, moved or removed later.</span>
+          {error ? <span className="error small grow">{error}</span> : <span className="muted small grow">Everything can be changed, moved or removed later.</span>}
           <button className="btn ghost" onClick={onClose}>Cancel</button>
           <button className="btn primary" disabled={!total || busy} onClick={create}>
             {total ? `Add ${[pickedTasks.length && `${pickedTasks.length} task${pickedTasks.length === 1 ? '' : 's'}`, sheetCount && `${sheetCount} sheet${sheetCount === 1 ? '' : 's'}`].filter(Boolean).join(' and ')}` : 'Add'}

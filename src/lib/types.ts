@@ -126,10 +126,24 @@ export const DEFAULT_PHASES: { name: string; weeks: number }[] = [
   { name: 'Construction Administration', weeks: 40 },
 ]
 
-export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off'
+export type TableName = 'people' | 'projects' | 'phases' | 'tasks' | 'time_off' | 'meeting_notes'
 
 /** Tables in the order they can be restored (parents before children). */
-export const TABLES: TableName[] = ['people', 'projects', 'phases', 'tasks', 'time_off']
+export const TABLES: TableName[] = ['people', 'projects', 'phases', 'tasks', 'time_off', 'meeting_notes']
+
+/** Notes from a meeting, kept with the project; optionally tied to a milestone or task. */
+export interface MeetingNote {
+  id: string
+  project_id: string
+  task_id: string | null
+  meeting_date: string
+  title: string
+  attendees: string | null
+  body: string | null
+  author: string | null
+  created_at?: string
+  updated_at?: string
+}
 
 export interface TimeOff {
   id: string

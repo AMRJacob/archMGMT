@@ -27,8 +27,12 @@ type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside
  * promote/demote from the menu (or Ctrl+[ / Ctrl+]), and cut/copy/paste with the menu or Ctrl+X/C/V.
  */
 export default function PlanTree({
-  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented,
+  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented, onAddNote, noteCount, onOpenNotes,
 }: {
+  /** Meeting notes: start one for a row, how many it has, open its latest. */
+  onAddNote?: (t: Task) => void
+  noteCount?: (t: Task) => number
+  onOpenNotes?: (t: Task) => void
   /** Whether a row is in the presentation view, and flipping it (right-click menu). */
   presented?: (t: Task) => boolean
   onTogglePresented?: (t: Task) => void
@@ -340,8 +344,14 @@ export default function PlanTree({
             )}
           </Pop>
         )}
+        {noteCount && onOpenNotes && noteCount(t) > 0 && (
+          <button className="note-chip" title={`${noteCount(t)} meeting note${noteCount(t) === 1 ? '' : 's'}: open the latest`} onClick={() => onOpenNotes(t)}>
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5h5l2 2v7h-7z M4 5h4 M4 7h4 M4 9h2.5" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" /></svg>
+            {noteCount(t)}
+          </button>
+        )}
         {prog.total > 0 && <span className={`prog${prog.done === prog.total ? ' all' : ''}`} title={`${prog.done} of ${prog.total} done`}>{prog.done}/{prog.total}</span>}
-        <TaskControls task={shown} people={people} phases={phases} isParent={parent}
+        <TaskControls task={shown} people={people} phases={phases} isParent={parent} columnar
           onPatch={(c) => onPatch(t, c)} onDelete={() => onDrop(t.id)} />
         {firstOf(t) && seam([{ task: t, depth }], 'before')}
         {!(isOpen && kids.length) && seam([{ task: t, depth }, ...enders], 'after')}
@@ -490,6 +500,11 @@ export default function PlanTree({
       { label: `${pasteLabel} below`, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(t, 'after') },
       ...(holds ? [{ label: `${pasteLabel} inside`, disabled: !hasClip, run: () => paste(t, 'inside') }] : []),
       { label: 'Duplicate', keys: 'Ctrl+D', run: () => duplicate(t) },
+      ...(onAddNote && k !== 'item' ? [
+        'sep' as const,
+        { label: t.is_milestone ? 'Add meeting notes' : 'Add notes', run: () => onAddNote(t) },
+        ...(noteCount && onOpenNotes && noteCount(t) > 0 ? [{ label: `Open notes (${noteCount(t)})`, run: () => onOpenNotes(t) }] : []),
+      ] : []),
       ...(presented && onTogglePresented && k !== 'item'
         ? ['sep' as const, { label: presented(t) ? 'Hide from presentation' : 'Show in presentation', run: () => onTogglePresented(t) }]
         : []),
