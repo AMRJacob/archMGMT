@@ -16,7 +16,7 @@ import { useAuth } from '../auth/authContext.ts'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import { projectPalette } from '../lib/colors.ts'
-import { addDays, parseISO, toISO, today } from '../lib/dates.ts'
+import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { KIND_RANK, type MeetingNote, type Phase, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
@@ -143,16 +143,14 @@ export default function Schedule() {
    * view. With no date it starts this week if the phase is under way, otherwise when the phase starts.
    */
   function addHere(phase: Phase | null, date: string | null, opts: { milestone?: boolean; parent?: Task | null } = {}) {
-    const t = today()
-    const inPhase = phase && phase.start_date <= t && t <= phase.end_date
-    const d = date ?? (phase ? (inPhase ? mondayOf(t) : phase.start_date) : mondayOf(t))
+    // With no date (the "+ Add task" rows), it starts undated: the user clicks in its row to place it.
     const parent = opts.parent ? real(opts.parent) : null
     const kind = parent ? kindUnder(parent, 'task') : 'task'
     return addTask({
       phase_id: parent?.phase_id ?? phase?.id ?? null, parent_id: parent?.id ?? null, kind,
       title: opts.milestone ? 'New milestone' : 'New task',
       is_milestone: Boolean(opts.milestone), client_visible: Boolean(opts.milestone),
-      start_date: opts.milestone ? null : d, due_date: opts.milestone ? d : addDays(d, 4),
+      start_date: date && !opts.milestone ? date : null, due_date: date ? (opts.milestone ? date : addDays(date, 4)) : null,
       effort: opts.milestone ? null : 2,
       ...(parent ? { assignee_ids: parent.assignee_ids ?? [], assignee_id: parent.assignee_id } : {}),
     })
@@ -222,6 +220,11 @@ export default function Schedule() {
     ? [winStart, addDays(addMonths(winStart, months), -1)]
     : undefined
   const step = Math.round((months * 30) / 4) // arrows move a quarter of the view
+  // The whole project's span, for the scroll bar under a zoomed timeline.
+  const allDates = [...phases.rows.flatMap((p) => [p.start_date, p.end_date]), ...tasks.rows.flatMap((t) => [t.start_date, t.due_date])].filter((d): d is string => Boolean(d))
+  const spanStart = minDate(allDates), spanEnd = maxDate(allDates)
+  const winDays = chartWindow ? daysBetween(chartWindow[0], chartWindow[1]) : 0
+  const scrollMax = spanStart && spanEnd ? Math.max(0, daysBetween(spanStart, spanEnd) - winDays + 14) : 0
 
   const palette = projectPalette(project.color, phases.rows.length, project.color_scheme)
 
@@ -252,7 +255,7 @@ export default function Schedule() {
             </div>
             {mode === 'working' ? (
               <span className="muted small grow">
-                {`Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars to move them.${months ? ' Click and hold empty space to pan.' : ''}`}
+                {`Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
               </span>
             ) : (
               <PresentationFilter rules={rules} onChange={setRules}
@@ -275,6 +278,15 @@ export default function Schedule() {
                 <button className="btn small-btn" onClick={() => setWinStart(addDays(winStart, -step))} title="Earlier">‹</button>
                 <button className="btn small-btn" onClick={() => setWinStart(defaultWindowStart())}>Today</button>
                 <button className="btn small-btn" onClick={() => setWinStart(addDays(winStart, step))} title="Later">›</button>
+              </div>
+            )}
+            {months > 0 && spanStart && scrollMax > 0 && (
+              <div className="chart-scroll">
+                <span className="muted small">{shortDate(spanStart)}</span>
+                <input type="range" min={-7} max={scrollMax} step={1} aria-label="Scroll the timeline"
+                  value={Math.min(scrollMax, Math.max(-7, daysBetween(spanStart, winStart)))}
+                  onChange={(e) => setWinStart(addDays(spanStart, Number(e.target.value)))} />
+                <span className="muted small">{shortDate(spanEnd)}</span>
               </div>
             )}
           </div>

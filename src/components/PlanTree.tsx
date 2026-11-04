@@ -7,7 +7,6 @@ import {
   placeAmong, promote, readClip, saveClip, slotFor, type Change, type Clip, type Place,
 } from '../lib/treeEdit.ts'
 import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
-import { addDays, nextMonday } from '../lib/dates.ts'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { childrenOf, descendants, isItem, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
@@ -87,16 +86,15 @@ export default function PlanTree({
     const { sortOrders, parent, phaseId } = orderAt(target, place)
     const ph = phases.find((x) => x.id === phaseId) ?? phase
     const k = kind === 'sheet' && parent ? kindUnder(parent, 'view') : kindUnder(parent, kind)
-    const base = parent ? rolledDates(tree, parent) : null
-    const s = base?.start ?? (ph.start_date > nextMonday() ? ph.start_date : nextMonday())
-    const dated = k !== 'item'
     const created = await onAdd({
       id: crypto.randomUUID(), project_id: projectId, phase_id: ph.id, parent_id: parent?.id ?? null, kind: k,
       title: '',
       sheet_number: null, sheet_type: k === 'sheet' ? 'other' : null,
       ...assignPatch(parent ? assigneesOf(parent) : []),
-      start_date: dated && !milestone ? (k === 'sheet' ? ph.start_date : s) : null,
-      due_date: dated ? (milestone ? ph.end_date : k === 'sheet' ? ph.end_date : base?.due ?? addDays(s, 13)) : null,
+      // Sheets span their phase; tasks, views and milestones start undated, to be placed on the timeline
+      // (or given dates with the date chip) where they belong, instead of landing somewhere arbitrary.
+      start_date: k === 'sheet' ? ph.start_date : null,
+      due_date: k === 'sheet' ? ph.end_date : null,
       estimated_hours: null, effort: k === 'item' ? null : k === 'view' ? 1 : 2, status: 'todo',
       is_milestone: milestone, client_visible: milestone, sort_order: sortOrders[0],
     })

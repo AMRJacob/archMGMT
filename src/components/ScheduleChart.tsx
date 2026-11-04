@@ -95,6 +95,9 @@ export default function ScheduleChart({
   const inner = useRef<SVGSVGElement | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const pan = useRef<{ x0: number; applied: number } | null>(null)
+  const wheelAcc = useRef(0)
+  // Placing an undated task or milestone: press in its row where it should start, drag to set its length.
+  const [place, setPlace] = useState<{ id: string; a: string; b: string } | null>(null)
   const [panning, setPanning] = useState(false)
   const pres = mode === 'presentation'
 
@@ -177,7 +180,20 @@ export default function ScheduleChart({
     pan.current = { x0: toChartX(e.clientX), applied: 0 }
     setPanning(true)
   }
+  const dateAt = (clientX: number) => addDays(start, Math.max(0, Math.floor((toChartX(clientX) - x0) / dayW)))
+  const startPlace = (e: RPointerEvent, id: string) => {
+    if (!editable || e.button !== 0) return
+    e.stopPropagation()
+    inner.current?.setPointerCapture(e.pointerId)
+    const d = dateAt(e.clientX)
+    setPlace({ id, a: d, b: d })
+  }
   const onMove = (e: RPointerEvent) => {
+    if (place) {
+      const b = dateAt(e.clientX)
+      if (b !== place.b) setPlace({ ...place, b })
+      return
+    }
     if (pan.current) {
       // Drag right to see earlier dates, left to see later ones.
       const d = Math.round((toChartX(e.clientX) - pan.current.x0) / dayW)
@@ -191,6 +207,17 @@ export default function ScheduleChart({
     if (delta !== drag.delta || moved !== drag.moved) setDrag({ ...drag, delta, moved })
   }
   const endDrag = () => {
+    if (place) {
+      const pl = place
+      setPlace(null)
+      const t = tasks.find((x) => x.id === pl.id)
+      if (!t) return
+      const [a, b] = pl.a <= pl.b ? [pl.a, pl.b] : [pl.b, pl.a]
+      // A click places a week (or the milestone's day); a drag sets the span.
+      if (t.is_milestone) onMoveTask?.(t, null, pl.a)
+      else onMoveTask?.(t, a, a === b ? addDays(a, 4) : b)
+      return
+    }
     if (pan.current) { pan.current = null; setPanning(false); return }
     if (!drag) return
     const d = drag
@@ -280,7 +307,7 @@ export default function ScheduleChart({
     if (!editable) return null
     const ew = resizable ? Math.min(EDGE, bw / 3) : 0
     return (
-      <g className="handles">
+      <g className="handles" style={{ touchAction: 'none' }}>
         <rect x={bx + ew} y={top} width={Math.max(4, bw - 2 * ew)} height={h} fill="transparent"
           style={{ cursor: drag ? 'grabbing' : 'grab' }} data-drag={`${kind}:${id}:move`} onPointerDown={(e) => startDrag(e, kind, id, 'move')} />
         {resizable && (
@@ -305,9 +332,18 @@ export default function ScheduleChart({
     <svg
       ref={(el) => { inner.current = el; if (svgRef) svgRef.current = el }}
       xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
-      style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'none' : undefined }}
+      style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'pan-y' : undefined }}
       fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
-      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); pan.current = null; setPanning(false) }}
+      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); setPlace(null); pan.current = null; setPanning(false) }}
+      onWheel={onPan ? (e) => {
+        // Sideways scrolling (trackpad swipe, Shift+wheel) moves through time in the zoomed views.
+        const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
+        if (!dx) return
+        wheelAcc.current += dx
+        const pxPerDay = Math.max(4, dayW * ((inner.current?.getBoundingClientRect().width ?? W) / W))
+        const days = Math.trunc(wheelAcc.current / pxPerDay)
+        if (days) { wheelAcc.current -= days * pxPerDay; onPan(days) }
+      } : undefined}
       onContextMenu={onContextAt ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
       onDoubleClick={onAddAt ? (e) => {
         if (!(e.target as Element).closest('[data-pan]')) return
@@ -464,7 +500,26 @@ export default function ScheduleChart({
         const done = task.status === 'done'
         const cy = ry + ROW_TASK / 2
         const [ts, te] = taskDates(task)
-        if (!ts || !te) return null
+        if (!ts || !te) {
+          // Not placed yet: the whole row is the place to click.
+          if (!editable || pres || (task as ShownTask)._rolled) return null
+          const pl = place?.id === task.id ? place : null
+          const [a, b] = pl ? (pl.a <= pl.b ? [pl.a, pl.b] : [pl.b, pl.a]) : ['', '']
+          return (
+            <g key={`b${i}`} className="placer">
+              <rect x={x0} y={ry + 1} width={cw} height={ROW_TASK - 2} fill={C.accent} opacity={pl ? 0.06 : 0.035} rx={3}
+                style={{ cursor: 'crosshair', touchAction: 'none' }} data-drag={`place:${task.id}`} onPointerDown={(e) => startPlace(e, task.id)} />
+              {pl && (task.is_milestone
+                ? <rect x={x(pl.a) + dayW / 2 - 5.5} y={cy - 5.5} width={11} height={11} fill={C.accent} transform={`rotate(45 ${x(pl.a) + dayW / 2} ${cy})`} pointerEvents="none" />
+                : <rect x={x(a)} y={cy - 4} width={Math.max(dayW, xEnd(b) - x(a))} height={8} rx={2} fill={C.accent} opacity={0.75} pointerEvents="none" />)}
+              {pl
+                ? dragLabel(task.is_milestone ? x(pl.a) : x(a), task.is_milestone ? 12 : Math.max(dayW, xEnd(b) - x(a)), cy, task.is_milestone || a === b ? shortDate(pl.a) : `${shortDate(a)} – ${shortDate(b)}`)
+                : <text x={x0 + 10} y={cy + 4} fontSize={11} fill={C.accent} pointerEvents="none">
+                    {task.is_milestone ? 'Click the day this milestone falls on' : 'Click where it starts, or drag across its dates'}
+                  </text>}
+            </g>
+          )
+        }
         const active = dragging('task', task.id)
         if (task.is_milestone) {
           const cx = x(te) + dayW / 2
@@ -472,7 +527,8 @@ export default function ScheduleChart({
             <g key={`b${i}`} opacity={done && !pres ? 0.55 : 1}>
               <rect x={cx - 5.5} y={cy - 5.5} width={11} height={11} fill={active ? C.accent : milestoneColor(task.milestone_type, C.ink)} transform={`rotate(45 ${cx} ${cy})`} />
               {!active && <text x={cx + 12} y={cy + 4} fontSize={11} fill={C.muted} pointerEvents="none">{shortDate(te)}</text>}
-              {handles('task', task.id, cx - 9, 18, cy - 10, 20, false)}
+              {/* Grab the diamond or its date label to move it. */}
+              {handles('task', task.id, cx - 12, 12 + 12 + shortDate(te).length * 6.5, cy - 11, 22, false)}
               {active && dragLabel(cx - 6, 12, cy, shortDate(te))}
             </g>
           )

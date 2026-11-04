@@ -974,3 +974,5 @@ select.wish-status { border: 1px solid var(--line); }
 .cp-brand { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 4px 6px; cursor: pointer; text-align: left; }
 .cp-brand.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .cp-brand .cp-preview i { width: 16px; }
+.chart-scroll { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; max-width: 720px; }
+.chart-scroll input[type='range'] { flex: 1; accent-color: var(--accent); }
