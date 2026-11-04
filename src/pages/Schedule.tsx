@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
@@ -12,6 +12,8 @@ import TaskEditor from '../components/TaskEditor.tsx'
 import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
+import ExportPreview, { renderPng, type ExportSettings } from '../components/ExportPreview.tsx'
+import { exportColors, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
 import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
@@ -58,6 +60,12 @@ export default function Schedule() {
   const [spot, setSpot] = useState<(Omit<ChartSpot, 'phase'> & { phase: Phase | null }) | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
+  const [xPage, setXPage] = useSaved<ExportPage>('archmgmt.exportPage', 'letter')
+  const [xFit, setXFit] = useSaved<ExportFit>('archmgmt.exportFit', 'fit')
+  const xSettings: ExportSettings = { bg: xBg, page: xPage, fit: xFit }
+  const setXSettings = (s: ExportSettings) => { setXBg(s.bg); setXPage(s.page); setXFit(s.fit) }
   // The on-screen timeline draws at the card's real width, so text stays normal size on wide screens.
   const [chartW, setChartW] = useState<number | undefined>(undefined)
   const chartBox = useCallback((el: HTMLDivElement | null) => {
@@ -182,21 +190,7 @@ export default function Schedule() {
     if (!el) return
     setSaving(true)
     try {
-      const [, , w, h] = el.getAttribute('viewBox')!.split(' ').map(Number)
-      const markup = new XMLSerializer().serializeToString(el)
-      const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }))
-      const img = new Image()
-      await new Promise<void>((ok, fail) => { img.onload = () => ok(); img.onerror = () => fail(new Error('Could not draw the schedule')); img.src = url })
-      const scale = 2
-      const canvas = document.createElement('canvas')
-      canvas.width = w * scale
-      canvas.height = h * scale
-      const ctx = canvas.getContext('2d')!
-      ctx.scale(scale, scale)
-      ctx.drawImage(img, 0, 0, w, h)
-      URL.revokeObjectURL(url)
-      const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/png'))
-      if (!blob) throw new Error('Could not create the image')
+      const blob = await renderPng(el, xSettings, xColors.bg)
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
       a.download = `${fileBase}.png`
@@ -205,6 +199,17 @@ export default function Schedule() {
     } finally {
       setSaving(false)
     }
+  }
+
+  /** Print to PDF with this export's paper size; the page margin is drawn by the print area so the background reaches the edge. */
+  function printPdf() {
+    const pg = pageOf(xPage)
+    const style = document.createElement('style')
+    style.textContent = `@page { size: ${pg.w}in ${pg.h}in; margin: 0; }`
+    document.head.appendChild(style)
+    const done = () => { style.remove(); window.removeEventListener('afterprint', done) }
+    window.addEventListener('afterprint', done)
+    window.print()
   }
 
   const months = zoom === 'all' ? 0 : Number(zoom)
@@ -220,6 +225,7 @@ export default function Schedule() {
 
   // One colour per phase, in phase order (each phase keeps its own colour when phases are reordered).
   const colorOf = phaseColors(project, phases.rows)
+  const xColors = exportColors(project, xBg)
   const palette = [...phases.rows].sort((a, b) => a.sort_order - b.sort_order).map((p) => colorOf.get(p.id)!)
 
 
@@ -257,8 +263,9 @@ export default function Schedule() {
                 hiddenPhases={phases.rows.filter((p) => !p.client_visible).length} />
             )}
             {levelControl}
+            <button className="btn" onClick={() => setPreviewing(true)} title="See the PDF / PNG pages and choose paper, background and fit">Preview…</button>
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
-            <button className="btn primary" onClick={() => window.print()}>Save as PDF</button>
+            <button className="btn primary" onClick={printPdf}>Save as PDF</button>
           </div>
           <div className="zoombar no-print">
             <span className="muted small">Zoom</span>
@@ -295,7 +302,8 @@ export default function Schedule() {
               onContextAt={(sp) => setSpot(sp)} />
           </div>
           <p className="muted small no-print">
-            “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. The page is set to landscape.
+            “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Exports use {pageOf(xPage).name.split(' (')[0].toLowerCase()} paper,
+            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : 'brand dark'} background`}; change these in Preview.
           </p>
         </>
       )}
@@ -333,10 +341,15 @@ export default function Schedule() {
       )}
 
       {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
-      <div className="print-area export-only" aria-hidden="true">
+      <div className={`print-area export-only sched-export${xFit === 'fit' ? ' fit' : ''}`} aria-hidden="true"
+        style={{ '--pbg': xColors.bg, '--ph': `${pageOf(xPage).h}in`, '--pm': `${PAGE_MARGIN}in` } as CSSProperties}>
         <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
-          firmName={FIRM_NAME} svgRef={exportSvg} keepOrder />
+          firmName={FIRM_NAME} svgRef={exportSvg} keepOrder colors={xColors} />
       </div>
+      {previewing && (
+        <ExportPreview svg={exportSvg} settings={xSettings} onSettings={setXSettings} bgColor={xColors.bg} saving={saving}
+          onClose={() => setPreviewing(false)} onPng={() => void downloadPng()} onPdf={() => { setPreviewing(false); setTimeout(printPdf, 50) }} />
+      )}
 
       {phaseEdit && (() => {
         const ph = phases.rows.find((x) => x.id === phaseEdit)

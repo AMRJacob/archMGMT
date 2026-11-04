@@ -28,6 +28,27 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
   const names = phaseNames.length ? phaseNames : ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5', 'Phase 6']
   const current = scheme ?? 'balanced'
   const accent = projectAccent(value).accent
+  // The brand colours this project uses, in order (empty when it uses a generated scheme).
+  const picked = brand?.colors ?? []
+  const applyColors = (colors: string[], name: string) => {
+    if (!colors.length) return
+    onChange(colors[0])
+    onScheme(encodeBrand(name, colors))
+  }
+  /** Name for a hand-picked set: the palette's name when every colour comes from one palette. */
+  const nameFor = (colors: string[], fallback: string) => {
+    const one = brands.rows.find((b) => colors.every((c) => b.colors.includes(c)))
+    return one?.name ?? (fallback || 'Brand colours')
+  }
+  const toggle = (c: string, from: string) => {
+    if (picked.includes(c)) {
+      const rest = picked.filter((x) => x !== c)
+      if (rest.length) applyColors(rest, nameFor(rest, brand?.name ?? from))
+      return
+    }
+    const next = brand ? [...picked, c] : [c]
+    applyColors(next, nameFor(next, 'Mixed brand colours'))
+  }
   const short = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()
 
   return (
@@ -40,17 +61,27 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
               <div className="cp-label">Brand palettes</div>
               <div className="cp-brands">
                 {[...brands.rows].sort((a, b) => a.name.localeCompare(b.name)).map((b) => {
-                  const on = brand?.name === b.name
+                  const all = brand !== null && brand.colors.length === b.colors.length && b.colors.every((c, i) => brand.colors[i] === c)
                   return (
-                    <button key={b.id} className={`cp-brand${on ? ' on' : ''}`} title={b.notes ?? b.name}
-                      onClick={() => { if (b.colors[0]) onChange(b.colors[0]); onScheme(encodeBrand(b.name, b.colors)) }}>
-                      <span className="cp-preview">{b.colors.map((c, i) => <i key={i} style={{ background: c }} />)}</span>
-                      <span className="cp-scheme-name">{b.name}</span>
-                    </button>
+                    <div key={b.id} className={`cp-brand${all ? ' on' : ''}`} title={b.notes ?? b.name}>
+                      <button className="cp-brand-name" title={`Use all ${b.name} colours`} onClick={() => applyColors(b.colors, b.name)}>{b.name}</button>
+                      <span className="cp-brand-chips">
+                        {b.colors.map((c, i) => {
+                          const n = picked.indexOf(c)
+                          return (
+                            <button key={i} className={`cp-chip${n >= 0 ? ' on' : ''}`} style={{ background: c, color: textOn(c) }}
+                              title={n >= 0 ? `${c}: phase colour ${n + 1}. Click to leave it out.` : `${c}: click to add`}
+                              onClick={() => toggle(c, b.name)}>{n >= 0 ? n + 1 : ''}</button>
+                          )
+                        })}
+                      </span>
+                    </div>
                   )
                 })}
               </div>
-              {brand && <p className="cp-hint">Phases use the {brand.name} colours in order. Pick a scheme below to go back to generated colours.</p>}
+              {brand
+                ? <p className="cp-hint">Phases use {picked.length === 1 ? 'this colour' : `these ${picked.length} colours in the numbered order`}. Click palette names to use a whole palette, or single colours (from any palette) to pick your own set. Pick a scheme below to go back to generated colours.</p>
+                : <p className="cp-hint">Click a palette name to use all its colours, or click single colours, in the order you want them, to use just those.</p>}
             </>
           )}
           <div className="cp-label">Root colour</div>

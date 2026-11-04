@@ -39,7 +39,8 @@ carrying about three medium tasks at once.
   - *Timeline*: drag bars to move them, drag ends to change length; moving a phase moves its tasks.
     Zoom to 12 months (month ticks), 6 months (week ticks) or 3 months (day ticks) for fine moves;
     click and hold empty space to pan. *Working view* shows everything; *Presentation view* shows only
-    phases and tasks marked "Show in presentation view". Export as PDF (print, landscape) or PNG.
+    phases and tasks marked "Show in presentation view". Export as PDF or PNG; *Preview…* shows the pages and sets paper (Letter / Tabloid), fit (one page or
+    full width) and background (white, brand tint or brand dark, from the project's colour).
   - *Calendar*: month grid; drag a task to another day.
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
     drag cards between columns.
@@ -47,7 +48,8 @@ carrying about three medium tasks at once.
   - Undo (button or Ctrl+Z) reverses drags and moves.
 - **Project colours**: each project picks one root colour and a scheme (swatch next to its number on Overview).
   Every phase gets a different hue that harmonises with the root (Balanced, Triad or Complementary), all at one
-  soft lightness and chroma (computed in OKLCH). The first phase is the root colour. Used on every view and export.
+  soft lightness and chroma (computed in OKLCH). The first phase is the root colour. Or use brand colours: a whole saved palette, or single colours picked
+  (from one or several palettes) in the order the phases should use them. Used on every view and export.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week heat map per staff member (Light / Steady / Busy / Overloaded), ◆ for due dates,
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
