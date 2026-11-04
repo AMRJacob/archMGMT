@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase.ts'
 import { WISH_STATUSES, type WishItem, type WishStatus } from '../lib/types.ts'
 
 /**
- * Wishlist & problems: anyone can ask for something or report a problem; admins set the status and reply.
+ * Settings → Wishlist & Errors: anyone can ask for something or report an error; admins set the status and reply.
  * Newest first, like a log. Open items show; closed ones (complete, infeasible, duplicate) fold away.
  */
 export default function Wishlist() {
@@ -50,7 +50,7 @@ export default function Wishlist() {
     return (
       <li key={x.id} className={`wish ${x.status}`}>
         <div className="wish-head">
-          <span className={`wish-kind ${x.kind}`}>{x.kind === 'problem' ? 'Problem' : 'Wish'}</span>
+          <span className={`wish-kind ${x.kind}`}>{x.kind === 'problem' ? 'Error' : 'Wish'}</span>
           {canEdit
             ? <TextField value={x.title} className="wish-title" onSave={(v) => v && patch(x, { title: v })} />
             : <strong className="wish-title">{x.title}</strong>}
@@ -89,7 +89,7 @@ export default function Wishlist() {
       <div className="wish-form">
         <div className="segmented small-seg" role="radiogroup" aria-label="Kind">
           <button role="radio" aria-checked={kind === 'wish'} className={kind === 'wish' ? 'on' : ''} onClick={() => setKind('wish')}>Wish</button>
-          <button role="radio" aria-checked={kind === 'problem'} className={kind === 'problem' ? 'on' : ''} onClick={() => setKind('problem')}>Problem</button>
+          <button role="radio" aria-checked={kind === 'problem'} className={kind === 'problem' ? 'on' : ''} onClick={() => setKind('problem')}>Error</button>
         </div>
         <input className="field boxed" placeholder={kind === 'wish' ? 'What would you like it to do?' : 'What went wrong?'} value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea className="field boxed" rows={2} placeholder={kind === 'wish' ? 'Details (optional)' : 'What you were doing and what happened (optional)'} value={details} onChange={(e) => setDetails(e.target.value)} />

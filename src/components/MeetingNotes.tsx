@@ -175,7 +175,7 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
     <Modal size="wide" onClose={close} lock={lockedBy ? undefined : note.id}
       title={
         <div className="note-head">
-          <span className="note-kicker" style={mt ? { color: mt.color } : undefined}>{mt?.label ?? 'Meeting notes'}</span>
+          <span className="note-kicker" style={mt ? { color: mt.color } : undefined}>{mt?.label ?? 'Meeting Notes'}</span>
           <input className="field note-title" disabled={Boolean(lockedBy)} value={title} placeholder="Meeting title, e.g. Owner SD review" autoFocus={!note.title}
             onChange={(e) => setTitle(e.target.value)} onBlur={() => title !== note.title && save({ title })} />
         </div>

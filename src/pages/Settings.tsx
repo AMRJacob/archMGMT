@@ -4,6 +4,8 @@ import TitleBlockSettings from '../components/TitleBlockSettings.tsx'
 import StorageUsage from '../components/StorageUsage.tsx'
 import { MyName } from '../components/AccessManager.tsx'
 import { useRef, useState } from 'react'
+import { NavLink, Navigate, useParams } from 'react-router-dom'
+import Wishlist from '../components/Wishlist.tsx'
 import { ChangePassword } from '../auth/Auth.tsx'
 import AccessManager from '../components/AccessManager.tsx'
 import { useAuth } from '../auth/authContext.ts'
@@ -13,7 +15,18 @@ import {
 import { today } from '../lib/dates.ts'
 import type { Person, Project } from '../lib/types.ts'
 
+/** Settings is split into sections, each at /settings/<id>, listed down the left of the page. */
+const SECTIONS = [
+  { id: 'general', name: 'General', blurb: 'How the app looks for you, and your account.' },
+  { id: 'branding', name: 'Branding & Printing', blurb: 'Client brand colours and what printed meeting notes carry.' },
+  { id: 'wishlist', name: 'Wishlist & Errors', blurb: 'Ask for something the app should do, or tell us what’s not working. Everyone can see the list and its status.' },
+  { id: 'access', name: 'Access', blurb: 'Who can sign in to archMGMT.' },
+  { id: 'data', name: 'Data', blurb: 'Where data lives, how much room it takes, backups and sample data.' },
+] as const
+type SectionId = (typeof SECTIONS)[number]['id']
+
 export default function Settings() {
+  const { section = 'general' } = useParams()
   const { session } = useAuth()
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,61 +81,83 @@ export default function Settings() {
     } catch (e) { fail(e) } finally { setBusy(false) }
   }
 
+  const cur = SECTIONS.find((x) => x.id === section)
+  if (!cur) return <Navigate to="/settings" replace />
+  const show = (id: SectionId) => cur.id === id
+
   return (
     <section>
       <header className="page-head">
         <div>
-          <h1>Settings &amp; data</h1>
-          <p className="muted">Account, appearance, backups and access.</p>
+          <h1>Settings &amp; Data</h1>
+          <p className="muted">{cur.blurb}</p>
         </div>
       </header>
       {message && <p className="success">{message}</p>}
       {error && <p className="error">{error}</p>}
 
-      <ThemePicker />
-      <BrandPalettes />
-      <TitleBlockSettings />
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {SECTIONS.map((x) => (
+            <NavLink key={x.id} to={x.id === 'general' ? '/settings' : `/settings/${x.id}`} end
+              className={() => (x.id === cur.id ? 'active' : '')}>{x.name}</NavLink>
+          ))}
+        </nav>
+        <div className="settings-body">
+          {show('general') && <>
+            <ThemePicker />
+          {session && (
+            <div className="card pad">
+              <h2>Your Account</h2>
+              <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
+              {session.user.email && <MyName email={session.user.email} />}
+              <ChangePassword />
+            </div>
+          )}
+          </>}
 
-      <div className="card pad">
-        <h2>Where data is stored</h2>
-        {usingSampleData ? (
-          <p><strong>In this browser only.</strong> Download a backup regularly; the backup file is also how this data moves into the shared database.</p>
-        ) : (
-          <p><strong>In the shared database.</strong> Everyone signed in with an @amr-architects.com address (or added to the access list) sees the same data.</p>
-        )}
-      </div>
-      <StorageUsage />
+          {show('branding') && <>
+            <BrandPalettes />
+            <TitleBlockSettings />
+          </>}
 
-      {session && (
-        <div className="card pad">
-          <h2>Your account</h2>
-          <p className="muted">Signed in as <strong>{session.user.email}</strong>.</p>
-          {session.user.email && <MyName email={session.user.email} />}
-          <ChangePassword />
+          {show('wishlist') && <Wishlist />}
+
+          {show('access') && (session
+            ? <AccessManager myEmail={session.user.email} />
+            : <div className="card pad"><h2>Who Has Access</h2><p className="muted">Access is managed once the shared database is connected.</p></div>)}
+
+          {show('data') && <>
+          <div className="card pad">
+            <h2>Where Data Is Stored</h2>
+            {usingSampleData ? (
+              <p><strong>In this browser only.</strong> Download a backup regularly; the backup file is also how this data moves into the shared database.</p>
+            ) : (
+              <p><strong>In the shared database.</strong> Everyone signed in with an @amr-architects.com address (or added to the access list) sees the same data.</p>
+            )}
+          </div>
+            <StorageUsage />
+          <div className="card pad">
+            <h2>Backup and Restore</h2>
+            <p className="muted">A backup is one file with every person, project, phase, task and time-off entry.</p>
+            <div className="row-gap">
+              <button className="btn primary" onClick={backup} disabled={busy}>Download backup</button>
+              <button className="btn" onClick={() => file.current?.click()} disabled={busy}>Restore from backup…</button>
+              <input ref={file} type="file" accept="application/json,.json" hidden
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void restore(f) }} />
+            </div>
+          </div>
+          <div className="card pad">
+            <h2>Sample Data</h2>
+            <p className="muted">
+              {usingSampleData
+                ? (samples > 0 ? `${samples} sample records are mixed in with your data.` : 'No sample records left.')
+                : 'Remove the “Sample …” projects and the sample people (Ralph, Susan and Betty) once you’re working with real projects only.'}
+            </p>
+            {(!usingSampleData || samples > 0) && <div className="row-gap"><button className="btn danger" onClick={clearSamples} disabled={busy}>Remove sample data</button></div>}
+          </div>
+          </>}
         </div>
-      )}
-
-      {session && <AccessManager myEmail={session.user.email} />}
-
-      <div className="card pad">
-        <h2>Backup and restore</h2>
-        <p className="muted">A backup is one file with every person, project, phase, task and time-off entry.</p>
-        <div className="row-gap">
-          <button className="btn primary" onClick={backup} disabled={busy}>Download backup</button>
-          <button className="btn" onClick={() => file.current?.click()} disabled={busy}>Restore from backup…</button>
-          <input ref={file} type="file" accept="application/json,.json" hidden
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) void restore(f) }} />
-        </div>
-      </div>
-
-      <div className="card pad">
-        <h2>Sample data</h2>
-        <p className="muted">
-          {usingSampleData
-            ? (samples > 0 ? `${samples} sample records are mixed in with your data.` : 'No sample records left.')
-            : 'Remove the “Sample …” projects and the sample people (Ralph, Susan and Betty) once you’re working with real projects only.'}
-        </p>
-        {(!usingSampleData || samples > 0) && <div className="row-gap"><button className="btn danger" onClick={clearSamples} disabled={busy}>Remove sample data</button></div>}
       </div>
     </section>
   )

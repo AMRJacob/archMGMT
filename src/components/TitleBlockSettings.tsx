@@ -20,7 +20,7 @@ export default function TitleBlockSettings() {
   return (
     <div className="card pad">
       <div className="card-head-row">
-        <h2>Meeting notes title block</h2>
+        <h2>Meeting Notes Title Block</h2>
         <button className="btn" onClick={() => setOpen(!open)}>{open ? 'Done' : 'Edit'}</button>
       </div>
       <p className="muted small">Printed at the top of every exported meeting note. A placeholder for now; the title block creator from CAzen will replace it. Saved in this browser.</p>

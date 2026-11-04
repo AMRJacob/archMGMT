@@ -77,7 +77,7 @@ export function NewProjectDialog({ onCreate, onClose }: {
   }
 
   return (
-    <Modal title="New project" onClose={onClose}
+    <Modal title="New Project" onClose={onClose}
       footer={
         <>
           {chosen.length > 0 && (
@@ -239,7 +239,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
 
   const total = pickedTasks.length + sheetCount
   return (
-    <Modal title={`Set up ${phase.name}`} onClose={onClose} size="wide"
+    <Modal title={`Set Up ${phase.name}`} onClose={onClose} size="wide"
       footer={
         <>
           {error ? <span className="error small grow">{error}</span> : <span className="muted small grow">Everything can be changed, moved or removed later.</span>}

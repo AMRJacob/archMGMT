@@ -75,7 +75,7 @@ export default function NotePrint({ note, project, people, tasks, onDone }: {
       {decisions.length > 0 && <section><h2>Decisions</h2><ol>{decisions.map((d, i) => <li key={i}>{d}</li>)}</ol></section>}
       {actions.length > 0 && (
         <section>
-          <h2>Action items</h2>
+          <h2>Action Items</h2>
           <table className="np-actions">
             <thead><tr><th style={{ width: '4%' }} /><th>Item</th><th style={{ width: '22%' }}>Who</th><th style={{ width: '16%' }}>Due</th></tr></thead>
             <tbody>

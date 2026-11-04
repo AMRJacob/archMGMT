@@ -69,7 +69,7 @@ export default function ExportPreview({ svg, settings, onSettings, bgColor, onCl
   const set = (c: Partial<ExportSettings>) => onSettings({ ...settings, ...c })
 
   return (
-    <Modal title="Export preview" size="wide" onClose={onClose}
+    <Modal title="Export Preview" size="wide" onClose={onClose}
       footer={<>
         <span className="muted small grow">
           “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Paper size and margins are already set.

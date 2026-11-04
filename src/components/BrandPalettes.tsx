@@ -133,7 +133,7 @@ export default function BrandPalettes() {
 
   return (
     <div className="card pad">
-      <h2>Brand palettes</h2>
+      <h2>Brand Palettes</h2>
       <p className="muted">
         Save a school’s or company’s brand colours, then choose them in a project’s colour picker (the dot next to its number).
         Enter the hex values from the client’s brand guide, or pull them from the client’s website. The first colour is the

@@ -118,7 +118,7 @@ export default function Team() {
     <section>
       <header className="page-head">
         <div>
-          <h1>Team &amp; workload</h1>
+          <h1>Team &amp; Workload</h1>
           <p className="muted">
             How full each person's weeks are, from the size of the open tasks they're on, their availability and time off.
             Hover a week to see what's in it. ◆ marks due dates. Click a person for their projects and details.
@@ -211,7 +211,7 @@ export default function Team() {
                             </div>
                             <div className="pd-cols">
                               <div>
-                                <h3>Open tasks</h3>
+                                <h3>Open Tasks</h3>
                                 <ul className="task-list">
                                   {openTasks(p.id).slice(0, 8).map((t) => (
                                     <li key={t.id}>
@@ -226,7 +226,7 @@ export default function Team() {
                                 </ul>
                               </div>
                               <div>
-                                <h3>Time off</h3>
+                                <h3>Time Off</h3>
                                 <ul className="task-list">
                                   {mine.map((o) => (
                                     <li key={o.id} className="off-row">

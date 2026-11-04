@@ -16,7 +16,6 @@ import Notes from './pages/Notes.tsx'
 import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
-import WishlistPage from './pages/WishlistPage.tsx'
 
 export default function App() {
   return (
@@ -54,7 +53,7 @@ function Shell() {
             <nav>
               <NavLink to="/overview">Overview</NavLink>
               <NavLink to="/schedule">Schedule</NavLink>
-              <NavLink to="/notes">Meeting notes</NavLink>
+              <NavLink to="/notes">Meeting Notes</NavLink>
             </nav>
           </section>
           <div className="sidebar-foot">
@@ -67,11 +66,11 @@ function Shell() {
             {/* Office-wide pages, apart from the project. */}
             <nav className="office-nav" aria-label="Office">
               <span className="nav-label">Office</span>
-              <NavLink to="/" end>All projects</NavLink>
-              <NavLink to="/team">Team &amp; workload</NavLink>
+              <NavLink to="/" end>All Projects</NavLink>
+              <NavLink to="/team">Team &amp; Workload</NavLink>
             </nav>
-            <NavLink to="/settings" className="settings-link">Settings &amp; data</NavLink>
-            <NavLink to="/wishlist" className="settings-link">Wishlist &amp; problems</NavLink>
+            <NavLink to="/settings" className="settings-link">Settings &amp; Data</NavLink>
+            <NavLink to="/settings/wishlist" className="settings-link subtle-link">Wishlist &amp; Errors</NavLink>
             {session && (
               <div className="signout">
                 <span>{session.user.email}</span>
@@ -89,7 +88,8 @@ function Shell() {
             <Route path="/notes" element={<Notes />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/settings/:section" element={<Settings />} />
+            <Route path="/wishlist" element={<Navigate to="/settings/wishlist" replace />} />
             <Route path="/projects/:id" element={<OpenProject />} />
             <Route path="/workload" element={<Navigate to="/team" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

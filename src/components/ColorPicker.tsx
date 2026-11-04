@@ -116,7 +116,7 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
                 })}
               </div>
               {!brand && <p className="cp-hint">{SCHEMES.find((s) => s.id === current)?.hint} The first phase always uses the root colour.</p>}
-              {brands.rows.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Brand palettes to use them here.</p>}
+              {brands.rows.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Branding &amp; Printing to use them here.</p>}
             </>
           )}
         </div>

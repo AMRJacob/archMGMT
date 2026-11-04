@@ -36,7 +36,7 @@ export default function Notes() {
     <section>
       <header className="page-head">
         <div>
-          <h1>Meeting notes</h1>
+          <h1>Meeting Notes</h1>
           <p className="muted">{[project.number, project.name].filter(Boolean).join(' · ')}</p>
         </div>
         <button className="btn primary" onClick={() => void nh.add(null)}>+ New note</button>
@@ -60,7 +60,7 @@ export default function Notes() {
         </div>
         {openActions.length > 0 && (
           <aside className="card notes-card open-actions">
-            <h2>Open action items</h2>
+            <h2>Open Action Items</h2>
             <ul>
               {openActions.map(({ a, n }) => (
                 <li key={a.id}>

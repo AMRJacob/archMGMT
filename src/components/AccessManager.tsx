@@ -116,7 +116,7 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
   if (denied) {
     return (
       <div className="card pad">
-        <h2>Who has access</h2>
+        <h2>Who Has Access</h2>
         <p className="muted">Only archMGMT admins can add people. Ask an admin for a sign-in link.</p>
       </div>
     )
@@ -124,7 +124,7 @@ export default function AccessManager({ myEmail }: { myEmail: string | undefined
 
   return (
     <div className="card pad access">
-      <h2>Who has access</h2>
+      <h2>Who Has Access</h2>
       <p className="muted">
         Add someone to get a one-time sign-in link, then send it to them yourself (Teams, email, text). The app doesn’t send
         anything. Opening the link lets them choose a password. Links work once and expire after about an hour.

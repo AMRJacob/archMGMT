@@ -259,7 +259,7 @@ export default function Projects() {
     <section>
       <header className="page-head">
         <div>
-          <h1>All projects</h1>
+          <h1>All Projects</h1>
           <p className="muted">Every project at a glance. Filter, sort by any column, and pick the columns you want.</p>
         </div>
         <button className="btn primary" onClick={() => setCreating(true)}>+ New project</button>

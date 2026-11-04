@@ -194,7 +194,7 @@ export const WISH_STATUSES: { value: WishStatus; label: string; closed: boolean 
   { value: 'duplicate', label: 'Duplicate – closed', closed: true },
 ]
 
-/** A wish or problem report from Settings → Wishlist & problems. */
+/** A wish or error report from Settings → Wishlist & Errors. (Errors are stored with kind 'problem'.) */
 export interface WishItem {
   id: string
   kind: 'wish' | 'problem'

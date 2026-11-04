@@ -188,7 +188,7 @@ export function CreatePassword() {
     <div className="signin">
       <form className="card" onSubmit={save}>
         <Logo />
-        <h2>Create your password</h2>
+        <h2>Create Your Password</h2>
         <p className="muted">You’ll use it with <strong>{session?.user.email}</strong> to sign in from now on.</p>
         <label>Password
           <input type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />

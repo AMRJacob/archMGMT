@@ -55,10 +55,10 @@ carrying about three medium tasks at once.
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
 - **Editing tasks**: every part of a task row is clickable in place (status, size, dates, assignee, ⋯ for more);
   clicking a task in the timeline, calendar or board opens the same controls in a small panel.
-- **Settings & data**: theme, brand palettes (typed in, or pulled from a client's website and then picked,
-  reordered and trimmed), title block, account, access, backup / restore, remove sample data.
-- **Wishlist & problems** (own page, under Settings & data): requests and problem reports, newest first like a
-  log. Admins set status and can reply; the reply box only appears once there's a reply or you click *Reply*.
+- **Settings & Data**, in sections down the left: *General* (theme, your account), *Branding & Printing* (brand
+  palettes, typed in or pulled from a client's website; meeting-notes title block), *Wishlist & Errors* (requests
+  and error reports, newest first; admins set status and reply), *Access*, and *Data* (storage, backup / restore,
+  sample data). A small *Wishlist & Errors* link under Settings in the sidebar goes straight to the list.
 
 ## Keeping data safe while iterating
 
