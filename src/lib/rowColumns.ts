@@ -49,4 +49,8 @@ function subscribe(cb: () => void) {
 }
 
 export const useRowLayout = () => useSyncExternalStore(subscribe, getRowLayout, () => DEFAULT)
-export const widthOf = (l: RowLayout, k: RowColumn) => l.widths[k] ?? ROW_COLUMNS.find((c) => c.key === k)!.width
+/** Widths stay in a sensible range, so a stray drag can't push a column across the row. */
+export const MIN_W = 40
+export const MAX_W = 240
+export const clampW = (w: number) => Math.max(MIN_W, Math.min(MAX_W, Math.round(w)))
+export const widthOf = (l: RowLayout, k: RowColumn) => clampW(l.widths[k] ?? ROW_COLUMNS.find((c) => c.key === k)!.width)

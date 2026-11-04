@@ -1,6 +1,6 @@
 import { useState, type PointerEvent as RPointerEvent } from 'react'
 import { Pop } from './TaskChips.tsx'
-import { getRowLayout, resetRowLayout, ROW_COLUMNS, setRowLayout, useRowLayout, widthOf, type RowColumn } from '../lib/rowColumns.ts'
+import { clampW, getRowLayout, resetRowLayout, ROW_COLUMNS, setRowLayout, useRowLayout, widthOf, type RowColumn } from '../lib/rowColumns.ts'
 
 /**
  * Column headings over the Overview rows: drag a heading to move that column, drag its left edge to
@@ -19,16 +19,22 @@ export default function RowColumnsHeader() {
     const i = order.indexOf(to) + (side === 'r' ? 1 : 0)
     setRowLayout({ ...layout, order: [...order.slice(0, i), from, ...order.slice(i)] })
   }
-  // Columns sit at the right of the row, so their left edge is the one to drag.
+  // Drag a column's right edge: right makes it wider, left narrower (like a spreadsheet).
   const resize = (k: RowColumn) => (e: RPointerEvent) => {
     e.preventDefault(); e.stopPropagation()
     const x0 = e.clientX, w0 = widthOf(layout, k)
     const mv = (ev: PointerEvent) => {
       const cur = getRowLayout()
-      setRowLayout({ ...cur, widths: { ...cur.widths, [k]: Math.max(36, Math.round(w0 - (ev.clientX - x0))) } })
+      setRowLayout({ ...cur, widths: { ...cur.widths, [k]: clampW(w0 + (ev.clientX - x0)) } })
     }
     window.addEventListener('pointermove', mv)
     window.addEventListener('pointerup', () => window.removeEventListener('pointermove', mv), { once: true })
+  }
+  const resetWidth = (k: RowColumn) => {
+    const cur = getRowLayout()
+    const { [k]: _gone, ...rest } = cur.widths
+    void _gone
+    setRowLayout({ ...cur, widths: rest })
   }
 
   return (
@@ -52,8 +58,11 @@ export default function RowColumnsHeader() {
       <span className="grow" />
       {shown.map((k) => (
         <span key={k} draggable className={`rh-cell${drag === k ? ' dragging' : ''}${drop?.key === k ? ` drop-${drop.side}` : ''}`}
-          style={{ width: widthOf(layout, k) }} title="Drag to move this column · drag the left edge to resize"
-          onDragStart={(e) => { setDrag(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', label(k)) }}
+          style={{ width: widthOf(layout, k) }} title="Drag the name to move this column · drag its right edge to resize (double-click it to reset)"
+          onDragStart={(e) => {
+            if ((e.target as HTMLElement).closest('.rh-resize')) { e.preventDefault(); return }
+            setDrag(k); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', label(k))
+          }}
           onDragOver={(e) => {
             if (!drag) return
             e.preventDefault()
@@ -69,8 +78,9 @@ export default function RowColumnsHeader() {
             setDrag(null); setDrop(null)
           }}
           onDragEnd={() => { setDrag(null); setDrop(null) }}>
-          <span className="rh-resize" onPointerDown={resize(k)} onDragStart={(e) => e.preventDefault()} />
-          {label(k)}
+          <span className="rh-label">{label(k)}</span>
+          <span className="rh-resize" draggable={false} onPointerDown={resize(k)} onDoubleClick={() => resetWidth(k)}
+            onDragStart={(e) => { e.preventDefault(); e.stopPropagation() }} />
         </span>
       ))}
       <span className="rh-more" />

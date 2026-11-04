@@ -935,8 +935,9 @@ th.num .th-sort { width: 100%; text-align: right; }
 .rh-cell.dragging { opacity: 0.4; }
 .rh-cell.drop-l { box-shadow: inset 3px 0 0 var(--accent); }
 .rh-cell.drop-r { box-shadow: inset -3px 0 0 var(--accent); }
-.rh-resize { position: absolute; left: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; }
-.rh-resize:hover { background: linear-gradient(90deg, var(--accent) 2px, transparent 2px); }
+.rh-resize { position: absolute; right: 0; top: 2px; width: 7px; height: calc(100% - 4px); cursor: col-resize; border-right: 2px solid transparent; }
+.rh-cell:hover .rh-resize { border-right-color: var(--line-strong); }
+.rh-resize:hover, .rh-resize:active { border-right-color: var(--accent) !important; }
 .rh-more { width: 30px; flex: none; }
 .row-head-menu { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; }
 
@@ -1035,3 +1036,5 @@ select.wish-status { border: 1px solid var(--line); }
 .phase-sec.drop-after::after { bottom: -6px; }
 .phase-row[draggable='true'] { cursor: grab; }
 .phase-row[draggable='true']:active { cursor: grabbing; }
+.tc-cell .chip-btn { justify-content: flex-start; text-align: left; }
+.tc-cell .date-chip { text-align: left; }
