@@ -1399,3 +1399,18 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .note-zone.sheet { --zc: #9b4a7c; }
 .nz-label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: color-mix(in srgb, var(--zc) 80%, var(--faint)); margin: 0 0 5px 2px; }
 .nz-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+/* Layers carry soft shadows instead of outlines: the phase sheet on the page, each group sheet on the phase,
+   each row sheet on its group. The left phase edge stays; the thin outline round the phase goes. */
+.phase-sec { border-top-color: transparent; border-right: none; border-bottom-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 3px 8px -2px rgba(0, 0, 0, 0.07); }
+.tgroup { box-shadow: -2px 2px 5px -1px rgba(0, 0, 0, 0.09), 0 1px 1px rgba(0, 0, 0, 0.03); }
+.tgroup-list > li.trow, .tgroup-list > li.irow { box-shadow: -2px 1px 3px -1px rgba(0, 0, 0, 0.08); }
+/* Opening things: a phase, a group or a row's children unfold from the top (quick; off for reduced motion). */
+@keyframes unfold { from { opacity: 0; transform: translateY(-6px) scaleY(0.97); } to { opacity: 1; transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.phase-sec.open .phase-body { animation: unfold 0.22s cubic-bezier(.2, .7, .3, 1) both; transform-origin: top; }
+.tgroup-list > li.trow, .tgroup-list > li.irow { animation: row-in 0.18s ease-out both; }
+.phase-sec .chev, .tgroup-head .caret, .twist { transition: transform 0.18s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .phase-sec.open .phase-body, .tgroup-list > li.trow, .tgroup-list > li.irow { animation: none; }
+}
