@@ -1350,10 +1350,10 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* Overview as stacked paper: the phase is the base sheet (a faint wash of its own colour); General Tasks and
    Sheets each sit on a sheet set a little to the right (faint amber / plum); the rows sit on plain sheets nudged
    right again; and anything under a row steps in further, showing a sliver of the level behind it. */
-.phase-sec { border-left: none; background: color-mix(in srgb, var(--pc, var(--line)) 6%, var(--panel)); }
-.phase-sec.past:not(.open) { background: color-mix(in srgb, var(--pc, var(--line)) 4%, var(--subtle)); }
+/* Each phase: the theme's own background, framed by a light border derived from the phase colour. */
+.phase-sec { border: 1px solid color-mix(in srgb, var(--pc, var(--line)) 35%, var(--line)); }
 /* An open phase: a very light wash of its own colour over the theme's soft background. */
-.phase-sec.open { background: color-mix(in srgb, var(--pc, var(--line)) 8%, var(--col-soft)); }
+.phase-sec.open { background: var(--col-soft); border-color: color-mix(in srgb, var(--pc, var(--line)) 45%, var(--line)); }
 .phase-sec.open .phase-body { border-top: none; }
 .phase-sec.open .tlist { padding: 0 0 10px; }
 .tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 6px; border-radius: 8px 0 0 8px;
@@ -1392,7 +1392,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .nz-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
 /* Layers carry soft shadows instead of outlines: the phase sheet on the page, each group sheet on the phase,
    each row sheet on its group. The left phase edge stays; the thin outline round the phase goes. */
-.phase-sec { border-top-color: transparent; border-right: none; border-bottom-color: transparent;
+.phase-sec {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 5px 14px -5px color-mix(in srgb, var(--pc, #000) 60%, transparent); }
 .tgroup { box-shadow: -2px 2px 5px -1px rgba(0, 0, 0, 0.09), 0 1px 1px rgba(0, 0, 0, 0.03); }
 .tgroup-list > li.trow, .tgroup-list > li.irow { box-shadow: -2px 1px 3px -1px rgba(0, 0, 0, 0.08); }
