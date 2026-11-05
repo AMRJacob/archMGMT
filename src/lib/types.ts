@@ -43,6 +43,8 @@ export interface Project {
   building_type?: string | null
   /** Set when archived: hidden from lists and workload, data kept, can be restored. */
   archived_at?: string | null
+  /** The people on this project (Overview → Team). Assigning tasks offers these first. */
+  team?: string[] | null
   created_at?: string
 }
 

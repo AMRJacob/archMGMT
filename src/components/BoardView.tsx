@@ -1,17 +1,18 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type ReactNode } from 'react'
 import { addDays, daysBetween, parseISO, shortDate, today } from '../lib/dates.ts'
 import { TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 import { shiftDates } from '../lib/useProjectPlan.ts'
 import { mondayOf, weekStarts } from '../lib/workload.ts'
-import { assigneesOf, isAssigned } from '../lib/assignees.ts'
+import { assignPatch, assigneesOf, isAssigned } from '../lib/assignees.ts'
 import { AvatarStack, MilestoneMark } from './TaskChips.tsx'
 
 /**
- * Task board. Columns by status (kanban), by phase, or by week (a post-it pull-plan, cards
- * coloured by person). Drag a card to another column to change its status, phase or week.
+ * Task board. Columns by status (kanban), by phase, by week (a post-it pull-plan, cards coloured by
+ * person) or by person (post-its; unassigned work on the left to hand out). Drag a card to another
+ * column to change its status, phase, week or who's on it.
  */
 
-export type BoardGroup = 'status' | 'phase' | 'week'
+export type BoardGroup = 'status' | 'phase' | 'week' | 'person'
 
 const NOTE_COLORS = ['#fdf1b8', '#d7ecf7', '#f9d9cf', '#dcefd8', '#e9dcf4', '#fbe3bd', '#d5e7e3', '#f3d6e4', '#e2e4e8']
 const WEEK_COLS = 8
@@ -19,8 +20,12 @@ const WEEK_COLS = 8
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
 
 export default function BoardView({
-  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd,
+  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar,
 }: {
+  /** The project team (person board columns); empty = everyone active on the Team list who has work here. */
+  team?: string[]
+  /** Shown above the person board: the project team with "+ Add team member". */
+  teamBar?: ReactNode
   group: BoardGroup
   phases: Phase[]
   tasks: Task[]
@@ -33,6 +38,7 @@ export default function BoardView({
 }) {
   const [over, setOver] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [dragFrom, setDragFrom] = useState<string | null>(null) // column the card was picked up from (person board)
   const [from, setFrom] = useState(() => addDays(mondayOf(today()), -7))
 
   const sortedPhases = [...phases].sort((a, b) => a.sort_order - b.sort_order)
@@ -58,6 +64,18 @@ export default function BoardView({
       })),
       { key: '', title: 'No phase', droppable: true, tasks: tasks.filter((t) => !t.phase_id || !phaseIndex.has(t.phase_id)).sort(byDue) },
     ]
+  } else if (group === 'person') {
+    // Unassigned work first, to hand out; then each person (the project team, or everyone with work here).
+    const ids = team && team.length ? team
+      : staffOrder.filter((p) => p.active && tasks.some((t) => isAssigned(t, p.id))).map((p) => p.id)
+    const open = (t: Task) => t.status !== 'done'
+    columns = [
+      { key: 'unassigned', title: 'Unassigned', sub: 'Drag to someone', droppable: true, tasks: tasks.filter((t) => !assigneesOf(t).length && open(t)).sort(byDue) },
+      ...ids.map((id) => person(id)).filter((p): p is Person => Boolean(p)).map((p) => ({
+        key: p.id, title: p.name, sub: p.kind === 'consultant' ? p.company ?? 'Consultant' : p.role ?? undefined, droppable: true,
+        tasks: tasks.filter((t) => isAssigned(t, p.id)).sort(byDue),
+      })),
+    ]
   } else {
     const weeks = weekStarts(from, WEEK_COLS)
     const last = addDays(weeks[weeks.length - 1], 6)
@@ -79,6 +97,17 @@ export default function BoardView({
     const t = tasks.find((x) => x.id === (e.dataTransfer.getData('text/plain') || dragId))
     setDragId(null)
     if (!t || !col.droppable) return
+    if (group === 'person') {
+      const ids = assigneesOf(t)
+      const fromId = dragFrom
+      setDragFrom(null)
+      if (col.key === 'unassigned') { if (ids.length) onPatch(t, assignPatch([])); return }
+      if (ids.includes(col.key)) return
+      // Moving from one person to another hands it over; from Unassigned it just gets this person.
+      const rest = fromId && fromId !== 'unassigned' ? ids.filter((x) => x !== fromId) : ids
+      onPatch(t, assignPatch([...rest, col.key]))
+      return
+    }
     if (group === 'status') {
       if (t.status !== col.key) onPatch(t, { status: col.key as TaskStatus })
     } else if (group === 'phase') {
@@ -96,6 +125,7 @@ export default function BoardView({
   }
 
   const addDefaults = (col: Column): Partial<Task> | null => {
+    if (group === 'person') return col.key === 'unassigned' ? assignPatch([]) : assignPatch([col.key])
     if (group === 'status') return { status: col.key as TaskStatus }
     if (group === 'phase') return { phase_id: col.key || null }
     if (col.key === 'nodate') return { start_date: null, due_date: null }
@@ -105,6 +135,7 @@ export default function BoardView({
 
   return (
     <div className={`board board-${group}`}>
+      {group === 'person' && teamBar && <div className="board-bar">{teamBar}</div>}
       {group === 'week' && (
         <div className="board-bar">
           <div className="toolbar">
@@ -142,14 +173,14 @@ export default function BoardView({
                 {col.tasks.map((t, i) => {
                   const crew = assigneesOf(t).map((id) => person(id)).filter((x): x is Person => Boolean(x))
                   const pi = t.phase_id ? phaseIndex.get(t.phase_id) : undefined
-                  const note = group === 'week'
+                  const note = group === 'week' || group === 'person'
                   return (
                     <div key={t.id} draggable
                       className={`card-task${t.status === 'done' ? ' done' : ''}${dragId === t.id ? ' dragging' : ''}${note ? ' note' : ''}`}
                       style={note
-                        ? { background: personColor(t.assignee_id), transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
+                        ? { background: personColor(group === 'person' ? (col.key === 'unassigned' ? null : col.key) : t.assignee_id), transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
                         : { borderLeftColor: pi === undefined ? '#c9c6bf' : phaseColor(pi) }}
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; setDragId(t.id) }}
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; setDragId(t.id); setDragFrom(col.key) }}
                       onDragEnd={() => { setDragId(null); setOver(null) }}
                       onClick={() => onOpenTask(t)}>
                       <div className="ct-title">

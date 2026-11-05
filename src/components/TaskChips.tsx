@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useProject } from '../lib/projectContext.ts'
 import { createPortal } from 'react-dom'
 import { shortDate, today } from '../lib/dates.ts'
 import { assigneesOf, assignPatch, initialsOf } from '../lib/assignees.ts'
@@ -143,7 +144,12 @@ export function AvatarStack({ people, max = 3 }: { people: Person[]; max?: numbe
 export function AssigneeChip({ task, people, onPatch }: { task: Task; people: Person[]; onPatch: (c: Partial<Task>) => void }) {
   const ids = assigneesOf(task)
   const crew = ids.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => Boolean(p))
-  const active = people.filter((p) => p.active || ids.includes(p.id)).sort((a, b) => a.name.localeCompare(b.name))
+  // With a project team, the list is the team (plus anyone already on the task); "Everyone" shows the rest.
+  const team = useProject().projects.find((p) => p.id === task.project_id)?.team ?? []
+  const [everyone, setEveryone] = useState(false)
+  const onTeam = (p: Person) => !team.length || everyone || team.includes(p.id) || ids.includes(p.id)
+  const active = people.filter((p) => (p.active || ids.includes(p.id)) && onTeam(p)).sort((a, b) => a.name.localeCompare(b.name))
+  const hiddenCount = team.length && !everyone ? people.filter((p) => p.active && !onTeam(p)).length : 0
   const group = (kind: Person['kind']) => active.filter((p) => p.kind === kind)
   const toggle = (id: string) => onPatch(assignPatch(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
   return (
@@ -166,6 +172,11 @@ export function AssigneeChip({ task, people, onPatch }: { task: Task; people: Pe
               })}
             </div>
           ))}
+          {team.length > 0 && (
+            <button className="pm-item muted" onClick={() => setEveryone(!everyone)}>
+              {everyone ? 'Only the project team' : `Everyone else (${hiddenCount})…`}
+            </button>
+          )}
           <div className="pm-sep" />
           <div className="pm-row">
             {ids.length > 0 && <button className="pm-item muted" onClick={() => { onPatch(assignPatch([])); close() }}>Clear</button>}

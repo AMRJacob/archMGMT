@@ -1303,3 +1303,12 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .role-chip { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(0,0,0,.15); padding: 0; cursor: pointer; }
 .role-chip.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink); }
 .field.boxed.small-select { padding: 5px 8px; font-size: 13px; width: auto; flex: none; }
+
+/* Project team (Overview, person board). */
+.team-row { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; }
+.team-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); width: 110px; flex: none; }
+.project-team { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.team-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 4px 2px 3px; font-size: 13px; background: var(--panel); }
+.team-chip .icon-btn { opacity: .4; padding: 0 4px; }
+.team-chip:hover .icon-btn { opacity: 1; }
+.board-person .board-bar { justify-content: flex-start; gap: 12px; }

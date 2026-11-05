@@ -76,6 +76,7 @@ function Shell() {
             <nav>
               <NavLink to="/overview">Overview</NavLink>
               <NavLink to="/schedule">Schedule</NavLink>
+              <NavLink to="/board">Board</NavLink>
               <NavLink to="/notes">Meeting Notes</NavLink>
             </nav>
           </section>
@@ -107,6 +108,7 @@ function Shell() {
             <Route path="/" element={<Projects />} />
             <Route path="/overview" element={<ProjectDetail />} />
             <Route path="/schedule" element={<Schedule />} />
+            <Route path="/board" element={<Schedule />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />

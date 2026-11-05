@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode, type ChartSpot } from '../components/ScheduleChart.tsx'
@@ -11,6 +11,7 @@ import { chartColors, useTheme } from '../lib/theme.ts'
 import TaskEditor from '../components/TaskEditor.tsx'
 import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
+import ProjectTeam from '../components/ProjectTeam.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import ExportPreview, { renderPng, type ExportSettings } from '../components/ExportPreview.tsx'
 import { brandOnlyProject, EXPORT_BGS, exportColors, paletteOf, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
@@ -43,12 +44,17 @@ function useSaved<T extends string>(key: string, initial: T): [T, (v: T) => void
 }
 
 export default function Schedule() {
+  const onBoardPage = useLocation().pathname === '/board'
+  const navigate = useNavigate()
   const { current: project, patch: patchProject } = useProject()
   const theme = useTheme()
   const plan = useProjectPlan(project?.id ?? '')
   const { phases, tasks, people } = plan
   const nh = useNotes(project?.id ?? '', tasks.rows, phases.rows, people.rows, () => void tasks.reload())
-  const [view, setView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
+  const [savedView, setSavedView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
+  // The Board has its own place in the sidebar (/board); Schedule shows the timeline or calendar.
+  const view: View = onBoardPage ? 'board' : savedView === 'board' ? 'timeline' : savedView
+  const setView = (v: View) => { if (v === 'board') navigate('/board'); else { setSavedView(v); if (onBoardPage) navigate('/schedule') } }
   const [mode, setMode] = useSaved<ChartMode>('archmgmt.chartMode', 'working')
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
@@ -248,7 +254,7 @@ export default function Schedule() {
     <section className="schedule-page">
       <header className="page-head no-print">
         <div>
-          <h1>Schedule</h1>
+          <h1>{onBoardPage ? 'Board' : 'Schedule'}</h1>
           <p className="muted">{project.number ? `${project.number} · ` : ''}{project.name}</p>
         </div>
         <div className="toolbar">
@@ -355,15 +361,20 @@ export default function Schedule() {
               <button className={group === 'status' ? 'on' : ''} onClick={() => setGroup('status')}>By status</button>
               <button className={group === 'phase' ? 'on' : ''} onClick={() => setGroup('phase')}>By phase</button>
               <button className={group === 'week' ? 'on' : ''} onClick={() => setGroup('week')}>By week (post-it)</button>
+              <button className={group === 'person' ? 'on' : ''} onClick={() => setGroup('person')}>By person (post-it)</button>
             </div>
             <span className="muted small grow">
-              {group === 'week'
+              {group === 'person'
+                ? 'Hand out work: drag a note from Unassigned (or from one person) onto someone.'
+                : group === 'week'
                 ? 'Pull-plan board: notes are coloured by person. Drag a note to another week to move its dates.'
                 : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
             </span>
             {levelControl}
           </div>
           <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
+            team={project.team ?? []}
+            teamBar={<><span className="team-label">Project team</span><ProjectTeam project={project} people={people.rows} compact onChange={(team) => void patchProject(project.id, { team })} /></>}
             onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
         </>
       )}

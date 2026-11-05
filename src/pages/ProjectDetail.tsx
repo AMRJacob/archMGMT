@@ -4,6 +4,7 @@ import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree from '../components/PlanTree.tsx'
+import ProjectTeam from '../components/ProjectTeam.tsx'
 import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
 import { useRowLayout } from '../lib/rowColumns.ts'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
@@ -254,6 +255,9 @@ export default function ProjectDetail() {
           <div className="stat"><span>Schedule</span>{formatDate(start)} – {formatDate(end)}
             <small className="muted">{openTaskRows.length} open task{openTaskRows.length === 1 ? '' : 's'}</small>
           </div>
+        </div>
+        <div className="team-row"><span className="team-label">Team</span>
+          <ProjectTeam project={project} people={people.rows} onChange={(team) => projects.patch(id, { team })} />
         </div>
         <label className="notes">Notes<TextField multiline value={project.notes} placeholder="Scope, contract notes…" onSave={(v) => projects.patch(id, { notes: v })} /></label>
       </header>
