@@ -59,8 +59,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder,
 }: {
+  /** Drag a task's title up or down to reorder it among the rows beside it (same phase and parent). */
+  onReorder?: (task: Task, target: Task, place: 'before' | 'after') => void
   /** At day scale (3-month zoom): draw a line and weekday letter for every day and shade weekends. Off: Mondays only. */
   dayMarks?: boolean
   /** Width to draw at, in screen pixels (on screen). Exports leave it out. */
@@ -96,6 +98,7 @@ export default function ScheduleChart({
   const W = width ? Math.max(900, Math.round(width)) : EXPORT_W
   const inner = useRef<SVGSVGElement | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
+  const [order, setOrder] = useState<{ id: string; y0: number; moved: boolean; target: string | null; place: 'before' | 'after' } | null>(null)
   const pan = useRef<{ x0: number; applied: number } | null>(null)
   const wheelAcc = useRef(0)
   // Placing an undated task or milestone: press in its row where it should start, drag to set its length.
@@ -177,6 +180,18 @@ export default function ScheduleChart({
     inner.current?.setPointerCapture(e.pointerId)
     setDrag({ kind, id, mode: m, x0: toChartX(e.clientX), delta: 0, moved: false })
   }
+  const toChartY = (clientY: number) => {
+    const r = inner.current?.getBoundingClientRect()
+    return r ? ((clientY - r.top) / r.height) * H : 0
+  }
+  /** Pressing a task title: a click opens it; dragging up or down reorders it among its neighbours. */
+  const startOrder = (e: RPointerEvent, t: Task) => {
+    if (!editable || e.button !== 0) return
+    e.stopPropagation()
+    inner.current?.setPointerCapture(e.pointerId)
+    setOrder({ id: t.id, y0: toChartY(e.clientY), moved: false, target: null, place: 'before' })
+  }
+  const sibling = (a: Task, b: Task) => a.id !== b.id && a.phase_id === b.phase_id && (a.parent_id ?? null) === (b.parent_id ?? null)
   const startPan = (e: RPointerEvent) => {
     if (!onPan || e.button !== 0) return
     inner.current?.setPointerCapture(e.pointerId)
@@ -192,6 +207,20 @@ export default function ScheduleChart({
     setPlace({ id, a: d, b: d })
   }
   const onMove = (e: RPointerEvent) => {
+    if (order) {
+      const cy = toChartY(e.clientY)
+      const moved = order.moved || Math.abs(cy - order.y0) > 4
+      const me = tasks.find((x) => x.id === order.id)
+      let target: string | null = null, at: 'before' | 'after' = 'before'
+      if (moved && me) {
+        rows.forEach((r, k) => {
+          if (r.kind !== 'task' || !sibling(me, r.task)) return
+          if (cy >= rowY[k] && cy < rowY[k] + ROW_TASK) { target = r.task.id; at = cy < rowY[k] + ROW_TASK / 2 ? 'before' : 'after' }
+        })
+      }
+      if (moved !== order.moved || target !== order.target || at !== order.place) setOrder({ ...order, moved, target, place: at })
+      return
+    }
     if (place) {
       const b = dateAt(e.clientX)
       if (b !== place.b) setPlace({ ...place, b })
@@ -210,6 +239,16 @@ export default function ScheduleChart({
     if (delta !== drag.delta || moved !== drag.moved) setDrag({ ...drag, delta, moved })
   }
   const endDrag = () => {
+    if (order) {
+      const o = order
+      setOrder(null)
+      const t = tasks.find((x) => x.id === o.id)
+      if (!t) return
+      if (!o.moved) { onOpenTask?.(t); return }
+      const target = tasks.find((x) => x.id === o.target)
+      if (target) onReorder?.(t, target, o.place)
+      return
+    }
     if (place) {
       const pl = place
       setPlace(null)
@@ -338,7 +377,7 @@ export default function ScheduleChart({
       xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
       style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'pan-y' : undefined }}
       fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
-      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); setPlace(null); pan.current = null; setPanning(false) }}
+      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); setPlace(null); setOrder(null); pan.current = null; setPanning(false) }}
       onWheel={onPan ? (e) => {
         // Sideways scrolling (trackpad swipe, Shift+wheel) moves through time in the zoomed views.
         const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
@@ -469,7 +508,10 @@ export default function ScheduleChart({
           <g key={i} opacity={task.status === 'done' && !pres ? 0.55 : 1}>
             <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={C.ink}
               fontWeight={task.kind === 'sheet' ? 600 : 400}
-              style={editable ? { cursor: 'pointer' } : undefined} onClick={editable ? () => onOpenTask?.(task) : undefined}>
+              opacity={order?.moved && order.id === task.id ? 0.4 : 1}
+              style={editable ? { cursor: order?.moved ? 'grabbing' : onReorder ? 'grab' : 'pointer' } : undefined}
+              onPointerDown={editable && onReorder ? (e) => startOrder(e, task) : undefined}
+              onClick={editable && !onReorder ? () => onOpenTask?.(task) : undefined}>
               {clip(`${task.kind === 'sheet' && task.sheet_number ? `${task.sheet_number}  ` : ''}${task.title}`, (pres ? 34 : 38) - Math.min(4, (task as ShownTask)._depth ?? 0) * 2)}
             </text>
             <text x={x0 - 14} y={cy + 4} fontSize={11} fill={C.muted} textAnchor="end">{right}</text>
@@ -477,6 +519,12 @@ export default function ScheduleChart({
         )
       })}
 
+      {order?.moved && order.target && (() => {
+        const k = rows.findIndex((r) => r.kind === 'task' && r.task.id === order.target)
+        if (k < 0) return null
+        const ly = order.place === 'before' ? rowY[k] : rowY[k] + ROW_TASK
+        return <g pointerEvents="none"><line x1={M + 24} x2={W - M} y1={ly} y2={ly} stroke={C.accent} strokeWidth={2} /><circle cx={M + 24} cy={ly} r={3.5} fill={C.accent} /></g>
+      })()}
       {daily && (
         <g pointerEvents="none">
           {dayList.filter((d) => dow(d) === 0 || dow(d) === 6).map((d) => (

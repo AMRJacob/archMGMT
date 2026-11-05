@@ -4,7 +4,7 @@ import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
 import ScheduleChart, { type ChartMode, type ChartSpot } from '../components/ScheduleChart.tsx'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
-import { kindUnder } from '../lib/treeEdit.ts'
+import { kindUnder, moveTo } from '../lib/treeEdit.ts'
 import { isPresented, ruleMatch, rulesOf, togglePresented, type PresentationRules } from '../lib/presentation.ts'
 import PresentationFilter from '../components/PresentationFilter.tsx'
 import { chartColors, useTheme } from '../lib/theme.ts'
@@ -314,6 +314,7 @@ export default function Schedule() {
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask}
+              onReorder={(t, target, at) => { const c = moveTo(tree, real(t), real(target), at, target.phase_id); if (c.length) plan.patchMany(c) }}
               onAddAt={(ph, d) => void addHere(ph, d)}
               onContextAt={(sp) => setSpot(sp)} />
           </div>
