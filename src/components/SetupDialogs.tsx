@@ -272,7 +272,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
                       <span>
                         {t.title}
                         {t.hint && <span className="pick-hint">{t.hint}</span>}
-                        {t.checklist && t.on && <span className="pick-hint">{t.checklist.length}-item checklist: {t.checklist.slice(0, 3).join(', ').toLowerCase()}…</span>}
+                        {t.checklist && t.on && <span className="pick-hint">{t.checklist.length} subtasks: {t.checklist.slice(0, 3).join(', ').toLowerCase()}…</span>}
                       </span>
                       <span className="pick-when muted small">{shortDate(datesIn(phase, t.at, Boolean(t.milestone)).due_date)}</span>
                     </label>
@@ -301,7 +301,7 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
                       <input type="checkbox" checked={s.on} onChange={(e) => setS({ on: e.target.checked, count: Math.max(1, s.count) })} />
                       <span>
                         {st.name}
-                        <span className="pick-hint">{st.checklist.length ? `${st.checklist.length}-item checklist` : 'no checklist'}{st.series ? ` · ${st.series}xx` : ''}</span>
+                        <span className="pick-hint">{st.checklist.length ? `${st.checklist.length} subtasks` : 'no subtasks'}{st.series ? ` · ${st.series}xx` : ''}</span>
                       </span>
                     </label>
                     <span className="stepper">

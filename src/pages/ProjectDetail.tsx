@@ -40,6 +40,8 @@ export default function ProjectDetail() {
   const myEmail = session?.user.email?.toLowerCase() ?? null
   const me = myEmail ? people.rows.find((p) => (p.email ?? '').toLowerCase() === myEmail) ?? null : null
   const [onlyMine, setOnlyMine] = useState(() => { try { return localStorage.getItem('archmgmt.onlyMine') === '1' } catch { return false } })
+  // Rows added while "Only mine" is on stay in view (so you can name them) even though they aren't yours.
+  const [addedHere, setAddedHere] = useState<Set<string>>(new Set())
   const toggleMine = (on: boolean) => { setOnlyMine(on); try { localStorage.setItem('archmgmt.onlyMine', on ? '1' : '0') } catch { /* private mode */ } }
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
@@ -115,7 +117,7 @@ export default function ProjectDetail() {
     const keep = new Set<string>()
     const down = (pid: string) => { for (const c of tree.children.get(pid) ?? []) { keep.add(c.id); down(c.id) } }
     for (const t of tasks.rows) {
-      if (!isAssigned(t, me.id)) continue
+      if (!isAssigned(t, me.id) && !addedHere.has(t.id)) continue
       keep.add(t.id); down(t.id)
       let cur = t.parent_id ? tree.byId.get(t.parent_id) : undefined
       for (let n = 0; cur && n < 12; n++) { keep.add(cur.id); cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined }
@@ -178,7 +180,7 @@ export default function ProjectDetail() {
       { label: 'Add milestone', run: ask('milestone') },
       { label: 'Add sheet', run: ask('sheet') },
       { label: 'Add sheets by type…', run: ask('plan') },
-      { label: 'Add Project Manual section', run: ask('section') },
+      { label: 'Add spec section', run: ask('section') },
       'sep',
       { label: filled ? `Add suggested work to ${p.name}…` : `Set up ${p.name}…`, run: () => setSetupLocal(p.id) },
       { label: 'Rename', run: () => { setOpenIds(new Set(open)); setRenaming(p.id) } },
@@ -327,6 +329,15 @@ export default function ProjectDetail() {
           <input type="checkbox" checked={mineOn} disabled={!me} onChange={(e) => toggleMine(e.target.checked)} />
           Only mine{me && mineOn ? <span className="muted"> · {me.name}</span> : null}
         </label>
+        {mineOn && me && (() => {
+          const extra = tasks.rows.filter((t) => addedHere.has(t.id) && !isAssigned(t, me.id)).length
+          return extra > 0 ? (
+            <span className="mine-note">
+              Also showing {extra} item{extra === 1 ? '' : 's'} you just added that {extra === 1 ? 'isn’t' : 'aren’t'} assigned to you; {extra === 1 ? 'it' : 'they'}’ll be filtered out next time.
+              <button className="linkbtn" onClick={() => toggleMine(false)}>Show everything</button>
+            </span>
+          ) : null
+        })()}
       </div>
       <RowColumnsHeader />
       <div className="phase-list">
@@ -396,7 +407,8 @@ export default function ProjectDetail() {
                     onOpenNotes={(x) => { const n = nh.latestFor(x); if (n) nh.open(n.id) }}
                     onTogglePresented={(x) => { const c = togglePresented(rulesOf(project), x); if (c.task) patchTask(x, c.task); if (c.rules) void projects.patch(id, { presentation: c.rules }) }}
                     request={phaseAdd?.phaseId === p.id ? phaseAdd.add : null} onRequestDone={() => setPhaseAdd(null)}
-                    onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
+                    onDrop={(tid) => void tasks.drop(tid)}
+                    onAdd={async (row) => { const c = await tasks.add(row); if (mineOn) setAddedHere((s) => new Set(s).add(c.id)); return c }}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
                 </div>
               )}

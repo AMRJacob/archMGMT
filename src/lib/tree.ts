@@ -3,7 +3,7 @@ import { KIND_RANK, type Task, type TaskKind } from './types.ts'
 
 /**
  * The hierarchy inside a phase: sheet → view → task → item, stored as tasks with parent_id.
- * Items are checklist lines / info and are never scheduled. Anything that has scheduled children
+ * Items ('item', shown as "subtasks") are tick-box lines and are never scheduled. Anything that has scheduled children
  * takes its dates from them (roll-up); only the bottom scheduled level carries workload.
  */
 
@@ -150,11 +150,15 @@ export function shiftTreeChanges(tree: Tree, t: Task, days: number): { task: Tas
 
 export type DetailLevel = 0 | 1 | 2 | 3 // 0 phases (and milestones), 1 sheets, 2 views, 3 tasks (items are never scheduled)
 
-export const DETAIL_LEVELS: { value: DetailLevel; label: string }[] = [
-  { value: 0, label: 'Phases' },
-  { value: 1, label: 'Sheets' },
-  { value: 2, label: 'Views' },
-  { value: 3, label: 'Tasks' },
+/**
+ * The Detail slider, in the app's terms (General Tasks: task → subtask; Sheets: sheet → view → task → subtask;
+ * Project Manual: spec section → task → subtask). Subtasks are tick-box lines and never show on the schedule.
+ */
+export const DETAIL_LEVELS: { value: DetailLevel; label: string; hint: string }[] = [
+  { value: 0, label: 'Phases', hint: 'Phases and milestones only' },
+  { value: 1, label: 'Tasks, Sheets & Sections', hint: 'Adds general tasks, sheets and spec sections' },
+  { value: 2, label: '+ Views', hint: 'Adds the views on each sheet' },
+  { value: 3, label: '+ Tasks Inside', hint: 'Adds the tasks inside sheets, views and spec sections' },
 ]
 
 /**

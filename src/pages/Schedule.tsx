@@ -71,6 +71,8 @@ export default function Schedule() {
   const brandPalettes = useRows<BrandPalette>('brand_palettes')
   const [setup, setSetup] = useSaved<'on' | 'off'>('archmgmt.presSetup', 'off')
   const [work, setWork] = useSaved<WorkFilter>('archmgmt.workFilter', 'all')
+  // The last thing added here, so we can say so when the current filters hide it.
+  const [justAdded, setJustAdded] = useState<string | null>(null)
   const [dayMarks, setDayMarks] = useSaved<'on' | 'off'>('archmgmt.dayMarks', 'on')
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
   const [xPage, setXPage] = useSaved<ExportPage>('archmgmt.exportPage', 'letter')
@@ -148,7 +150,7 @@ export default function Schedule() {
   const levelControl = levelOff ? null : (
     <>
     <span className={`level-group${workOff ? ' off' : ''}`} aria-disabled={workOff} title={workWhy}>
-    <div className="segmented small-seg" aria-label="Show" title={workOff ? undefined : 'Show everything, or only general tasks, sheets or Project Manual sections (milestones always show)'}>
+    <div className="segmented small-seg" aria-label="Show" title={workOff ? undefined : 'Show everything, or only General Tasks, Sheets or Project Manual (milestones always show)'}>
       {([['all', 'All'], ['tasks', 'General Tasks'], ['sheets', 'Sheets'], ['manual', 'Project Manual']] as [WorkFilter, string][]).map(([w, label]) => (
         <button key={w} className={work === w ? 'on' : ''} onClick={() => setWork(w)}>{label}</button>
       ))}
@@ -156,15 +158,41 @@ export default function Schedule() {
     </span>
     <span className={`level-group${levelOff ? ' off' : ''}`} aria-disabled={levelOff}
       title={levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.' : undefined}>
-    <div className="level-ctl" title="How much detail to show">
+    <div className="level-ctl" title={DETAIL_LEVELS.map((l) => `${l.label}: ${l.hint}`).join('\n')}>
       <span className="muted small">Detail</span>
       <input type="range" min={0} max={3} step={1} value={level} aria-label="Detail level"
         disabled={levelOff} onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
-      <span className="level-name">{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
+      <span className="level-name" title={DETAIL_LEVELS.find((l) => l.value === level)?.hint}>{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
     </div>
     </span>
     </>
   )
+  // A just-added item the current view hides: say why, with a one-click way to show it.
+  const hiddenNote = (() => {
+    const t = justAdded ? tasks.rows.find((x) => x.id === justAdded) : null
+    if (!t) return null
+    const showing = view === 'timeline' ? chartRows : frontierRows
+    const presOff = view === 'timeline' && mode === 'presentation'
+    const ph = phases.rows.find((p) => p.id === t.phase_id)
+    const inView = showing.some((r) => r.id === t.id) && (!presOff || (presented(t) && (!ph || ph.client_visible)))
+    if (inView) return null
+    const kindWord = t.is_milestone ? 'milestone' : t.kind === 'sheet' ? 'sheet' : t.kind === 'section' ? 'spec section' : t.kind === 'view' ? 'view' : t.parent_id ? 'task' : 'task'
+    let why = '', fix: (() => void) | null = null, fixLabel = 'Show it'
+    if (presOff) { why = 'the presentation view only shows what’s chosen for the client'; fix = () => setMode('working'); fixLabel = 'Switch to working view' }
+    else if (!passesWork(tree, t, work)) { why = `the Show filter is set to ${work === 'tasks' ? 'General Tasks' : work === 'sheets' ? 'Sheets' : 'Project Manual'}`; fix = () => setWork('all') }
+    else if (level < 3) { why = `Detail is set to “${DETAIL_LEVELS.find((l) => l.value === level)?.label}”`; fix = () => setLevelStr('3') }
+    else if (view !== 'timeline') { why = 'this view shows the lowest level of each branch'; fix = null }
+    else return null
+    return (
+      <div className="hidden-note no-print" role="status">
+        <span>The {kindWord} “{t.title}” was added, but it’s hidden because {why}.</span>
+        <span className="grow" />
+        {fix && <button className="btn small-btn" onClick={() => { fix!(); }}>{fixLabel}</button>}
+        <button className="linkbtn" aria-label="Dismiss" onClick={() => setJustAdded(null)}>×</button>
+      </div>
+    )
+  })()
+
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 
   async function addTask(defaults: Partial<Task>, open = true) {
@@ -177,6 +205,7 @@ export default function Schedule() {
       is_milestone: false, client_visible: false, sort_order: tasks.rows.length, ...defaults,
     })
     if (open) { setEditingId(created.id); setNewTaskId(created.id) }
+    setJustAdded(created.id)
     return created
   }
 
@@ -239,7 +268,7 @@ export default function Schedule() {
       ...(holds ? [{ label: `Add task under “${task.title.slice(0, 28)}”`, run: () => void addHere(sp.phase, sp.date, { parent: task }) }] : []),
       ...(sp.phase ? [
         { label: `Add sheet${where}`, run: () => void addHead(sp.phase!, 'sheet') },
-        { label: `Add Project Manual section${where}`, run: () => void addHead(sp.phase!, 'section') },
+        { label: `Add spec section${where}`, run: () => void addHead(sp.phase!, 'section') },
       ] : []),
       ...(!task && sp.phase ? [
         'sep' as const,
@@ -408,6 +437,7 @@ export default function Schedule() {
               </div>
             )}
           </div>
+          {hiddenNote}
           </div>
           <div className="card chart-card no-print" ref={chartBox}>
             <ScheduleChart project={pres ? xProject : project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
@@ -433,6 +463,7 @@ export default function Schedule() {
         </>
       )}
 
+      {view !== 'timeline' && hiddenNote}
       {view === 'calendar' && (
         <div className="subbar no-print"><span className="grow" />{levelControl}</div>
       )}

@@ -1,6 +1,6 @@
 import { lockHolder, usePresence } from '../lib/live.ts'
 import { useSearchParams } from 'react-router-dom'
-import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type DragEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import ContextMenu, { type MenuItem } from './ContextMenu.tsx'
 import { TextField } from './fields.tsx'
 import { remove } from '../lib/data.ts'
@@ -15,10 +15,43 @@ import { assigneesOf, assignPatch } from '../lib/assignees.ts'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
 const ghostName = (t: Task) =>
-  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', section: 'Section name', task: 'Task name', item: 'Checklist item' } as const)[kindOf(t)]
+  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', section: 'Section name', task: 'Task name', item: 'Subtask' } as const)[kindOf(t)]
 
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
+
+// ---------- selection: shared by every phase's tree, so Shift/Ctrl picks can span phases ----------
+// Click a row's left margin (or anywhere on it with Shift/Ctrl/Cmd) to select it instead of editing.
+// Shift picks a run of rows in screen order; Ctrl/Cmd adds or removes one.
+type Sel = { ids: Set<string>; anchor: string | null }
+let sel: Sel = { ids: new Set(), anchor: null }
+const selListeners = new Set<() => void>()
+const setSel = (ids: Set<string>, anchor: string | null) => { sel = { ids, anchor }; selListeners.forEach((l) => l()) }
+const selectOne = (id: string) => { if (sel.ids.size !== 1 || !sel.ids.has(id)) setSel(new Set([id]), id) }
+export const clearSelection = () => { if (sel.ids.size) setSel(new Set(), null) }
+const useSel = () => useSyncExternalStore((cb) => { selListeners.add(cb); return () => { selListeners.delete(cb) } }, () => sel)
+function pickRow(id: string, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) {
+  const add = e.ctrlKey || e.metaKey
+  if (e.shiftKey && sel.anchor) {
+    const order = [...document.querySelectorAll<HTMLElement>('li[data-row]')].map((el) => el.dataset.row!)
+    const a = order.indexOf(sel.anchor), b = order.indexOf(id)
+    if (a >= 0 && b >= 0) {
+      const ids = new Set(add ? sel.ids : [])
+      order.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => ids.add(x))
+      setSel(ids, sel.anchor)
+      return
+    }
+  }
+  if (add) { const ids = new Set(sel.ids); if (ids.has(id)) ids.delete(id); else ids.add(id); setSel(ids, id); return }
+  selectOne(id)
+}
+// Clicking away from the rows (and their menus and panels) clears the selection.
+if (typeof document !== 'undefined') {
+  document.addEventListener('mousedown', (e) => {
+    const el = e.target as HTMLElement | null
+    if (el && !el.closest('li[data-row], .ctx-menu, .pop-menu, .quick-panel, .modal, [role="dialog"]')) clearSelection()
+  })
+}
 
 /** Adds the phase header menu can ask for. */
 export type PhaseAdd = { what: 'task' | 'milestone' | 'sheet' | 'section' | 'plan' | 'quick'; n: number }
@@ -26,7 +59,8 @@ export type PhaseAdd = { what: 'task' | 'milestone' | 'sheet' | 'section' | 'pla
 type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam' | WorkGroup; place?: Place }
 
 /**
- * One phase's work as a tree: sheets → views → tasks → items (checklist lines / info).
+ * One phase's work as a tree. Terms: General Tasks: task → subtask; Sheets: sheet → view → task → subtask;
+ * Project Manual: spec section → task → subtask. Subtasks (kind 'item') are tick-box lines, never scheduled.
  * Every row is edited in place. Right-click anywhere to add at that spot, move rows by dragging the grip,
  * promote/demote from the menu (or Ctrl+[ / Ctrl+]), and cut/copy/paste with the menu or Ctrl+X/C/V.
  */
@@ -77,7 +111,9 @@ export default function PlanTree({
   const [newId, setNewId] = useState<string | null>(null)
   const [addingSheet, setAddingSheet] = useState(false)
   const [planning, setPlanning] = useState(false)
-  const [selected, setSelected] = useState<string | null>(null)
+  const selection = useSel()
+  const setSelected = (id: string) => selectOne(id)
+  const isSel = (id: string) => selection.ids.has(id)
   // The description box opens only when asked for (menu or the ≡ marker), never just by selecting a row.
   const [descFor, setDescFor] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -151,6 +187,9 @@ export default function PlanTree({
       is_milestone: milestone, client_visible: milestone, sort_order: sortOrders[0],
     })
     expand(parent?.id)
+    // A folded group would hide the new row: open it.
+    const g: WorkGroup = parent ? workGroupOf(tree, parent) : k === 'sheet' ? 'sheets' : k === 'section' ? 'manual' : 'tasks'
+    if (folded[g]) fold(g)
     setNewId(created.id)
     setSelected(created.id)
   }
@@ -203,6 +242,30 @@ export default function PlanTree({
     if (window.confirm(under ? `Delete "${t.title}" and the ${under} thing${under === 1 ? '' : 's'} under it?` : `Delete "${t.title}"?`)) onDrop(t.id)
   }
 
+  /** The selected rows that aren't inside another selected row (moving / deleting those carries the rest). */
+  const selRoots = (): Task[] => {
+    const ids = sel.ids
+    return [...ids].map((id) => tree.byId.get(id)).filter((x): x is Task => Boolean(x)).filter((x) => {
+      for (let p = x.parent_id; p; p = tree.byId.get(p)?.parent_id ?? null) if (ids.has(p)) return false
+      return true
+    })
+  }
+  const many = () => sel.ids.size > 1
+  const delMany = () => {
+    const roots = selRoots()
+    if (!roots.length) return
+    const under = roots.reduce((n, r) => n + descendants(tree, r.id).length, 0)
+    const what = `${roots.length} item${roots.length === 1 ? '' : 's'}${under ? ` and the ${under} thing${under === 1 ? '' : 's'} under them` : ''}`
+    if (!window.confirm(`Delete ${what}?`)) return
+    roots.forEach((r) => onDrop(r.id))
+    clearSelection()
+  }
+  const copyMany = (mode: Clip['mode']) => { const roots = selRoots(); if (roots.length) saveClip({ mode, rootIds: roots.map((r) => r.id), rows: branchOf(tree, roots) }) }
+  const markMany = (status: Task['status']) => {
+    const rows = [...sel.ids].map((id) => tree.byId.get(id)).filter((x): x is Task => Boolean(x) && x!.status !== status)
+    if (rows.length) onPatchMany(rows.map((task) => ({ task, next: { status } })))
+  }
+
   const promoteRow = (t: Task) => { const c = promote(tree, t); if (c.length) onPatchMany(c) }
   const demoteRow = (t: Task) => { const c = demote(tree, t); if (c.length) { onPatchMany(c); expand(c[0].next.parent_id) } }
 
@@ -214,11 +277,19 @@ export default function PlanTree({
     if (mod && (e.code === 'BracketRight' || e.key === ']')) { e.preventDefault(); demoteRow(t); return }
     if (typing) return
     const k = e.key.toLowerCase()
+    if (e.key === 'Escape') { clearSelection(); return }
+    // With a selection, the keys act on it (even if the focused row was just Ctrl-clicked off).
+    if (many() || (sel.ids.size === 1 && !sel.ids.has(t.id))) {
+      if (mod && k === 'c') { e.preventDefault(); copyMany('copy') }
+      else if (mod && k === 'x') { e.preventDefault(); copyMany('cut') }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delMany() }
+      return
+    }
     if (mod && k === 'c') { e.preventDefault(); copy(t, 'copy') }
     else if (mod && k === 'x') { e.preventDefault(); copy(t, 'cut') }
     else if (mod && k === 'v') { e.preventDefault(); paste(t, 'after') }
     else if (mod && k === 'd') { e.preventDefault(); duplicate(t) }
-    else if (e.key === 'Delete') { e.preventDefault(); del(t) }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); del(t) }
   }
 
   // ---------- drag and drop ----------
@@ -256,6 +327,8 @@ export default function PlanTree({
     if (c.length) { onPatchMany(c); if (place === 'inside') expand(target?.id) }
   }
   const grip = (t: Task) => (
+    <>
+    <span className="sel-zone" aria-hidden="true" title="Click to select · Shift-click for a run · Ctrl/Cmd-click to add" />
     <span className="grip" draggable title="Drag to move (hold Ctrl to copy)"
       onDragStart={(e) => {
         dragging = { id: t.id }
@@ -267,6 +340,7 @@ export default function PlanTree({
       onDragEnd={() => { dragging = null; setHint(null) }}>
       <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true">{[2, 7, 12].flatMap((y) => [<circle key={`a${y}`} cx="2" cy={y} r="1.2" />, <circle key={`b${y}`} cx="6" cy={y} r="1.2" />])}</svg>
     </span>
+    </>
   )
   /**
    * The + that appears on the seam between rows: click it to add something right there. Where a branch
@@ -301,18 +375,29 @@ export default function PlanTree({
 
   const rowProps = (t: Task, className: string, depth: number) => ({
     'data-locked-by': lockedBy(t.id),
-    className: `${className}${isSheetWork(tree, t) ? ' sheet-side' : ''}${lockedBy(t.id) ? ' locked' : ''}${selected === t.id ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
+    className: `${className}${isSheetWork(tree, t) ? ' sheet-side' : ''}${lockedBy(t.id) ? ' locked' : ''}${isSel(t.id) ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
     tabIndex: -1,
     'data-row': t.id,
     'data-depth': depth,
-    onFocus: () => setSelected(t.id),
-    onMouseDown: (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('input, button, select, textarea, .pop')) (e.currentTarget as HTMLElement).focus() },
+    // Editing a row's fields selects just that row.
+    onFocus: (e: FocusEvent) => { if ((e.target as HTMLElement).closest('input, textarea, select') && !isSel(t.id)) setSelected(t.id) },
+    onMouseDown: (e: MouseEvent) => {
+      if (e.button !== 0) return
+      const el = e.target as HTMLElement
+      // Shift / Ctrl / Cmd click anywhere on the row selects (never starts editing).
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        // (On the drag handle, don't block a Ctrl-drag copy from starting.)
+        if (!el.closest('.grip')) e.preventDefault()
+        pickRow(t.id, e); (e.currentTarget as HTMLElement).focus({ preventScroll: true }); return
+      }
+      if (!el.closest('input, button, select, textarea, .pop')) { pickRow(t.id, e); (e.currentTarget as HTMLElement).focus({ preventScroll: true }) }
+    },
     onKeyDown: rowKeys(t),
     onContextMenu: (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest('input, textarea')) return // keep the browser menu for text
       e.preventDefault(); e.stopPropagation()
-      setSelected(t.id)
+      if (!isSel(t.id)) setSelected(t.id)
       setMenu({ x: e.clientX, y: e.clientY, target: t })
     },
     ...dragProps(t),
@@ -353,7 +438,7 @@ export default function PlanTree({
           <input type="checkbox" checked={t.status === 'done'} title="Done"
             onChange={(e) => onPatch(t, { status: e.target.checked ? 'done' : 'todo' }, false)} />
           <div className="trow-title">{title(t)}</div>
-          <button className="icon-btn" title="Remove item" onClick={() => onDrop(t.id)}>×</button>
+          <button className="icon-btn" title="Remove subtask" onClick={() => onDrop(t.id)}>×</button>
           {firstOf(t) && seam([{ task: t, depth }], 'before')}
           {seam([{ task: t, depth }, ...enders], 'after')}
         </li>,
@@ -370,7 +455,7 @@ export default function PlanTree({
       <li key={t.id} {...rowProps(t, `trow k-${kind}${t.status === 'done' ? ' done' : ''}`, depth)}>
         {grip(t)}
         <button className={`twist${isOpen ? ' open' : ''}${kids.length ? '' : ' empty'}`} onClick={() => toggle(t.id)}
-          title={isOpen ? 'Collapse' : kids.length ? `Show ${kids.length} under it` : 'Add views, tasks or items under it'}>
+          title={isOpen ? 'Collapse' : kids.length ? `Show ${kids.length} under it` : 'Add views, tasks or subtasks under it'}>
           <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <button className={`tick ${t.status}`} title={t.status === 'done' ? 'Mark not done' : 'Mark done'}
@@ -406,7 +491,7 @@ export default function PlanTree({
                         is_milestone: false, client_visible: false, sort_order: 100 + i, effort: null, start_date: null, due_date: null,
                       })))
                       expand(t.id); close()
-                    }}>Add this type’s checklist</button>
+                    }}>Add this type’s standard subtasks</button>
                   </>
                 )}
               </div>
@@ -538,11 +623,11 @@ export default function PlanTree({
           { label: 'Spec section', run: () => addAt(t, place, 'section') },
         ]
       : k === 'item' || pk === 'task'
-        ? [{ label: 'Checklist item', run: () => addAt(t, place, 'item') }]
+        ? [{ label: 'Subtask', run: () => addAt(t, place, 'item') }]
         : [
             ...(pk === 'sheet' ? [{ label: 'View', run: () => addAt(t, place, 'view') }] : []),
             { label: 'Task', run: () => addAt(t, place, 'task') },
-            { label: 'Checklist item', run: () => addAt(t, place, 'item') },
+            { label: 'Subtask', run: () => addAt(t, place, 'item') },
           ]
     return [
       ...opts,
@@ -556,7 +641,7 @@ export default function PlanTree({
     return [
       ...(k === 'sheet' ? [{ label: 'View', run: () => addAt(t, 'inside', 'view') }] : []),
       ...(KIND_RANK[k] < 3 ? [{ label: 'Task', run: () => addAt(t, 'inside', 'task') }] : []),
-      { label: 'Checklist item', run: () => addAt(t, 'inside', 'item') },
+      { label: 'Subtask', run: () => addAt(t, 'inside', 'item') },
       ...(readClip() ? ['sep' as const, { label: clip?.mode === 'cut' ? 'Move here' : 'Paste here', run: () => paste(t, 'inside') }] : []),
     ]
   }
@@ -578,7 +663,7 @@ export default function PlanTree({
           { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) },
         ],
         manual: [
-          { label: 'Add Project Manual section', run: () => addAt(null, 'inside', 'section') },
+          { label: 'Add spec section', run: () => addAt(null, 'inside', 'section') },
         ],
       }
       const order: WorkGroup[] = [first, ...(['tasks', 'sheets', 'manual'] as WorkGroup[]).filter((g) => g !== first)]
@@ -588,18 +673,33 @@ export default function PlanTree({
         { label: pasteLabel, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(null, 'inside') },
       ]
     }
+    if (many() && isSel(t.id)) {
+      const n = sel.ids.size
+      return [
+        { label: `${n} selected`, disabled: true, run: () => {} },
+        'sep',
+        { label: 'Mark done', run: () => markMany('done') },
+        { label: 'Mark not done', run: () => markMany('todo') },
+        'sep',
+        { label: 'Cut', keys: 'Ctrl+X', run: () => copyMany('cut') },
+        { label: 'Copy', keys: 'Ctrl+C', run: () => copyMany('copy') },
+        'sep',
+        { label: 'Clear selection', keys: 'Esc', run: () => clearSelection() },
+        { label: `Delete ${n} items`, keys: 'Del', danger: true, run: () => delMany() },
+      ]
+    }
     const k = kindOf(t)
     const holds = canHold(t)
     const topLevel = !t.parent_id
     const add: MenuItem[] = k === 'item'
-      ? [{ label: 'Add item below', run: () => addAt(t, 'after', 'item') }]
+      ? [{ label: 'Add subtask below', run: () => addAt(t, 'after', 'item') }]
       : [
           ...(topLevel ? [{ label: 'Add sheet below', run: () => addAt(t, 'after', 'sheet') }, { label: 'Add spec section below', run: () => addAt(t, 'after', 'section') }] : []),
           { label: `Add ${k === 'view' ? 'view' : 'task'} below`, run: () => addAt(t, 'after', k === 'view' ? 'view' : 'task') },
           ...(topLevel ? [{ label: 'Add milestone below', run: () => addAt(t, 'after', 'task', true) }] : []),
           ...(k === 'sheet' ? [{ label: 'Add view inside', run: () => addAt(t, 'inside', 'view') }] : []),
-          ...(KIND_RANK[k] < 3 ? [{ label: 'Add task inside', run: () => addAt(t, 'inside', 'task') }] : []),
-          { label: 'Add checklist item inside', run: () => addAt(t, 'inside', 'item') },
+          ...(KIND_RANK[k] < 3 ? [{ label: 'Add task', run: () => addAt(t, 'inside', 'task') }] : []),
+          { label: 'Add subtask', run: () => addAt(t, 'inside', 'item') },
         ]
     return [
       ...add,
@@ -661,7 +761,7 @@ function AddSheetRow({ onAdd, onCancel }: { onAdd: (number: string, name: string
       <button className="btn primary" disabled={busy || (!number.trim() && !name.trim())} onClick={submit}>Add sheet</button>
       <button className="btn ghost" onClick={onCancel}>Done</button>
       <span className="muted small add-sheet-hint">
-        {st && st.checklist.length ? `Adds ${st.checklist.length} checklist items${st.source === 'suggested' ? ' (suggested list)' : ' (from your Asana projects)'}. ` : ''}
+        {st && st.checklist.length ? `Adds ${st.checklist.length} standard subtasks${st.source === 'suggested' ? ' (suggested list)' : ' (from your Asana projects)'}. ` : ''}
         Enter adds and starts the next; Esc closes.
       </span>
     </li>
@@ -684,7 +784,7 @@ function SheetPlanner({ onCreate, onCancel }: {
       <div className="sp-head">
         <div>
           <strong>Add sheets by type</strong>
-          <span className="muted small"> · How many of each do you expect? Each sheet gets its type’s checklist.</span>
+          <span className="muted small"> · How many of each do you expect? Each sheet gets its type’s standard subtasks.</span>
         </div>
         <button className="icon-btn" title="Close (Esc)" onClick={onCancel}>×</button>
       </div>
@@ -695,7 +795,7 @@ function SheetPlanner({ onCreate, onCancel }: {
             <div key={t.id} className={`sp-type${n ? ' on' : ''}`}>
               <span className="sp-name">
                 {t.name}
-                <span className="pm-hint">{t.checklist.length ? `${t.checklist.length} checks${t.source === 'suggested' ? ' · suggested' : ''}` : 'no checklist'}{t.series ? ` · ${t.series}xx` : ''}</span>
+                <span className="pm-hint">{t.checklist.length ? `${t.checklist.length} subtasks${t.source === 'suggested' ? ' · suggested' : ''}` : 'no subtasks'}{t.series ? ` · ${t.series}xx` : ''}</span>
               </span>
               <span className="stepper">
                 <button type="button" onClick={() => set(t.id, n - 1)} disabled={n === 0} aria-label={`Fewer ${t.name}`}>−</button>

@@ -20,7 +20,7 @@ export default function PresentationFilter({ rules, onChange, picked, hiddenPhas
   }
   const toggle = (on: boolean, key: 'sheets' | 'tasks') => (
     <button type="button" className={`filter-chip${on ? ' on' : ''}`} aria-pressed={on} onClick={() => onChange({ ...rules, [key]: !on })}>
-      {on ? '✓ ' : ''}{key === 'sheets' ? 'Sheets' : 'Phase tasks'}
+      {on ? '✓ ' : ''}{key === 'sheets' ? 'Sheets' : 'General tasks'}
     </button>
   )
   const extras = [

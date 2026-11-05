@@ -599,7 +599,7 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 /* detail slider */
 .level-ctl { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); }
 .level-ctl input[type=range] { width: 90px; accent-color: var(--sidebar); }
-.level-name { font-size: 13px; font-weight: 600; min-width: 46px; }
+.level-name { font-size: 13px; font-weight: 600; min-width: 11.5em; white-space: nowrap; }
 
 /* sheets-by-type planner */
 .sheet-planner { margin: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--subtle); }
@@ -1502,3 +1502,24 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 .qp-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
 /* Schedule: typing a new task's name straight into the "+ Add task" row. */
 .chart-type { width: 100%; height: 100%; box-sizing: border-box; border: 1px solid var(--accent); border-radius: 5px; padding: 0 8px; font: inherit; font-size: 12.5px; background: var(--panel); color: var(--ink); outline: none; }
+.mine-note { font-size: 12px; color: var(--muted); margin-left: 12px; }
+.mine-note .linkbtn { margin-left: 6px; color: var(--accent); }
+/* Schedule: a just-added item the current filters hide. */
+.hidden-note { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; padding: 7px 12px; border-radius: 8px; font-size: 13px;
+  background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); color: var(--ink); }
+.hidden-note .grow { flex: 1; }
+/* Overview: the left margin of each row is a select zone (click selects instead of editing). */
+.sel-zone { position: absolute; left: 0; top: 0; bottom: 0; width: max(14px, calc(var(--indent, 40px) - 26px)); cursor: pointer; border-radius: 6px 0 0 6px; }
+.trow:hover > .sel-zone, .irow:hover > .sel-zone { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.grip { z-index: 1; }
+.trow.selected + .trow.selected, .irow.selected + .irow.selected, .trow.selected + .irow.selected, .irow.selected + .trow.selected { box-shadow: inset 2px 0 0 var(--accent); }
+/* The name box fits its text, so the empty stretch of a row (between the name and the chips) is a place
+   to click to select the row rather than start typing. */
+@supports (field-sizing: content) {
+  .trow-title { display: flex; }
+  .trow-title input.field { field-sizing: content; width: auto; min-width: 7ch; max-width: 100%; flex: 0 1 auto; padding-right: 12px; }
+}
+.trow, .irow { cursor: default; }
+/* Selected rows: a clear tint and an accent edge (also over the group panels' own row background). */
+.tlist li.trow.selected, .tlist li.irow.selected, .tgroup-list > li.trow.selected, .tgroup-list > li.irow.selected {
+  background: color-mix(in srgb, var(--accent) 13%, var(--panel)); box-shadow: inset 3px 0 0 var(--accent); }

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase.ts'
 
 /** Supabase Free plan: 500 MB of database per project (supabase.com/pricing). Change if the plan changes. */
 const PLAN = { name: 'Supabase Free plan', bytes: 500 * 1024 * 1024 }
-const LABEL: Record<string, string> = { tasks: 'Tasks, sheets & checklist items', phases: 'Phases', projects: 'Projects', people: 'People', meeting_notes: 'Meeting notes', time_off: 'Time off', brand_palettes: 'Brand palettes', wishlist: 'Wishlist', access: 'Access list' }
+const LABEL: Record<string, string> = { tasks: 'Tasks, sheets, spec sections & subtasks', phases: 'Phases', projects: 'Projects', people: 'People', meeting_notes: 'Meeting notes', time_off: 'Time off', brand_palettes: 'Brand palettes', wishlist: 'Wishlist', access: 'Access list' }
 
 const mb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(b < 100 * 1024 * 1024 ? 1 : 0)} MB`)
 
