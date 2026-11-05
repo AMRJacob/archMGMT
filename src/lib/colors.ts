@@ -113,13 +113,15 @@ export function decodeBrand(scheme: string | null | undefined): { name: string; 
 
 export function projectPalette(root: string | null | undefined, n: number, scheme?: string | null): string[] {
   const count = Math.max(1, n)
-  // Brand palettes use their colours exactly, in order; past the end, lighter then darker versions of them.
+  // Brand colours are used exactly, in order. With more phases than colours, the extra phases take suggested
+  // colours that go with the brand (the same ones the picker offers), then lighter / darker versions.
   const brand = decodeBrand(scheme)
   if (brand) {
+    const filled = [...brand.colors, ...brandSuggestions(brand.colors, Math.max(0, count - brand.colors.length))]
     return Array.from({ length: count }, (_, i) => {
-      const c = brand.colors[i % brand.colors.length]
-      const round = Math.floor(i / brand.colors.length)
-      if (!round) return c
+      if (i < filled.length) return filled[i]
+      const c = filled[i % filled.length]
+      const round = Math.floor(i / filled.length)
       const o = hexToOklch(c)
       return oklchToHex({ ...o, l: clamp(o.l + (round % 2 ? 0.14 : -0.12) * Math.ceil(round / 2), 0.25, 0.9) })
     })
@@ -145,6 +147,11 @@ export function projectAccent(root: string | null | undefined) {
     accent: oklchToHex({ l: clamp(b.l, 0.45, 0.58), c: clamp(b.c, 0.06, 0.12), h: b.h }),
     soft: oklchToHex({ l: 0.95, c: clamp(b.c * 0.35, 0.015, 0.035), h: b.h }),
   }
+}
+
+/** The dot that stands for a project (swatch, lists): its base colour exactly, or its first brand colour. */
+export function projectDot(project: { color: string | null; color_scheme?: string | null } | null | undefined): string {
+  return project?.color ?? decodeBrand(project?.color_scheme)?.colors[0] ?? projectAccent(null).accent
 }
 
 /** Dark or light text, whichever reads better on a colour. */

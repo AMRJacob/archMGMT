@@ -221,7 +221,7 @@ export default function ProjectDetail() {
       )}
       <header className="project-head card">
         <div className="project-title">
-          <ColorPicker value={project.color} scheme={project.color_scheme ?? null} phaseNames={sortedPhases.map((p) => p.name)}
+          <ColorPicker value={project.color} scheme={project.color_scheme ?? null} phases={sortedPhases}
             onChange={(c) => projects.patch(id, c)} />
           <TextField value={project.number} placeholder="Project no." className="mono number"
             onSave={(v) => projects.patch(id, { number: v })} />

@@ -1334,3 +1334,5 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .cp-order-chip:hover button { opacity: 1; }
 .cp-chip.suggest { border-style: dashed; }
 .cp-label-note { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); }
+.cp-order-chip.suggested { outline: 1.5px dashed var(--muted); outline-offset: 1.5px; }
+.cp-order-chip b { font-size: 10px; }

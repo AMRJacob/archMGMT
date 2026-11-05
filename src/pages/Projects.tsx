@@ -3,7 +3,7 @@ import { useTableText } from '../lib/prefs.ts'
 import { useNavigate } from 'react-router-dom'
 import { useRows } from '../lib/data.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { projectAccent } from '../lib/colors.ts'
+import { projectDot } from '../lib/colors.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import NewProjectFlow from '../components/NewProjectFlow.tsx'
 import { Pop } from '../components/TaskChips.tsx'
@@ -338,7 +338,7 @@ export default function Projects() {
               <tr key={r.project.id} className={r.project.id === projects.current?.id ? 'current' : ''}
                 onClick={() => { projects.select(r.project.id); navigate('/overview') }}>
                 <td title={tableText === 'crop' ? [r.project.name, r.project.client].filter(Boolean).join(' · ') : undefined}>
-                  <div className="strong"><span className="pdot" style={{ background: projectAccent(r.project.color).accent }} />{r.project.name}</div>
+                  <div className="strong"><span className="pdot" style={{ background: projectDot(r.project) }} />{r.project.name}</div>
                   {!cols.includes('owner') && r.project.client && <div className="muted small">{r.project.client}</div>}
                 </td>
                 {shownCols.map((c) => {

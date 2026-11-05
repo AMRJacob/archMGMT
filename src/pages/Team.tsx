@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, DateField, SelectField, TextField } from '../components/fields.tsx'
-import { projectAccent } from '../lib/colors.ts'
+import { projectDot } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, parseISO, shortDate, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
@@ -177,7 +177,7 @@ export default function Team() {
                     </tr>
                     {open && breakdown.map(([projectId, m]) => {
                       const proj = projectMap.get(projectId)
-                      const color = projectAccent(proj?.color).accent
+                      const color = projectDot(proj)
                       return (
                         <tr key={projectId} className="sub" onClick={() => { select(projectId); navigate('/overview') }}>
                           <td className="who"><div className="sub-who"><span className="pdot" style={{ background: color }} />{proj?.name ?? 'Project'}</div></td>
