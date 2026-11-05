@@ -78,6 +78,8 @@ export default function PlanTree({
   const [addingSheet, setAddingSheet] = useState(false)
   const [planning, setPlanning] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  // The description box opens only when asked for (menu or the ≡ marker), never just by selecting a row.
+  const [descFor, setDescFor] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [hint, setHint] = useState<{ id: string; place: Place } | null>(null)
   const [clip, setClip] = useState<Clip | null>(() => readClip())
@@ -384,7 +386,7 @@ export default function PlanTree({
         )}
         {kind === 'view' && <span className="kind-tag">View</span>}
         <div className="trow-title">{title(t, kind === 'sheet' || kind === 'section' ? 'sheet-title' : '')}</div>
-        {t.notes && selected !== t.id && <span className="has-desc" title={t.notes}>≡</span>}
+        {t.notes && descFor !== t.id && <button className="has-desc" title={`${t.notes}\n\nClick to edit`} onClick={() => setDescFor(t.id)}>≡</button>}
         {kind === 'sheet' && (
           <Pop className="type-pop" title="Sheet type" label={<span className="type-chip">{type?.name ?? 'Type'}</span>}>
             {(close) => (
@@ -423,10 +425,10 @@ export default function PlanTree({
         {firstOf(t) && seam([{ task: t, depth }], 'before')}
         {!(isOpen && kids.length) && seam([{ task: t, depth }, ...enders], 'after')}
       </li>,
-      // The selected row shows its description underneath, to read or edit (it never shows on cards).
-      ...(selected === t.id ? [
-        <li key={`${t.id}-desc`} className="tdesc" style={{ paddingLeft: 40 + depth * 24 + 34 } as CSSProperties}>
-          <TextField multiline value={t.notes ?? null} placeholder="Add a description…" className="tdesc-field"
+      ...(descFor === t.id ? [
+        <li key={`${t.id}-desc`} className="tdesc" style={{ paddingLeft: 40 + depth * 24 + 34 } as CSSProperties} onBlur={() => setDescFor(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); (e.target as HTMLElement).blur() } }}>
+          <TextField multiline autoFocus value={t.notes ?? null} placeholder="Add a description…" className="tdesc-field"
             onSave={(v) => onPatch(t, { notes: v }, false)} />
         </li>,
       ] : []),
@@ -610,6 +612,8 @@ export default function PlanTree({
       { label: `${pasteLabel} below`, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(t, 'after') },
       ...(holds ? [{ label: `${pasteLabel} inside`, disabled: !hasClip, run: () => paste(t, 'inside') }] : []),
       { label: 'Duplicate', keys: 'Ctrl+D', run: () => duplicate(t) },
+      'sep',
+      { label: descFor === t.id ? 'Close description' : t.notes ? 'Edit description…' : 'Add description…', run: () => setDescFor(descFor === t.id ? null : t.id) },
       ...(onAddNote && k !== 'item' ? [
         'sep' as const,
         { label: t.is_milestone ? 'Add meeting notes' : 'Add notes', run: () => onAddNote(t) },

@@ -1471,7 +1471,8 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 .tlist li.tdesc { list-style: none; padding: 0 14px 8px; }
 .tgroup-list > li.tdesc { margin-left: 14px; background: var(--panel); }
 .tdesc-field { width: 100%; min-height: 52px; font-size: 13px; color: var(--ink); resize: vertical; }
-.has-desc { color: var(--faint); font-size: 13px; margin-left: -4px; cursor: help; }
+.has-desc { color: var(--faint); font-size: 13px; margin-left: -4px; cursor: pointer; border: none; background: none; padding: 0 3px; border-radius: 4px; flex: none; }
+.has-desc:hover { color: var(--ink); background: var(--hover); }
 .qp-desc { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
 .qp-desc > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .qp-desc .field { width: 100%; min-height: 64px; font-size: 13px; resize: vertical; }
