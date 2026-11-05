@@ -18,6 +18,8 @@ import { phaseColors, phaseSlots, projectAccent, textOn } from '../lib/colors.ts
 import { useProject } from '../lib/projectContext.ts'
 import { PROJECT_STATUSES, type Phase, type ProjectStatus, type Task } from '../lib/types.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
+import { useAuth } from '../auth/authContext.ts'
+import { isAssigned } from '../lib/assignees.ts'
 import { useNotes } from '../lib/useNotes.tsx'
 import { area, BUILDING_TYPES, money } from '../lib/amount.ts'
 import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
@@ -32,6 +34,13 @@ export default function ProjectDetail() {
   const { phases, tasks, people, patchTask, patchMany } = useProjectPlan(id)
   const rowLayout = useRowLayout()
   const nh = useNotes(id, tasks.rows, phases.rows, people.rows, () => void tasks.reload())
+  // "Only mine": the signed-in person's tasks (matched to the Team list by email), with what they sit under and
+  // what's under them. Remembered in this browser.
+  const { session } = useAuth()
+  const myEmail = session?.user.email?.toLowerCase() ?? null
+  const me = myEmail ? people.rows.find((p) => (p.email ?? '').toLowerCase() === myEmail) ?? null : null
+  const [onlyMine, setOnlyMine] = useState(() => { try { return localStorage.getItem('archmgmt.onlyMine') === '1' } catch { return false } })
+  const toggleMine = (on: boolean) => { setOnlyMine(on); try { localStorage.setItem('archmgmt.onlyMine', on ? '1' : '0') } catch { /* private mode */ } }
   const [openIds, setOpenIds] = useState<Set<string> | null>(null)
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
@@ -98,6 +107,19 @@ export default function ProjectDetail() {
 
   const staff = people.rows.filter((p) => p.kind === 'staff')
   const tree = buildTree(tasks.rows)
+  const mineOn = onlyMine && Boolean(me)
+  const viewTree = (() => {
+    if (!mineOn || !me) return tree
+    const keep = new Set<string>()
+    const down = (pid: string) => { for (const c of tree.children.get(pid) ?? []) { keep.add(c.id); down(c.id) } }
+    for (const t of tasks.rows) {
+      if (!isAssigned(t, me.id)) continue
+      keep.add(t.id); down(t.id)
+      let cur = t.parent_id ? tree.byId.get(t.parent_id) : undefined
+      for (let n = 0; cur && n < 12; n++) { keep.add(cur.id); cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined }
+    }
+    return buildTree(tasks.rows.filter((t) => keep.has(t.id)))
+  })()
   const work = (rows: Task[]) => rows.filter((x) => !x.is_milestone && isWorkLeaf(tree, x))
   const openTaskRows = work(tasks.rows).filter((x) => x.status !== 'done')
   const start = minDate(phases.rows.map((p) => p.start_date))
@@ -291,6 +313,12 @@ export default function ProjectDetail() {
       )}
 
       <div className="rows-area" style={rowLayout.span ? ({ '--rows-w': `${rowLayout.span}px` } as CSSProperties) : undefined}>
+      <div className="mine-bar">
+        <label className={`inline-check${mineOn ? ' on' : ''}`} title={me ? `Show only what's assigned to ${me.name} (and what it sits under)` : 'Link your account to the Team list (Settings → Access → Your name) to use this'}>
+          <input type="checkbox" checked={mineOn} disabled={!me} onChange={(e) => toggleMine(e.target.checked)} />
+          Only mine{me && mineOn ? <span className="muted"> · {me.name}</span> : null}
+        </label>
+      </div>
       <RowColumnsHeader />
       <div className="phase-list">
         {sortedPhases.map((p, i) => {
@@ -351,7 +379,7 @@ export default function ProjectDetail() {
                       <span className="muted small">Pick the usual tasks, milestones and sheets for this phase in one go, or add one thing at a time below.</span>
                     </div>
                   )}
-                  <PlanTree phase={p} tree={tree} phases={phases.rows} people={people.rows} projectId={id}
+                  <PlanTree phase={p} tree={viewTree} emptyNote={mineOn ? 'Nothing assigned to you in this phase.' : undefined} phases={phases.rows} people={people.rows} projectId={id}
                     onPatch={patchTask} onPatchMany={patchMany}
                     presented={(x) => isPresented(rulesOf(project), x)}
                     onAddNote={(x) => void nh.add(x)}

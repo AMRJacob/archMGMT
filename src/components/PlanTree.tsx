@@ -28,10 +28,12 @@ type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside
  * promote/demote from the menu (or Ctrl+[ / Ctrl+]), and cut/copy/paste with the menu or Ctrl+X/C/V.
  */
 export default function PlanTree({
-  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented, onAddNote, noteCount, onOpenNotes,
+  phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented, onAddNote, noteCount, onOpenNotes, emptyNote,
 }: {
   /** Meeting notes: start one for a row, how many it has, open its latest. */
   onAddNote?: (t: Task) => void
+  /** Shown instead of the add button when the phase is empty because of a filter (e.g. Only mine). */
+  emptyNote?: string
   noteCount?: (t: Task) => number
   onOpenNotes?: (t: Task) => void
   /** Whether a row is in the presentation view, and flipping it (right-click menu). */
@@ -457,7 +459,8 @@ export default function PlanTree({
             {!folded.sheets && topSheets.flatMap((t) => node(t, 0))}
           </ul></li>
         )}
-        {top.length === 0 && !addingSheet && (
+        {top.length === 0 && !addingSheet && emptyNote && <li className="muted small empty-row">{emptyNote}</li>}
+        {top.length === 0 && !addingSheet && !emptyNote && (
           <li className="muted small empty-row">
             <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
           </li>
