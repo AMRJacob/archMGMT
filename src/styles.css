@@ -1347,3 +1347,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .cc-pick input { width: 22px; height: 20px; border: none; padding: 0; background: none; cursor: pointer; }
 .cc-pick .icon-btn { padding: 0 3px; opacity: .5; }
 .xp-custom { margin: 2px 0 8px; }
+/* Year view: a visible day grid. Each week is a row of seven cells (day number plus the phase bars under it). */
+.ym-week { border: 1px solid var(--line); border-bottom: none; padding-bottom: 3px;
+  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px); background-size: calc(100% / 7) 100%; background-position: -1px 0; }
+.ym-week:last-child { border-bottom: 1px solid var(--line); }
+.ym-day { border-radius: 0; }
+.ym-day.today { outline-offset: -2px; }
+.ym-days > span:empty { background: var(--subtle); }
+.ym-dows span { padding-bottom: 3px; }
