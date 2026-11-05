@@ -5,6 +5,10 @@ import { shiftDates } from '../lib/useProjectPlan.ts'
 import { mondayOf, weekStarts } from '../lib/workload.ts'
 import { assignPatch, assigneesOf, isAssigned } from '../lib/assignees.ts'
 import { AvatarStack, MilestoneMark } from './TaskChips.tsx'
+import { textOn } from '../lib/colors.ts'
+
+/** "Schematic Design" → "SD", "Construction Administration" → "CA", "Bidding" → "B". */
+const initialsOfPhase = (name: string) => name.split(/[\s/&-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase()
 
 /**
  * Task board. Columns by status (kanban), by phase, by week (a post-it pull-plan, cards coloured by
@@ -183,6 +187,16 @@ export default function BoardView({
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; setDragId(t.id); setDragFrom(col.key) }}
                       onDragEnd={() => { setDragId(null); setOver(null) }}
                       onClick={() => onOpenTask(t)}>
+                      {note && (() => {
+                        // Post-its: a strip down the left in the phase's colour, with the phase's initials.
+                        const ph = t.phase_id ? sortedPhases[phaseIndex.get(t.phase_id) ?? -1] : undefined
+                        const c = pi === undefined ? '#c9c6bf' : phaseColor(pi)
+                        return (
+                          <span className="ct-phase" style={{ background: c, color: textOn(c) }} title={ph ? ph.name : 'No phase'}>
+                            {ph ? initialsOfPhase(ph.name) : '–'}
+                          </span>
+                        )
+                      })()}
                       <div className="ct-title">
                         {t.is_milestone && <MilestoneMark task={t} />}
                         {t.kind === 'sheet' && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}

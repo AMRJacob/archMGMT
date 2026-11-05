@@ -1362,3 +1362,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--warn) 80%, var(--faint)); }
 .tgroup.g-sheets .tgroup-head { color: color-mix(in srgb, #8e3b6e 70%, var(--faint)); }
 .tgroup .tgroup-list > li:nth-child(2) { border-top: 1px solid var(--line-soft); }
+/* Post-its: the phase strip down the left side. */
+.card-task.note { position: relative; padding-left: 32px; }
+.ct-phase { position: absolute; left: 0; top: 0; bottom: 0; width: 24px; display: flex; align-items: flex-start; justify-content: center; padding-top: 11px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0; border-radius: 2px 0 0 2px; }
