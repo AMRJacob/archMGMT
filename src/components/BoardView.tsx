@@ -113,6 +113,13 @@ export default function BoardView({
     ]
   }
 
+  /** The column whose left–right span is under the pointer (for drops below or between the cards). */
+  function colAt(e: DragEvent): Column | undefined {
+    const els = [...(e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>(':scope > .board-col')]
+    const i = els.findIndex((el) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left - 6 && e.clientX <= r.right + 6 })
+    return i >= 0 ? columns[i] : undefined
+  }
+
   function drop(col: Column, e: DragEvent) {
     e.preventDefault()
     setOver(null)
@@ -172,7 +179,11 @@ export default function BoardView({
           </div>
         </div>
       )}
-      <div className="board-cols">
+      {/* The whole height under each column takes drops too: whichever column the pointer is over (left to right). */}
+      <div className="board-cols"
+        onDragOver={(e) => { const col = colAt(e); if (col?.droppable) { e.preventDefault(); if (over !== col.key) setOver(col.key) } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null) }}
+        onDrop={(e) => { const col = colAt(e); if (col) drop(col, e); else setOver(null) }}>
         {columns.map((col) => {
           const defaults = addDefaults(col)
           const openCount = col.tasks.filter((t) => t.status !== 'done').length
@@ -181,7 +192,7 @@ export default function BoardView({
               className={`board-col${over === col.key && col.droppable ? ' over' : ''}${col.current ? ' current' : ''}${col.droppable ? '' : ' fixed'}`}
               onDragOver={(e) => { if (col.droppable) { e.preventDefault(); setOver(col.key) } }}
               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null) }}
-              onDrop={(e) => drop(col, e)}>
+              onDrop={(e) => { e.stopPropagation(); drop(col, e) }}>
               <div className="board-col-head" style={col.accent ? { borderTopColor: col.accent } : undefined}>
                 <div>
                   <span className="strong">{col.title}</span>

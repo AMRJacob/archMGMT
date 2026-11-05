@@ -1461,3 +1461,5 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .late { color: var(--danger); }
 .todo-filters select.field.boxed { width: auto; max-width: 280px; flex: none; }
 .todo-filters .todo-search { flex: none; }
+/* Board: the area under the columns runs to the bottom of the page, so a card can be dropped anywhere below a column. */
+.board-cols { min-height: calc(100vh - 230px); }
