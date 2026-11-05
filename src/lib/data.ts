@@ -414,7 +414,12 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
         } catch (e) {
           savedAt.current.delete(id)
           if (e instanceof StaleError) notify(`${nameOf(e.by)} changed this just before you, so your edit wasn't saved. You're now seeing their version.`, 'warn')
-          else setError(e instanceof Error ? e.message : String(e))
+          else {
+            // A refused save must not pass silently: say so, then show what's actually stored.
+            const msg = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e)
+            setError(msg)
+            notify(`That change couldn't be saved, so it was undone (${msg}).`, 'warn')
+          }
           void reload()
         }
       })
