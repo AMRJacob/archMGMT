@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
-import ScheduleChart, { type ChartMode, type ChartSpot } from '../components/ScheduleChart.tsx'
+import ScheduleChart, { type ChartMode, type ChartSeam, type ChartSpot } from '../components/ScheduleChart.tsx'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import { kindUnder, moveTo } from '../lib/treeEdit.ts'
 import { isPresented, ruleMatch, rulesOf, togglePresented, type PresentationRules } from '../lib/presentation.ts'
@@ -65,6 +65,7 @@ export default function Schedule() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
   const [phaseEdit, setPhaseEdit] = useState<string | null>(null)
+  const [seam, setSeam] = useState<ChartSeam | null>(null)
   const [spot, setSpot] = useState<(Omit<ChartSpot, 'phase'> & { phase: Phase | null }) | null>(null)
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
@@ -217,12 +218,6 @@ export default function Schedule() {
     return phase.start_date <= t0 && t0 <= phase.end_date ? mondayOf(t0) : phase.start_date
   }
 
-  /** Typed straight into a phase's "+ Add task" row: a named general task, a week long, no pop-up. */
-  function quickAdd(phase: Phase, title: string) {
-    const s = defaultStart(phase)
-    return addTask({ phase_id: phase.id, parent_id: null, kind: 'task', title, is_milestone: false, client_visible: false,
-      start_date: s, due_date: addDays(s, 4), effort: 2 }, false)
-  }
 
   /** The phase a day falls in (or the nearest one), for adding from the calendar. */
   const phaseOn = (d: string): Phase | null => {
@@ -256,6 +251,46 @@ export default function Schedule() {
       effort: opts.milestone ? null : 2,
       ...(parent ? { assignee_ids: parent.assignee_ids ?? [], assignee_id: parent.assignee_id } : {}),
     })
+  }
+
+  /** Put something just added at a seam: right after / before its neighbour, or inside a sheet or section. */
+  function placeNew(created: Task, anchor: Task | null, place: 'before' | 'after' | 'inside') {
+    if (!anchor) return
+    const rows = [...tasks.rows.filter((x) => x.id !== created.id), created]
+    const c = moveTo(buildTree(rows), created, real(anchor), place, created.phase_id)
+    if (c.length) plan.patchMany(c)
+  }
+
+  /** What the hover "+" between rows can add, given what's above and below it (and which zone it's in). */
+  function seamItems(sm: ChartSeam): MenuItem[] {
+    const above = sm.above ? real(sm.above) : null
+    const below = sm.below ? real(sm.below) : null
+    const byId = tree.byId
+    // Where a sibling goes: inside `above` when the row below is its first child, else next to the row above
+    // (or before the row below, right under a heading).
+    const firstChild = above && below && below.parent_id === above.id
+    const parent = firstChild ? above : above ? (above.parent_id ? byId.get(above.parent_id) ?? null : null) : below?.parent_id ? byId.get(below.parent_id) ?? null : null
+    const anchor: Task | null = firstChild ? below : above ?? below
+    const place: 'before' | 'after' = firstChild || !above ? 'before' : 'after'
+    const at = <T,>(p: Promise<T & Task>) => void p.then((c) => placeNew(c, anchor, place))
+    const items: MenuItem[] = []
+    if (parent && (parent.kind === 'sheet' || parent.kind === 'section')) {
+      items.push({ label: `Task in “${[parent.sheet_number, parent.title].filter(Boolean).join(' ').slice(0, 34)}”`, run: () => at(addHere(sm.phase, null, { parent })) })
+    } else if (!parent) {
+      const z = sm.zone
+      if (!z || z === 'general') {
+        items.push({ label: 'Task', run: () => at(addHere(sm.phase, null)) })
+        items.push({ label: 'Milestone', run: () => at(addHere(sm.phase, null, { milestone: true })) })
+      }
+      if (!z || z === 'sheets') items.push({ label: 'Sheet', run: () => at(addHead(sm.phase, 'sheet')) })
+      if (!z || z === 'manual') items.push({ label: 'Spec section', run: () => at(addHead(sm.phase, 'section')) })
+    }
+    // Right under a sheet or section with nothing open beneath it: also offer a task inside it.
+    if (above && !firstChild && (above.kind === 'sheet' || above.kind === 'section')) {
+      items.push({ label: `Task inside “${[above.sheet_number, above.title].filter(Boolean).join(' ').slice(0, 30)}”`, run: () => void addHere(sm.phase, null, { parent: above }) })
+    }
+    if (!items.length) items.push({ label: 'Task', run: () => at(addHere(sm.phase, null)) })
+    return items
   }
 
   function spotItems(sp: NonNullable<typeof spot>): MenuItem[] {
@@ -391,7 +426,7 @@ export default function Schedule() {
             )}
             {mode === 'working' ? (
               <span className="muted small grow">
-                {setup === 'on' ? null : `Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
+                {setup === 'on' ? null : `Hover between rows for a + to add there, or right-click / double-click a spot on the timeline; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
               </span>
             ) : (
               <PresentationFilter rules={rules} onChange={setRules}
@@ -456,7 +491,7 @@ export default function Schedule() {
               onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}
               onReorder={(t, target, at) => { const c = moveTo(tree, real(t), real(target), at, target.phase_id); if (c.length) plan.patchMany(c) }}
               onAddAt={(ph, d) => void addHere(ph, d)}
-              onQuickAdd={(ph, title) => void quickAdd(ph, title)}
+              onSeam={(sm) => setSeam(sm)}
               onContextAt={(sp) => setSpot(sp)} />
           </div>
           <p className="muted small no-print">
@@ -527,6 +562,7 @@ export default function Schedule() {
       })()}
       {nh.editor}
       {spot && <ContextMenu x={spot.clientX} y={spot.clientY} items={spotItems(spot)} onClose={() => setSpot(null)} />}
+      {seam && <ContextMenu x={seam.clientX} y={seam.clientY + 8} items={seamItems(seam)} onClose={() => setSeam(null)} />}
 
       {editing && (
         <TaskEditor task={editing} phases={phases.rows} people={people.rows}

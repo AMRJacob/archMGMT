@@ -40,6 +40,19 @@ type Row =
 type DragMode = 'move' | 'start' | 'end'
 
 /** What's under the pointer on the timeline: the day (null over the labels), the phase and the task row, if any. */
+/** A spot between two rows in the label column, where the hover "+" adds something. */
+export interface ChartSeam {
+  phase: Phase
+  /** The task row just above the line (null right under a phase or zone heading). */
+  above: Task | null
+  /** The task row just below the line, if it's in the same phase. */
+  below: Task | null
+  /** The zone the line sits in (working view), if any. */
+  zone: 'general' | 'sheets' | 'manual' | null
+  clientX: number
+  clientY: number
+}
+
 export interface ChartSpot { date: string | null; phase: Phase | null; task: Task | null; clientX: number; clientY: number }
 interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number; delta: number; moved: boolean }
 
@@ -74,7 +87,7 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onQuickAdd, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onQuickAdd, onSeam, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
 }: {
   /** On screen: keep the date header in view while scrolling, this far from the top of the window (CSS length). */
   stickyTop?: string
@@ -96,6 +109,8 @@ export default function ScheduleChart({
   onAddAt?: (phase: Phase, date: string | null) => void
   /** Type a name into the "+ Add task" row: Enter adds it (and leaves the box open for the next one). */
   onQuickAdd?: (phase: Phase, title: string) => void
+  /** Hovering the line below or between rows shows a "+"; clicking it asks what to add there. */
+  onSeam?: (seam: ChartSeam) => void
   /** Right-click on the chart: the date and row under the pointer. */
   onContextAt?: (at: ChartSpot) => void
   /** Theme colors for the on-screen chart; exports leave this out and get the neutral presentation look. */
@@ -168,7 +183,8 @@ export default function ScheduleChart({
         part.forEach((task) => rows.push({ kind: 'task', task, color }))
       }
     }
-    if (editable && onAddAt && !pres && !setup) rows.push({ kind: 'add', phase, color })
+    // (With the hover "+" between rows, the old "+ Add task" row isn't needed.)
+    if (editable && onAddAt && !onSeam && !pres && !setup) rows.push({ kind: 'add', phase, color })
   })
   const loose = tasks.filter((t) => !t.phase_id && (!pres || presented(t))).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
@@ -722,6 +738,33 @@ export default function ScheduleChart({
       })}
       </g>
       <line x1={M} x2={W - M} y1={rowsBottom} y2={rowsBottom} stroke={C.lineStrong} />
+
+      {/* Working view: hover the line under (or between) rows in the label column for a "+" that adds right there. */}
+      {editable && onSeam && !pres && !setup && rows.map((r, i) => {
+        if (r.kind !== 'phase' && r.kind !== 'task' && r.kind !== 'zone') return null
+        const phaseOfRow = r.kind === 'task' ? sorted.find((p) => p.id === r.task.phase_id) : r.phase
+        if (!phaseOfRow) return null
+        const next = rows[i + 1]
+        // A phase heading directly over its zone heading needs no line of its own.
+        if (r.kind === 'phase' && next?.kind === 'zone') return null
+        const h = r.kind === 'task' ? ROW_TASK : r.kind === 'zone' ? ROW_ZONE : ROW_PHASE
+        const ly = rowY[i] + h
+        // The zone this line sits in: the nearest zone heading above it in the same phase.
+        let zone: ChartSeam['zone'] = null
+        for (let j = i; j >= 0; j--) { const q = rows[j]; if (q.kind === 'zone') { zone = q.zone; break } if (q.kind === 'phase') break }
+        const above = r.kind === 'task' ? r.task : null
+        const below = next?.kind === 'task' && next.task.phase_id === phaseOfRow.id ? next.task : null
+        return (
+          <g key={`seam-${i}`} className="sched-seam" onClick={(e) => { e.stopPropagation(); onSeam({ phase: phaseOfRow, above, below, zone, clientX: e.clientX, clientY: e.clientY }) }}>
+            <rect x={M} y={ly - 5} width={x0 - M} height={10} fill="transparent" style={{ cursor: 'pointer' }} />
+            <g className="seam-vis" pointerEvents="none">
+              <line x1={M + 22} x2={x0 - 6} y1={ly} y2={ly} stroke={C.accent} strokeWidth={1.5} />
+              <circle cx={M + 14} cy={ly} r={7} fill={C.accent} />
+              <path d={`M${M + 10.5} ${ly}h7M${M + 14} ${ly - 3.5}v7`} stroke="#fff" strokeWidth={1.6} strokeLinecap="round" />
+            </g>
+          </g>
+        )
+      })}
 
       {/* Presentation setup: a wash over everything the presentation won't show, and a click target on each row
           (on top, so nothing drags while choosing). Tasks in a hidden phase are hidden with it. */}

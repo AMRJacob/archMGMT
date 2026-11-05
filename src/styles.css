@@ -1523,3 +1523,6 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 /* Selected rows: a clear tint and an accent edge (also over the group panels' own row background). */
 .tlist li.trow.selected, .tlist li.irow.selected, .tgroup-list > li.trow.selected, .tgroup-list > li.irow.selected {
   background: color-mix(in srgb, var(--accent) 13%, var(--panel)); box-shadow: inset 3px 0 0 var(--accent); }
+/* Schedule: the hover "+" between rows in the label column. */
+.sched-seam .seam-vis { opacity: 0; transition: opacity .12s; }
+.sched-seam:hover .seam-vis { opacity: 1; }
