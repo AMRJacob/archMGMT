@@ -653,16 +653,16 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 
 /* Zen: low contrast and calm. Soft ink on stone paper, a sage accent, quiet lines, a little more room. */
 :root[data-theme='zen'] {
-  --ink: #3a3f42; --muted: #80868a; --line: #e8e6e0; --line-strong: #dad7cf; --paper: #f3f2ee; --panel: #fbfbf9; --hover: #eeede8;
+  --ink: #3a3f42; --muted: #7b8185; --line: #dcdad3; --line-strong: #cdcac1; --paper: #e8e7e2; --panel: #f1f0ec; --hover: #e4e3dd;
   --accent: #5f8a7d; --accent-strong: #4d7468; --accent-soft: #e3ece8; --on-accent: #fff; --sidebar: #3d4743;
   --ok: #5f8a6a; --warn: #b08a4a; --info: #6d88a0; --danger: #b0645a;
-  --subtle: #f8f7f4; --line-soft: #f0efea; --chip: #ecebe6; --col: #efeee9; --col-soft: #f4f3ef; --faint: #bdbab3;
+  --subtle: #ecebe7; --line-soft: #e5e4de; --chip: #e2e1db; --col: #e5e4de; --col-soft: #eae9e4; --faint: #b3b0a8;
   --ok-soft: #e6eee8; --info-soft: #e6ecf1; --warn-soft: #f2ece0; --danger-soft: #f5e8e5; --danger-line: #e8cdc8;
   --heat-1: #e7eee9; --heat-2: #bcd3c6; --heat-3: #e6d3a6; --heat-4: #dcaea2; --heat-ink: rgba(58, 63, 66, 0.7);
   --side-ink: #d6dcd8; --side-muted: #a9b4af; --side-faint: #8e9a95; --side-strong: #f4f6f4;
   font-size: 14.5px; line-height: 1.55;
 }
-[data-theme='zen'] .card { border-color: var(--line-soft); border-radius: 12px; box-shadow: 0 1px 2px rgba(58, 63, 66, 0.04); }
+[data-theme='zen'] .card { border-color: var(--line-soft); border-radius: 12px; box-shadow: 0 1px 2px rgba(58, 63, 66, 0.05); }
 [data-theme='zen'] h1 { font-weight: 600; letter-spacing: -0.005em; }
 [data-theme='zen'] h2 { font-weight: 600; }
 [data-theme='zen'] .btn { border-radius: 8px; }
