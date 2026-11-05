@@ -200,13 +200,6 @@ export default function BoardView({
                           </span>
                         )
                       })()}
-                      {note && sheetOf && (() => {
-                        // Which kind of work: a corner in the Overview's group colours (amber general, plum sheet).
-                        const sh = sheetOf(t)
-                        return <span className={`ct-kind ${sh ? 'sheet' : 'general'}`} title={sh ? `Sheet work${sh.sheet_number ? `: ${sh.sheet_number}` : ''} ${sh.title}` : 'General task'}>
-                          {sh && sh.id !== t.id ? (sh.sheet_number || 'Sheet') : ''}
-                        </span>
-                      })()}
                       <div className="ct-title">
                         {t.is_milestone && <MilestoneMark task={t} />}
                         {t.kind === 'sheet' && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
@@ -226,13 +219,36 @@ export default function BoardView({
                     </div>
                   )
                 }
-                  if (!(group === 'week' || group === 'person') || !sheetOf) return col.tasks.map(card)
-                  // Post-its gather in two zones on the column itself: general tasks, then sheet work.
-                  const gen = col.tasks.filter((t) => !sheetOf(t)), sh = col.tasks.filter((t) => sheetOf(t))
+                  if (!sheetOf) return col.tasks.map(card)
+                  // Cards gather in two zones on the column itself, general tasks then sheet work, and within a zone
+                  // they clump by phase (a small phase label over each clump; not needed when columns are phases).
+                  const byPhase = (list: Task[]) => {
+                    const order = (t: Task) => (t.phase_id ? phaseIndex.get(t.phase_id) ?? 999 : 999)
+                    return [...list].sort((x, y) => order(x) - order(y))
+                  }
+                  const zone = (kind: 'general' | 'sheet', label: string, list: Task[]) => {
+                    if (!list.length) return null
+                    const out: ReactNode[] = []
+                    let last: string | null | undefined
+                    byPhase(list).forEach((t, i) => {
+                      const ph = t.phase_id ?? null
+                      if (group !== 'phase' && ph !== last) {
+                        const pi2 = ph ? phaseIndex.get(ph) : undefined
+                        out.push(
+                          <div key={`ph-${ph ?? 'none'}`} className="nz-phase">
+                            <i style={{ background: pi2 === undefined ? '#c9c6bf' : phaseColor(pi2) }} />{pi2 === undefined ? 'No phase' : sortedPhases[pi2].name}
+                          </div>,
+                        )
+                        last = ph
+                      }
+                      out.push(card(t, i))
+                    })
+                    return <div className={`note-zone ${kind}`}><span className="nz-label">{label}</span><div className="nz-cards">{out}</div></div>
+                  }
                   return (
                     <>
-                      {gen.length > 0 && <div className="note-zone general"><span className="nz-label">General</span><div className="nz-cards">{gen.map(card)}</div></div>}
-                      {sh.length > 0 && <div className="note-zone sheet"><span className="nz-label">Sheets</span><div className="nz-cards">{sh.map(card)}</div></div>}
+                      {zone('general', 'General', col.tasks.filter((t) => !sheetOf(t)))}
+                      {zone('sheet', 'Sheets', col.tasks.filter((t) => sheetOf(t)))}
                     </>
                   )
                 })()}

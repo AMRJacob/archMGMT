@@ -1381,16 +1381,6 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .card-task.note.dragging { box-shadow: none; }
 .ct-phase { position: absolute; left: 0; top: 0; bottom: 0; width: 16px; display: flex; align-items: flex-start; justify-content: center; padding-top: 12px;
   font-size: 8px; font-weight: 700; letter-spacing: -0.02em; border-radius: 2px 0 0 2px; overflow: hidden; }
-/* Post-its: what kind of work, in the Overview's group colours: a folded corner (amber general, plum sheet),
-   with the sheet number beside it on tasks that sit under a sheet. */
-.ct-kind { position: absolute; top: 0; right: 0; display: flex; align-items: flex-start; gap: 3px;
-  font-size: 9px; font-weight: 700; font-family: ui-monospace, monospace; line-height: 1; color: var(--kc); }
-.ct-kind:not(:empty) { padding-top: 3px; }
-.ct-kind::after { content: ''; flex: none; width: 18px; height: 18px; margin-top: 0; background: linear-gradient(225deg, var(--kc) 0 50%, rgba(0,0,0,.14) 50% 57%, transparent 57%); border-top-right-radius: 2px; }
-.ct-kind:not(:empty)::after { margin-top: -3px; }
-.ct-kind.general { --kc: var(--kind-general); }
-.ct-kind.sheet { --kc: var(--kind-sheet); }
-.card-task.note .ct-title { padding-right: 18px; }
 
 /* Post-its fit their text, and gather in a General zone and a Sheets zone in each column. */
 .card-task.note { min-height: 0; width: fit-content; max-width: 100%; min-width: 120px; padding-top: 9px; padding-bottom: 8px; }
@@ -1416,3 +1406,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 }
 /* Work kinds in the theme's own colours (General Tasks / Sheets in the Overview and on the board). */
 :root { --kind-general: var(--warn); --kind-sheet: color-mix(in srgb, var(--info) 55%, var(--danger)); }
+/* Board zones: a soft shadow lifts each zone off the column; phase labels head the clumps inside. */
+.note-zone { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 10px -6px rgba(0, 0, 0, 0.18); }
+.note-zone + .note-zone { margin-top: 2px; }
+.board-cards { gap: 10px; }
+.nz-phase { flex-basis: 100%; display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin: 2px 0 -3px 2px; }
+.nz-phase:first-child { margin-top: 0; }
+.nz-phase i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.note-zone .nz-cards > .card-task:not(.note) { width: 100%; }
