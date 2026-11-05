@@ -74,7 +74,7 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onQuickAdd, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
 }: {
   /** On screen: keep the date header in view while scrolling, this far from the top of the window (CSS length). */
   stickyTop?: string
@@ -94,6 +94,8 @@ export default function ScheduleChart({
   presented?: (t: Task) => boolean
   /** Add a task in a phase, starting on a date (from the "+ Add task" rows and double-clicks on empty space). */
   onAddAt?: (phase: Phase, date: string | null) => void
+  /** Type a name into the "+ Add task" row: Enter adds it (and leaves the box open for the next one). */
+  onQuickAdd?: (phase: Phase, title: string) => void
   /** Right-click on the chart: the date and row under the pointer. */
   onContextAt?: (at: ChartSpot) => void
   /** Theme colors for the on-screen chart; exports leave this out and get the neutral presentation look. */
@@ -124,6 +126,7 @@ export default function ScheduleChart({
   const [order, setOrder] = useState<{ id: string; y0: number; moved: boolean; target: string | null; place: 'before' | 'after' } | null>(null)
   const pan = useRef<{ x0: number; applied: number } | null>(null)
   const wheelAcc = useRef(0)
+  const [typing, setTyping] = useState<string | null>(null)
   // Placing an undated task or milestone: press in its row where it should start, drag to set its length.
   const [place, setPlace] = useState<{ id: string; a: string; b: string } | null>(null)
   const [panning, setPanning] = useState(false)
@@ -583,10 +586,22 @@ export default function ScheduleChart({
         if (r.kind === 'add') {
           const phase = r.phase
           return (
-            <g key={i} className="chart-add" style={{ cursor: 'pointer' }} onClick={() => onAddAt?.(phase, null)}>
+            typing === phase.id && onQuickAdd ? (
+              <foreignObject key={i} x={M + 24} y={ry + 2} width={x0 - M - 34} height={ROW_ADD - 4}>
+                <input className="chart-type" autoFocus placeholder="Task name — Enter to add, Esc to stop"
+                  onKeyDown={(e) => {
+                    const el = e.currentTarget
+                    if (e.key === 'Enter') { const v = el.value.trim(); if (v) { onQuickAdd(phase, v); el.value = '' } else setTyping(null) }
+                    if (e.key === 'Escape') { el.value = ''; setTyping(null) }
+                  }}
+                  onBlur={(e) => { const v = e.currentTarget.value.trim(); if (v) onQuickAdd(phase, v); setTyping(null) }} />
+              </foreignObject>
+            ) : (
+            <g key={i} className="chart-add" style={{ cursor: 'pointer' }} onClick={() => (onQuickAdd ? setTyping(phase.id) : onAddAt?.(phase, null))}>
               <rect x={M} y={ry} width={x0 - M} height={ROW_ADD} fill="transparent" />
               <text x={M + 30} y={ry + 16} fontSize={12} fill={C.muted}>+ Add task</text>
             </g>
+            )
           )
         }
         const task = r.task

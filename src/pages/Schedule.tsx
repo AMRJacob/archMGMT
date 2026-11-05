@@ -167,7 +167,7 @@ export default function Schedule() {
   )
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
 
-  async function addTask(defaults: Partial<Task>) {
+  async function addTask(defaults: Partial<Task>, open = true) {
     const t = today()
     const phase = phases.rows.find((p) => p.start_date <= t && t <= p.end_date) ?? phases.rows[0]
     const start = mondayOf(t)
@@ -176,8 +176,22 @@ export default function Schedule() {
       start_date: start, due_date: addDays(start, 4), estimated_hours: null, effort: 2, status: 'todo',
       is_milestone: false, client_visible: false, sort_order: tasks.rows.length, ...defaults,
     })
-    setEditingId(created.id)
-    setNewTaskId(created.id)
+    if (open) { setEditingId(created.id); setNewTaskId(created.id) }
+    return created
+  }
+
+  /** Where a new task with no date goes: this week if its phase is under way, otherwise the phase's first week. */
+  const defaultStart = (phase: Phase | null) => {
+    const t0 = today()
+    if (!phase) return mondayOf(t0)
+    return phase.start_date <= t0 && t0 <= phase.end_date ? mondayOf(t0) : phase.start_date
+  }
+
+  /** Typed straight into a phase's "+ Add task" row: a named general task, a week long, no pop-up. */
+  function quickAdd(phase: Phase, title: string) {
+    const s = defaultStart(phase)
+    return addTask({ phase_id: phase.id, parent_id: null, kind: 'task', title, is_milestone: false, client_visible: false,
+      start_date: s, due_date: addDays(s, 4), effort: 2 }, false)
   }
 
   /** The phase a day falls in (or the nearest one), for adding from the calendar. */
@@ -200,14 +214,15 @@ export default function Schedule() {
   }
 
   function addHere(phase: Phase | null, date: string | null, opts: { milestone?: boolean; parent?: Task | null } = {}) {
-    // With no date (the "+ Add task" rows), it starts undated: the user clicks in its row to place it.
     const parent = opts.parent ? real(opts.parent) : null
     const kind = parent ? kindUnder(parent, 'task') : 'task'
     return addTask({
       phase_id: parent?.phase_id ?? phase?.id ?? null, parent_id: parent?.id ?? null, kind,
       title: opts.milestone ? 'New milestone' : 'New task',
       is_milestone: Boolean(opts.milestone), client_visible: Boolean(opts.milestone),
-      start_date: date && !opts.milestone ? date : null, due_date: date ? (opts.milestone ? date : addDays(date, 4)) : null,
+      // With no date it still gets a place (this week, or the phase's first week), so it shows on the schedule at once.
+      start_date: opts.milestone ? null : (date ?? defaultStart(phase)),
+      due_date: opts.milestone ? (date ?? addDays(defaultStart(phase), 4)) : addDays(date ?? defaultStart(phase), 4),
       effort: opts.milestone ? null : 2,
       ...(parent ? { assignee_ids: parent.assignee_ids ?? [], assignee_id: parent.assignee_id } : {}),
     })
@@ -408,6 +423,7 @@ export default function Schedule() {
               onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}
               onReorder={(t, target, at) => { const c = moveTo(tree, real(t), real(target), at, target.phase_id); if (c.length) plan.patchMany(c) }}
               onAddAt={(ph, d) => void addHere(ph, d)}
+              onQuickAdd={(ph, title) => void quickAdd(ph, title)}
               onContextAt={(sp) => setSpot(sp)} />
           </div>
           <p className="muted small no-print">

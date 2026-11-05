@@ -23,12 +23,16 @@ export default function TaskEditor({
 }) {
   const box = useRef<HTMLDivElement>(null)
 
+  // Closing saves whatever is still being typed: blur the field first so it commits, then close.
+  const finish = useRef(onClose)
+  finish.current = () => { const a = document.activeElement as HTMLElement | null; if (a && box.current?.contains(a)) a.blur(); onClose() }
+
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (isNew) onDelete(); onClose() } }
     const away = (e: MouseEvent) => {
       const t = e.target as HTMLElement
       // Clicking another task re-targets the panel; anything else outside closes it.
-      if (!box.current?.contains(t) && !t.closest('[data-drag], .cal-task, .card-task, .trow, .pop-menu, .ctx-menu')) onClose()
+      if (!box.current?.contains(t) && !t.closest('[data-drag], .cal-task, .card-task, .trow, .pop-menu, .ctx-menu')) finish.current()
     }
     document.addEventListener('keydown', esc)
     document.addEventListener('mousedown', away)
@@ -45,13 +49,16 @@ export default function TaskEditor({
         {task.is_milestone && <MilestoneMark task={task} onPatch={onPatch} />}
         <TextField value={task.title} className="qp-title" autoFocus={isNew} onSave={(v) => v && onPatch({ title: v })}
           onEscape={isNew ? () => { onDelete(); onClose() } : undefined} />
-        <button className="icon-btn close" title="Close (Esc)" onClick={onClose}>×</button>
+        <button className="icon-btn close" title="Close" onClick={() => finish.current()}>×</button>
       </div>
       <div className="qp-sub muted small">{phase?.name ?? 'No phase'}{task.is_milestone ? ` · ${milestoneType(task.milestone_type)?.label ?? 'Untyped'} milestone` : ''}</div>
       <TaskControls task={task} people={people} phases={phases} onPatch={onPatch} onDelete={() => { onDelete(); onClose() }} />
       <label className="qp-desc"><span>Description</span>
         <TextField multiline value={task.notes ?? null} placeholder="Add a description…" onSave={(v) => onPatch({ notes: v })} />
       </label>
+      <div className="qp-foot">
+        <button className="btn primary" onClick={() => finish.current()}>Done</button>
+      </div>
     </div>
   )
 }
