@@ -518,12 +518,12 @@ export default function ScheduleChart({
           )
         }
         if (r.kind === 'zone') {
-          // A faint band across the whole schedule (see-through, so the grid shows), a thin edge, and the heading.
+          // An outline round the zone across the whole schedule (no fill), with a little gap between zones, and the heading.
           const zc = r.zone === 'sheets' ? ZONE_SHEETS : ZONE_GENERAL
           const h = ROW_ZONE + r.rows * ROW_TASK
           return (
             <g key={i} pointerEvents="none">
-              <rect x={M} y={ry + 1} width={W - 2 * M} height={h - 2} rx={4} fill={zc} fillOpacity={0.06} stroke={zc} strokeOpacity={0.22} />
+              <rect x={M} y={ry + 3} width={W - 2 * M} height={h - 6} rx={4} fill="none" stroke={zc} strokeOpacity={0.3} />
               <text x={M + 30} y={ry + 14} fontSize={9.5} fontWeight={600} letterSpacing={1} fill={zc}>{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
               <text x={M + 30 + (r.zone === 'sheets' ? 52 : 96)} y={ry + 14} fontSize={9.5} fill={C.faint}>{r.rows}</text>
             </g>
@@ -546,6 +546,8 @@ export default function ScheduleChart({
           : whoLabel(task, people)
         return (
           <g key={i} opacity={task.status === 'done' && !pres ? 0.55 : 1}>
+            {/* Working view: a very light line under each task, across the whole chart, to follow the row. */}
+            {!pres && rows[i + 1]?.kind === 'task' && <line x1={M + 24} x2={W - M - 4} y1={ry + ROW_TASK - 0.5} y2={ry + ROW_TASK - 0.5} stroke={C.line} strokeOpacity={0.7} pointerEvents="none" />}
             <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={C.ink}
               fontWeight={task.kind === 'sheet' ? 600 : 400}
               opacity={order?.moved && order.id === task.id ? 0.4 : 1}
