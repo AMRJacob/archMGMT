@@ -164,7 +164,7 @@ export default function CalendarView({
       if (!s || !e) return []
       const d = drag?.id === task.id ? delta : 0
       return [{
-        kind: 'task' as const, id: task.id, title: task.kind === 'sheet' && task.sheet_number ? `${task.sheet_number} ${task.title}` : task.title, start: addDays(s, d), end: addDays(e, d),
+        kind: 'task' as const, id: task.id, title: (task.kind === 'sheet' || task.kind === 'section') && task.sheet_number ? `${task.sheet_number} ${task.title}` : task.title, start: addDays(s, d), end: addDays(e, d),
         color: colorOfPhase.get(task.phase_id ?? '') ?? '#8b8f94', task, done: task.status === 'done', milestone: task.is_milestone,
       }]
     }),

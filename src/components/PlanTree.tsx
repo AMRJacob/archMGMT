@@ -1,6 +1,6 @@
 import { lockHolder, usePresence } from '../lib/live.ts'
 import { useSearchParams } from 'react-router-dom'
-import { useEffect, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import ContextMenu, { type MenuItem } from './ContextMenu.tsx'
 import { TextField } from './fields.tsx'
 import { remove } from '../lib/data.ts'
@@ -10,17 +10,20 @@ import {
 } from '../lib/treeEdit.ts'
 import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
-import { childrenOf, descendants, isItem, isSheetWork, kindOf, progressOf, rolledDates, scheduledChildren, type Tree } from '../lib/tree.ts'
+import { childrenOf, descendants, isItem, isSheetWork, kindOf, progressOf, rolledDates, scheduledChildren, workGroupOf, type Tree, type WorkGroup } from '../lib/tree.ts'
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
 const ghostName = (t: Task) =>
-  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', task: 'Task name', item: 'Checklist item' } as const)[kindOf(t)]
+  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', section: 'Section name', task: 'Task name', item: 'Checklist item' } as const)[kindOf(t)]
 
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
 
-type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam' | 'tasks' | 'sheets'; place?: Place }
+/** Adds the phase header menu can ask for. */
+export type PhaseAdd = { what: 'task' | 'milestone' | 'sheet' | 'section' | 'plan' | 'quick'; n: number }
+
+type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside' | 'seam' | WorkGroup; place?: Place }
 
 /**
  * One phase's work as a tree: sheets → views → tasks → items (checklist lines / info).
@@ -29,7 +32,11 @@ type MenuState = { x: number; y: number; target: Task | null; only?: 'add-inside
  */
 export default function PlanTree({
   phase, tree, phases, people, projectId, onPatch, onPatchMany, onDrop, onAdd, onAddMany, presented, onTogglePresented, onAddNote, noteCount, onOpenNotes, emptyNote,
+  request, onRequestDone,
 }: {
+  /** An add asked for from outside (the phase's own right-click menu); run once, then onRequestDone. */
+  request?: PhaseAdd | null
+  onRequestDone?: () => void
   /** Meeting notes: start one for a row, how many it has, open its latest. */
   onAddNote?: (t: Task) => void
   /** Shown instead of the add button when the phase is empty because of a filter (e.g. Only mine). */
@@ -86,24 +93,24 @@ export default function PlanTree({
   const top = childrenOf(tree, null).filter((t) => t.phase_id === phase.id)
   // Each phase's General Tasks / Sheets groups fold away separately; remembered in this browser.
   const foldKey = `archmgmt.groupFold.${phase.id}`
-  const [folded, setFolded] = useState<{ tasks?: boolean; sheets?: boolean }>(() => {
+  const [folded, setFolded] = useState<Partial<Record<WorkGroup, boolean>>>(() => {
     try { return JSON.parse(localStorage.getItem(foldKey) ?? '{}') } catch { return {} }
   })
-  const fold = (g: 'tasks' | 'sheets') => setFolded((f) => {
+  const fold = (g: WorkGroup) => setFolded((f) => {
     const next = { ...f, [g]: !f[g] }
     try { localStorage.setItem(foldKey, JSON.stringify(next)) } catch { /* private mode */ }
     return next
   })
-  const isSheetSide = (t: Task) => ['sheet', 'view'].includes(kindOf(t))
-  const topTasks = top.filter((t) => !isSheetSide(t))
-  const topSheets = top.filter(isSheetSide)
-  const groupHead = (cls: string, label: string, n: number, g = cls.split(' ')[0] as 'tasks' | 'sheets') => (
+  const topTasks = top.filter((t) => workGroupOf(tree, t) === 'tasks')
+  const topSheets = top.filter((t) => workGroupOf(tree, t) === 'sheets')
+  const topManual = top.filter((t) => workGroupOf(tree, t) === 'manual')
+  const groupHead = (cls: string, label: string, n: number, g = cls.split(' ')[0] as WorkGroup) => (
     <li key={`head-${g}`} className={`tgroup-head ${cls}${folded[g] ? ' folded' : ''}`} role="button" tabIndex={0} aria-expanded={!folded[g]}
       title={folded[g] ? `Show ${label.toLowerCase()}` : `Collapse ${label.toLowerCase()}`}
       onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) fold(g) }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fold(g) } }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, target: null, only: g }) }}>
       <span className="caret" aria-hidden="true">▾</span><span>{label}</span><span className="count">{n}</span>
-      <button className="icon-btn" title={g === 'tasks' ? 'Add a task or milestone' : 'Add sheets'}
+      <button className="icon-btn" title={g === 'tasks' ? 'Add a task or milestone' : g === 'sheets' ? 'Add sheets' : 'Add a spec section'}
         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null, only: g }) }}>+</button>
     </li>
   )
@@ -128,7 +135,7 @@ export default function PlanTree({
   async function addAt(target: Task | null, place: Place, kind: TaskKind, milestone = false) {
     const { sortOrders, parent, phaseId } = orderAt(target, place)
     const ph = phases.find((x) => x.id === phaseId) ?? phase
-    const k = kind === 'sheet' && parent ? kindUnder(parent, 'view') : kindUnder(parent, kind)
+    const k = (kind === 'sheet' || kind === 'section') && parent ? kindUnder(parent, kind === 'sheet' ? 'view' : 'task') : kindUnder(parent, kind)
     const created = await onAdd({
       id: crypto.randomUUID(), project_id: projectId, phase_id: ph.id, parent_id: parent?.id ?? null, kind: k,
       title: '',
@@ -136,8 +143,8 @@ export default function PlanTree({
       ...assignPatch(parent ? assigneesOf(parent) : []),
       // Sheets span their phase; tasks, views and milestones start undated, to be placed on the timeline
       // (or given dates with the date chip) where they belong, instead of landing somewhere arbitrary.
-      start_date: k === 'sheet' ? ph.start_date : null,
-      due_date: k === 'sheet' ? ph.end_date : null,
+      start_date: k === 'sheet' || k === 'section' ? ph.start_date : null,
+      due_date: k === 'sheet' || k === 'section' ? ph.end_date : null,
       estimated_hours: null, effort: k === 'item' ? null : k === 'view' ? 1 : 2, status: 'todo',
       is_milestone: milestone, client_visible: milestone, sort_order: sortOrders[0],
     })
@@ -145,6 +152,18 @@ export default function PlanTree({
     setNewId(created.id)
     setSelected(created.id)
   }
+
+  // The phase header's right-click menu asks for adds here, so they land (and get focused) like any other.
+  const handled = useRef(0)
+  useEffect(() => {
+    if (!request || handled.current === request.n) return
+    handled.current = request.n
+    onRequestDone?.()
+    if (request.what === 'plan') setPlanning(true)
+    else if (request.what === 'quick') setAddingSheet(true)
+    else void addAt(null, 'inside', request.what === 'milestone' ? 'task' : request.what, request.what === 'milestone')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request])
 
   // ---------- clipboard ----------
   const copy = (t: Task, mode: Clip['mode']) => saveClip({ mode, rootIds: [t.id], rows: branchOf(tree, [t]) })
@@ -360,8 +379,11 @@ export default function PlanTree({
         {kind === 'sheet' && (
           <TextField value={t.sheet_number ?? null} placeholder="No." className="sheet-no mono" onSave={(v) => onPatch(t, { sheet_number: v }, false)} />
         )}
+        {kind === 'section' && (
+          <TextField value={t.sheet_number ?? null} placeholder="Section" className="sheet-no section-no mono" onSave={(v) => onPatch(t, { sheet_number: v }, false)} />
+        )}
         {kind === 'view' && <span className="kind-tag">View</span>}
-        <div className="trow-title">{title(t, kind === 'sheet' ? 'sheet-title' : '')}</div>
+        <div className="trow-title">{title(t, kind === 'sheet' || kind === 'section' ? 'sheet-title' : '')}</div>
         {t.notes && selected !== t.id && <span className="has-desc" title={t.notes}>≡</span>}
         {kind === 'sheet' && (
           <Pop className="type-pop" title="Sheet type" label={<span className="type-chip">{type?.name ?? 'Type'}</span>}>
@@ -414,7 +436,7 @@ export default function PlanTree({
           <button className="btn ghost" onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
             setMenu({ x: r.left, y: r.bottom + 2, target: t, only: 'add-inside' })
-          }}>+ Add under {kind === 'sheet' ? 'sheet' : kind === 'view' ? 'view' : 'task'}</button>
+          }}>+ Add under {kind === 'sheet' ? 'sheet' : kind === 'view' ? 'view' : kind === 'section' ? 'section' : 'task'}</button>
         </li>,
       ] : []),
     ]
@@ -467,10 +489,16 @@ export default function PlanTree({
             {!folded.sheets && topSheets.flatMap((t) => node(t, 0))}
           </ul></li>
         )}
+        {topManual.length > 0 && (
+          <li className="tgroup g-manual"><ul className="tgroup-list">
+            {groupHead('manual', 'Project Manual', topManual.length)}
+            {!folded.manual && topManual.flatMap((t) => node(t, 0))}
+          </ul></li>
+        )}
         {top.length === 0 && !addingSheet && emptyNote && <li className="muted small empty-row">{emptyNote}</li>}
         {top.length === 0 && !addingSheet && !emptyNote && (
           <li className="muted small empty-row">
-            <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
+            <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a task, sheet or spec section</button>
           </li>
         )}
         {addingSheet && (
@@ -488,7 +516,7 @@ export default function PlanTree({
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}
           items={menu.only === 'add-inside' ? insideItems(menu.target!) : menu.only === 'seam' ? seamItems(menu.target!, menu.place ?? 'after')
-            : menu.only === 'tasks' || menu.only === 'sheets' ? menuItems(null).filter((m) => m === 'sep' || (menu.only === 'tasks') === !/sheet/i.test(m.label)).filter((m, i, a) => m !== 'sep' || (i > 0 && i < a.length - 1))
+            : menu.only === 'tasks' || menu.only === 'sheets' || menu.only === 'manual' ? menuItems(null, menu.only)
             : menuItems(menu.target)} />
       )}
     </>
@@ -502,9 +530,10 @@ export default function PlanTree({
     const pasteLabel = clip?.mode === 'cut' ? 'Move here' : 'Paste here'
     const opts: MenuItem[] = !parent
       ? [
-          { label: 'Sheet', run: () => addAt(t, place, 'sheet') },
           { label: 'Task', run: () => addAt(t, place, 'task') },
           { label: 'Milestone', run: () => addAt(t, place, 'task', true) },
+          { label: 'Sheet', run: () => addAt(t, place, 'sheet') },
+          { label: 'Spec section', run: () => addAt(t, place, 'section') },
         ]
       : k === 'item' || pk === 'task'
         ? [{ label: 'Checklist item', run: () => addAt(t, place, 'item') }]
@@ -530,16 +559,29 @@ export default function PlanTree({
     ]
   }
 
-  function menuItems(t: Task | null): MenuItem[] {
+  function menuItems(t: Task | null, first: WorkGroup = 'tasks'): MenuItem[] {
     const hasClip = Boolean(clip)
     const pasteLabel = clip?.mode === 'cut' ? 'Move here' : 'Paste'
     if (!t) {
+      // Every kind of work can be started from here, so an empty group is never a dead end.
+      // The group that was right-clicked comes first.
+      const groups: Record<WorkGroup, MenuItem[]> = {
+        tasks: [
+          { label: 'Add general task', run: () => addAt(null, 'inside', 'task') },
+          { label: 'Add milestone', run: () => addAt(null, 'inside', 'task', true) },
+        ],
+        sheets: [
+          { label: 'Add sheet', run: () => addAt(null, 'inside', 'sheet') },
+          { label: 'Add sheets by type…', run: () => setPlanning(true) },
+          { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) },
+        ],
+        manual: [
+          { label: 'Add Project Manual section', run: () => addAt(null, 'inside', 'section') },
+        ],
+      }
+      const order: WorkGroup[] = [first, ...(['tasks', 'sheets', 'manual'] as WorkGroup[]).filter((g) => g !== first)]
       return [
-        { label: 'Add sheet', run: () => addAt(null, 'inside', 'sheet') },
-        { label: 'Add sheets by type…', run: () => setPlanning(true) },
-        { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) },
-        { label: 'Add task', run: () => addAt(null, 'inside', 'task') },
-        { label: 'Add milestone', run: () => addAt(null, 'inside', 'task', true) },
+        ...order.flatMap((g, i) => [...(i ? ['sep' as const] : []), ...groups[g]]),
         'sep',
         { label: pasteLabel, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(null, 'inside') },
       ]
@@ -550,7 +592,7 @@ export default function PlanTree({
     const add: MenuItem[] = k === 'item'
       ? [{ label: 'Add item below', run: () => addAt(t, 'after', 'item') }]
       : [
-          ...(topLevel ? [{ label: 'Add sheet below', run: () => addAt(t, 'after', 'sheet') }] : []),
+          ...(topLevel ? [{ label: 'Add sheet below', run: () => addAt(t, 'after', 'sheet') }, { label: 'Add spec section below', run: () => addAt(t, 'after', 'section') }] : []),
           { label: `Add ${k === 'view' ? 'view' : 'task'} below`, run: () => addAt(t, 'after', k === 'view' ? 'view' : 'task') },
           ...(topLevel ? [{ label: 'Add milestone below', run: () => addAt(t, 'after', 'task', true) }] : []),
           ...(k === 'sheet' ? [{ label: 'Add view inside', run: () => addAt(t, 'inside', 'view') }] : []),

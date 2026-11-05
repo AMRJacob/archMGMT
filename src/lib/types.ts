@@ -62,9 +62,10 @@ export interface Phase {
   color_slot?: number | null
 }
 
-export type TaskKind = 'sheet' | 'view' | 'task' | 'item'
+/** 'section' is a Project Manual spec section (e.g. 08 71 00 Door Hardware); it holds tasks and items like a sheet. */
+export type TaskKind = 'sheet' | 'view' | 'section' | 'task' | 'item'
 
-export const KIND_RANK: Record<TaskKind, number> = { sheet: 1, view: 2, task: 3, item: 4 }
+export const KIND_RANK: Record<TaskKind, number> = { sheet: 1, view: 2, section: 1, task: 3, item: 4 }
 
 export type Effort = 1 | 2 | 3
 

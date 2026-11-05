@@ -6,6 +6,7 @@ import { mondayOf, weekStarts } from '../lib/workload.ts'
 import { assignPatch, assigneesOf, isAssigned } from '../lib/assignees.ts'
 import { AvatarStack, MilestoneMark } from './TaskChips.tsx'
 import { textOn } from '../lib/colors.ts'
+import type { WorkGroup } from '../lib/tree.ts'
 
 /** "Schematic Design" → "SD", "Construction Administration" → "CA", "Bidding" → "B". */
 const initialsOfPhase = (name: string) => name.split(/[\s/&-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase()
@@ -22,12 +23,13 @@ const WEEK_COLS = 8
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
 
 export default function BoardView({
-  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar, sheetOf, onTeam,
+  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar, groupOf, onTeam,
 }: {
   /** Update the project team: people who get or hand over work on the person board join it, so their column stays. */
   onTeam?: (team: string[]) => void
   /** The sheet a card belongs to (itself, or the sheet it sits under); null for a general task. */
-  sheetOf?: (t: Task) => Task | null
+  /** Which kind of work a card is (General / Sheets / Project Manual); left out when the board is filtered to one kind. */
+  groupOf?: (t: Task) => WorkGroup
   /** The project team (person board columns); empty = everyone active on the Team list who has work here. */
   team?: string[]
   /** Shown above the person board: the project team with "+ Add team member". */
@@ -229,7 +231,7 @@ export default function BoardView({
                       })()}
                       <div className="ct-title">
                         {t.is_milestone && <MilestoneMark task={t} />}
-                        {t.kind === 'sheet' && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
+                        {(t.kind === 'sheet' || t.kind === 'section') && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
                         {t.kind === 'view' && <span className="kind-tag">View</span>}
                         {t.title}
                       </div>
@@ -252,7 +254,7 @@ export default function BoardView({
                     const order = (t: Task) => (t.phase_id ? phaseIndex.get(t.phase_id) ?? 999 : 999)
                     return [...list].sort((x, y) => order(x) - order(y))
                   }
-                  const zone = (kind: 'general' | 'sheet', label: string, list: Task[]) => {
+                  const zone = (kind: 'general' | 'sheet' | 'manual', label: string, list: Task[]) => {
                     if (!list.length) return null
                     const out: ReactNode[] = []
                     let last: string | null | undefined
@@ -269,15 +271,16 @@ export default function BoardView({
                       }
                       out.push(card(t, i))
                     })
-                    // Filtered to one kind (no sheetOf): no zone box, just the phase clumps.
-                    if (!sheetOf) return <div className="nz-cards plain">{out}</div>
+                    // Filtered to one kind (no groupOf): no zone box, just the phase clumps.
+                    if (!groupOf) return <div className="nz-cards plain">{out}</div>
                     return <div className={`note-zone ${kind}`}><span className="nz-label">{label}</span><div className="nz-cards">{out}</div></div>
                   }
-                  if (!sheetOf) return zone('general', '', col.tasks)
+                  if (!groupOf) return zone('general', '', col.tasks)
                   return (
                     <>
-                      {zone('general', 'General', col.tasks.filter((t) => !sheetOf(t)))}
-                      {zone('sheet', 'Sheets', col.tasks.filter((t) => sheetOf(t)))}
+                      {zone('general', 'General', col.tasks.filter((t) => groupOf(t) === 'tasks'))}
+                      {zone('sheet', 'Sheets', col.tasks.filter((t) => groupOf(t) === 'sheets'))}
+                      {zone('manual', 'Project Manual', col.tasks.filter((t) => groupOf(t) === 'manual'))}
                     </>
                   )
                 })()}

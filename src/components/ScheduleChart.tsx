@@ -35,7 +35,7 @@ type Row =
   | { kind: 'group'; label: string; color: string }
   | { kind: 'add'; phase: Phase; color: string }
   /** Working view: the heading of a phase's General Tasks or Sheets zone (its band spans `rows` rows below it). */
-  | { kind: 'zone'; phase: Phase; zone: 'general' | 'sheets'; rows: number; color: string }
+  | { kind: 'zone'; phase: Phase; zone: 'general' | 'sheets' | 'manual'; rows: number; color: string }
 
 type DragMode = 'move' | 'start' | 'end'
 
@@ -46,6 +46,7 @@ interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number;
 /** Zone colours (as in the Overview), used see-through so they sit lightly on any theme. */
 const ZONE_GENERAL = '#c98a12'
 const ZONE_SHEETS = '#8e3b6e'
+const ZONE_MANUAL = '#3f7f6e'
 
 /** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */
 function mixHex(a: string, b: string, t: number) {
@@ -136,10 +137,14 @@ export default function ScheduleChart({
   const palette = sorted.map((p) => colorOf.get(p.id)!)
   // Sheet work: a sheet or view, or anything under one (parents looked up among the tasks drawn here).
   const byId = new Map(tasks.map((t) => [t.id, t]))
-  const sheetSide = (t: Task) => {
+  const sideOf = (t: Task): 'general' | 'sheets' | 'manual' => {
     let cur: Task | undefined = t
-    for (let n = 0; cur && n < 12; n++) { if (cur.kind === 'sheet' || cur.kind === 'view') return true; cur = cur.parent_id ? byId.get(cur.parent_id) : undefined }
-    return false
+    for (let n = 0; cur && n < 12; n++) {
+      if (cur.kind === 'sheet' || cur.kind === 'view') return 'sheets'
+      if (cur.kind === 'section') return 'manual'
+      cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+    }
+    return 'general'
   }
   const rows: Row[] = []
   sorted.forEach((phase, i) => {
@@ -153,8 +158,8 @@ export default function ScheduleChart({
     else {
       // Working view: like the Overview, general tasks first and sheet work after, each in its own zone. Branches stay
       // together (everything under a sheet is sheet work), and each keeps its order.
-      const gen = list.filter((t) => !sheetSide(t)), sh = list.filter((t) => sheetSide(t))
-      for (const [zone, part] of [['general', gen], ['sheets', sh]] as const) {
+      for (const zone of ['general', 'sheets', 'manual'] as const) {
+        const part = list.filter((t) => sideOf(t) === zone)
         if (!part.length) continue
         rows.push({ kind: 'zone', phase, zone, rows: part.length, color })
         part.forEach((task) => rows.push({ kind: 'task', task, color }))
@@ -562,15 +567,16 @@ export default function ScheduleChart({
         }
         if (r.kind === 'zone') {
           // An outline round the zone across the whole schedule (no fill), with a little gap between zones, and the heading.
-          const zc = r.zone === 'sheets' ? ZONE_SHEETS : ZONE_GENERAL
+          const zc = r.zone === 'sheets' ? ZONE_SHEETS : r.zone === 'manual' ? ZONE_MANUAL : ZONE_GENERAL
+          const zl = r.zone === 'sheets' ? 'SHEETS' : r.zone === 'manual' ? 'PROJECT MANUAL' : 'GENERAL TASKS'
           const h = ROW_ZONE + r.rows * ROW_TASK
           return (
             <g key={i} pointerEvents="none">
               <rect x={M} y={ry + 3} width={W - 2 * M} height={h - 6} rx={4} fill="none" stroke={zc} strokeOpacity={0.3} />
               {/* The zone's title: a muted band across the whole chart, lettered in a deeper shade of the same colour. */}
               <path d={`M${M} ${ry + 7} a4 4 0 0 1 4 -4 H${W - M - 4} a4 4 0 0 1 4 4 V${ry + ROW_ZONE - 1} H${M} Z`} fill={mixHex(zc, C.bg, 0.72)} />
-              <text x={M + 30} y={ry + 15} fontSize={9.5} fontWeight={700} letterSpacing={1.1} fill={mixHex(zc, C.ink, 0.45)}>{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
-              <text x={M + 30 + (r.zone === 'sheets' ? 54 : 100)} y={ry + 15} fontSize={9.5} fill={mixHex(zc, C.ink, 0.45)} fillOpacity={0.7}>{r.rows}</text>
+              <text x={M + 30} y={ry + 15} fontSize={9.5} fontWeight={700} letterSpacing={1.1} fill={mixHex(zc, C.ink, 0.45)}>{zl}</text>
+              <text x={M + 30 + (r.zone === 'sheets' ? 54 : r.zone === 'manual' ? 108 : 100)} y={ry + 15} fontSize={9.5} fill={mixHex(zc, C.ink, 0.45)} fillOpacity={0.7}>{r.rows}</text>
             </g>
           )
         }
@@ -594,12 +600,12 @@ export default function ScheduleChart({
             {/* Working view: a very light line under each task, across the whole chart, to follow the row. */}
             {!pres && rows[i + 1]?.kind === 'task' && <line x1={M + 24} x2={W - M - 4} y1={ry + ROW_TASK - 0.5} y2={ry + ROW_TASK - 0.5} stroke={C.line} strokeOpacity={0.7} pointerEvents="none" />}
             <text x={M + 30 + Math.min(4, (task as ShownTask)._depth ?? 0) * 14} y={cy + 4} fontSize={12.5} fill={C.ink}
-              fontWeight={task.kind === 'sheet' ? 600 : 400}
+              fontWeight={task.kind === 'sheet' || task.kind === 'section' ? 600 : 400}
               opacity={order?.moved && order.id === task.id ? 0.4 : 1}
               style={editable ? { cursor: order?.moved ? 'grabbing' : onReorder ? 'grab' : 'pointer' } : undefined}
               onPointerDown={editable && onReorder ? (e) => startOrder(e, task) : undefined}
               onClick={editable && !onReorder ? () => onOpenTask?.(task) : undefined}>
-              {clip(`${task.kind === 'sheet' && task.sheet_number ? `${task.sheet_number}  ` : ''}${task.title}`, (pres ? 34 : 38) - Math.min(4, (task as ShownTask)._depth ?? 0) * 2)}
+              {clip(`${(task.kind === 'sheet' || task.kind === 'section') && task.sheet_number ? `${task.sheet_number}  ` : ''}${task.title}`, (pres ? 34 : 38) - Math.min(4, (task as ShownTask)._depth ?? 0) * 2)}
             </text>
             <text x={x0 - 14} y={cy + 4} fontSize={11} fill={C.muted} textAnchor="end">{right}</text>
           </g>

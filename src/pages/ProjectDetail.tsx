@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AmountField, SelectField, TextField } from '../components/fields.tsx'
 import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
-import PlanTree from '../components/PlanTree.tsx'
+import PlanTree, { type PhaseAdd } from '../components/PlanTree.tsx'
 import ProjectTeam from '../components/ProjectTeam.tsx'
 import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
 import { useRowLayout } from '../lib/rowColumns.ts'
@@ -45,6 +45,8 @@ export default function ProjectDetail() {
   const [newId, setNewId] = useState<string | null>(null)
   const [openFor, setOpenFor] = useState(id)
   const [phaseMenu, setPhaseMenu] = useState<{ x: number; y: number; phase: Phase } | null>(null)
+  // An add picked from a phase header's menu; that phase's tree carries it out (opening the phase first).
+  const [phaseAdd, setPhaseAdd] = useState<{ phaseId: string; add: PhaseAdd } | null>(null)
   const [editingPhase, setEditingPhase] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [dragPhase, setDragPhase] = useState<string | null>(null)
@@ -170,7 +172,14 @@ export default function ProjectDetail() {
 
   function phaseItems(p: Phase): MenuItem[] {
     const filled = tasksFor(p.id).length > 0
+    const ask = (what: PhaseAdd['what']) => () => { setOpenIds(new Set([...open, p.id])); setPhaseAdd({ phaseId: p.id, add: { what, n: Date.now() } }) }
     return [
+      { label: 'Add general task', run: ask('task') },
+      { label: 'Add milestone', run: ask('milestone') },
+      { label: 'Add sheet', run: ask('sheet') },
+      { label: 'Add sheets by type…', run: ask('plan') },
+      { label: 'Add Project Manual section', run: ask('section') },
+      'sep',
       { label: filled ? `Add suggested work to ${p.name}…` : `Set up ${p.name}…`, run: () => setSetupLocal(p.id) },
       { label: 'Rename', run: () => { setOpenIds(new Set(open)); setRenaming(p.id) } },
       { label: 'Change dates…', run: () => setEditingPhase(p.id) },
@@ -386,6 +395,7 @@ export default function ProjectDetail() {
                     noteCount={(x) => nh.forTask(x).length}
                     onOpenNotes={(x) => { const n = nh.latestFor(x); if (n) nh.open(n.id) }}
                     onTogglePresented={(x) => { const c = togglePresented(rulesOf(project), x); if (c.task) patchTask(x, c.task); if (c.rules) void projects.patch(id, { presentation: c.rules }) }}
+                    request={phaseAdd?.phaseId === p.id ? phaseAdd.add : null} onRequestDone={() => setPhaseAdd(null)}
                     onDrop={(tid) => void tasks.drop(tid)} onAdd={tasks.add}
                     onAddMany={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload() }} />
                 </div>

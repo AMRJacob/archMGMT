@@ -8,12 +8,12 @@ import { phaseColors, projectDot } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { buildTree, isSheetWork, isWorkLeaf } from '../lib/tree.ts'
+import { buildTree, headOf, isWorkLeaf, WORK_GROUPS, workGroupOf, type WorkGroup } from '../lib/tree.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 import { mondayOf } from '../lib/workload.ts'
 
 type Due = 'all' | 'overdue' | 'week' | 'two' | 'nodate'
-type Kind = 'all' | 'general' | 'sheets'
+type Kind = 'all' | WorkGroup
 type Group = 'project' | 'due'
 
 /** Saved per browser, so the page opens the way you left it. */
@@ -39,7 +39,7 @@ export default function MyTodo() {
   const people = useRows<Person>('people')
   const [showDone, setShowDone] = useSaved<boolean>('archmgmt.todo.done', false)
   const [projectId, setProjectId] = useSaved<string>('archmgmt.todo.project', '')
-  const [kind, setKind] = useSaved<Kind>('archmgmt.todo.kind', 'all')
+  const [kind, setKind] = useSaved<Kind>('archmgmt.todo.kind2', 'all')
   const [due, setDue] = useSaved<Due>('archmgmt.todo.due', 'all')
   const [group, setGroup] = useSaved<Group>('archmgmt.todo.group', 'project')
   const [q, setQ] = useState('')
@@ -63,7 +63,7 @@ export default function MyTodo() {
   const shown = mine.filter((t) => {
     if (!showDone && t.status === 'done') return false
     if (projectId && t.project_id !== projectId) return false
-    if (kind !== 'all' && (kind === 'sheets') !== isSheetWork(tree, t)) return false
+    if (kind !== 'all' && workGroupOf(tree, t) !== kind) return false
     const d = dueOf(t)
     if (due === 'overdue' && !(d && d < t0 && t.status !== 'done')) return false
     if (due === 'week' && !(d && d <= weekEnd)) return false
@@ -83,7 +83,7 @@ export default function MyTodo() {
     const p = projectOf(t)
     return p ? phaseColors(p, phases.rows.filter((x) => x.project_id === p.id)).get(t.phase_id ?? '') : undefined
   }
-  const sheetOf = (t: Task) => { let c: Task | undefined = t; for (let n = 0; c && n < 12; n++) { if (c.kind === 'sheet') return c; c = c.parent_id ? tree.byId.get(c.parent_id) : undefined } return null }
+  const sheetOf = (t: Task) => headOf(tree, t)
   const open = (t: Task) => { select(t.project_id); navigate('/overview') }
   const patch = (t: Task, c: Partial<Task>) => void tasks.patch(t.id, c)
 
@@ -140,7 +140,7 @@ export default function MyTodo() {
           <div className="todo-main">
             <button className="todo-title" onClick={() => setOpenId(t.id)} title="Show details">
               {t.is_milestone && <MilestoneMark task={t} />}
-              {t.kind === 'sheet' && t.sheet_number && <span className="mono todo-no">{t.sheet_number}</span>}
+              {(t.kind === 'sheet' || t.kind === 'section') && t.sheet_number && <span className="mono todo-no">{t.sheet_number}</span>}
               {t.title || 'Untitled'}
               {t.notes && <span className="has-desc" title={t.notes}>≡</span>}
             </button>
@@ -189,7 +189,7 @@ export default function MyTodo() {
               {live.filter((p) => mine.some((t) => t.project_id === p.id)).map((p) => <option key={p.id} value={p.id}>{p.number ? `${p.number} · ` : ''}{p.name}</option>)}
             </select>
             <div className="segmented small-seg" aria-label="Kind">
-              {([['all', 'All'], ['general', 'General Tasks'], ['sheets', 'Sheets']] as [Kind, string][]).map(([k, l]) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{l}</button>)}
+              {([['all', 'All'], ...WORK_GROUPS.map((w) => [w.id, w.label])] as [Kind, string][]).map(([k, l]) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{l}</button>)}
             </div>
             <select className="field boxed small-select" value={due} onChange={(e) => setDue(e.target.value as Due)} aria-label="Due">
               <option value="all">Any date</option>
@@ -214,9 +214,9 @@ export default function MyTodo() {
                 <strong>{g.title}</strong>
                 <span className="count">{g.items.length}</span>
               </div>
-              {/* As in the Overview: general tasks, then sheet work, each on its own panel. */}
+              {/* As in the Overview: general tasks, sheet work, then Project Manual, each on its own panel. */}
               <ul className="tlist todo-zones">
-                {([['tasks', 'General Tasks', g.items.filter((t) => !isSheetWork(tree, t))], ['sheets', 'Sheets', g.items.filter((t) => isSheetWork(tree, t))]] as const)
+                {WORK_GROUPS.map((w) => [w.id, w.label, g.items.filter((t) => workGroupOf(tree, t) === w.id)] as const)
                   .filter(([, , list]) => list.length > 0)
                   .map(([zone, label, list]) => (
                     <li key={zone} className={`tgroup g-${zone}`}>

@@ -564,7 +564,8 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .twist svg { transition: transform 0.26s ease; }
 .twist.open svg { transform: rotate(90deg); }
 .twist.empty { opacity: 0.35; }
-.trow.k-sheet { background: var(--panel); }
+.trow.k-sheet, .trow.k-section { background: var(--panel); }
+.section-no { width: 84px; }
 .trow.k-sheet + .trow.k-sheet { border-top-color: var(--line); }
 .sheet-no { width: 70px; flex: none; font-weight: 500; color: var(--ink); }
 .sheet-title { font-weight: 600; }
@@ -1359,10 +1360,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .tgroup-list { list-style: none; margin: 0; padding: 0; }
 .tgroup.g-tasks { --zc: var(--kind-general); }
 .tgroup.g-sheets { --zc: var(--kind-sheet); }
+.tgroup.g-manual { --zc: var(--kind-manual); }
 .tgroup .tgroup-head { border-bottom: none; padding: 7px 12px 5px 26px; background: none; }
 .tgroup .tgroup-head .caret { margin-left: -14px; }
 .tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--zc) 80%, var(--faint)); }
-.tgroup.g-sheets .tgroup-head { color: color-mix(in srgb, var(--zc) 75%, var(--faint)); }
+.tgroup.g-sheets .tgroup-head, .tgroup.g-manual .tgroup-head { color: color-mix(in srgb, var(--zc) 75%, var(--faint)); }
 .tgroup-list > li.trow, .tgroup-list > li.irow { margin-left: 14px; background: var(--panel); box-shadow: -1px 0 2px rgba(0, 0, 0, 0.04); }
 .tgroup-list > li.tgroup-head + li { border-top-left-radius: 6px; }
 .tgroup-list > li:last-child { border-bottom-left-radius: 6px; }
@@ -1386,6 +1388,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .note-zone { border-radius: 8px; padding: 5px 6px 8px; background: color-mix(in srgb, var(--zc) 9%, transparent); }
 .note-zone.general { --zc: var(--kind-general); }
 .note-zone.sheet { --zc: var(--kind-sheet); }
+.note-zone.manual { --zc: var(--kind-manual); }
 .nz-label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: color-mix(in srgb, var(--zc) 80%, var(--faint)); margin: 0 0 5px 2px; }
 .nz-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
 /* Layers carry soft shadows instead of outlines: the phase sheet on the page, each group sheet on the phase,
@@ -1404,7 +1407,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
   .phase-sec.open .phase-body, .tgroup-list > li.trow, .tgroup-list > li.irow { animation: none; }
 }
 /* Work kinds in the theme's own colours (General Tasks / Sheets in the Overview and on the board). */
-:root { --kind-general: var(--warn); --kind-sheet: color-mix(in srgb, var(--info) 55%, var(--danger)); }
+:root { --kind-general: var(--warn); --kind-sheet: color-mix(in srgb, var(--info) 55%, var(--danger)); --kind-manual: color-mix(in srgb, var(--ok) 60%, var(--info)); }
 /* Board zones: a soft shadow lifts each zone off the column; phase labels head the clumps inside. */
 .note-zone { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 10px -6px rgba(0, 0, 0, 0.18); }
 .note-zone + .note-zone { margin-top: 2px; }

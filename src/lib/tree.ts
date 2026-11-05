@@ -45,6 +45,9 @@ function sheetKey(n: string | null | undefined): [number, string] {
 /** Sheets by number (in discipline order), then everything by date, then creation order. */
 export function treeOrder(a: Task, b: Task): number {
   const ra = KIND_RANK[kindOf(a)], rb = KIND_RANK[kindOf(b)]
+  if (kindOf(a) === 'section' && kindOf(b) === 'section') {
+    return (a.sheet_number ?? '~').localeCompare(b.sheet_number ?? '~', undefined, { numeric: true }) || a.title.localeCompare(b.title)
+  }
   if (kindOf(a) === 'sheet' && kindOf(b) === 'sheet') {
     const [da, na] = sheetKey(a.sheet_number), [db, nb] = sheetKey(b.sheet_number)
     return da - db || na.localeCompare(nb, undefined, { numeric: true }) || a.title.localeCompare(b.title)
@@ -70,10 +73,37 @@ export function isSheetWork(tree: Tree, t: Task): boolean {
   return false
 }
 
-/** What the schedule shows: everything, only tasks (no sheets), or only sheets. Milestones always show. */
-export type WorkFilter = 'all' | 'tasks' | 'sheets'
+/** The three kinds of work in a phase: general tasks, sheets (and their views), and Project Manual sections. */
+export type WorkGroup = 'tasks' | 'sheets' | 'manual'
+export const WORK_GROUPS: { id: WorkGroup; label: string }[] = [
+  { id: 'tasks', label: 'General Tasks' }, { id: 'sheets', label: 'Sheets' }, { id: 'manual', label: 'Project Manual' },
+]
+export function workGroupOf(tree: Tree, t: Task): WorkGroup {
+  let cur: Task | undefined = t, d = 0
+  while (cur && d < 12) {
+    const k = kindOf(cur)
+    if (k === 'sheet' || k === 'view') return 'sheets'
+    if (k === 'section') return 'manual'
+    cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined
+    d++
+  }
+  return 'tasks'
+}
+/** The sheet or spec section a row sits in (itself included), if any. */
+export function headOf(tree: Tree, t: Task): Task | null {
+  let cur: Task | undefined = t, d = 0
+  while (cur && d < 12) {
+    if (cur.kind === 'sheet' || cur.kind === 'section') return cur
+    cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined
+    d++
+  }
+  return null
+}
+
+/** What the schedule shows: everything, or one kind of work. Milestones always show. */
+export type WorkFilter = 'all' | WorkGroup
 export const passesWork = (tree: Tree, t: Task, f: WorkFilter) =>
-  f === 'all' || t.is_milestone || (f === 'sheets') === isSheetWork(tree, t)
+  f === 'all' || t.is_milestone || workGroupOf(tree, t) === f
 export const scheduledChildren = (tree: Tree, id: string) => childrenOf(tree, id).filter((c) => !isItem(c))
 
 export function descendants(tree: Tree, id: string): Task[] {

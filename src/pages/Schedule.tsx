@@ -22,7 +22,7 @@ import { BRAND_ROLES, KIND_RANK, type BrandPalette, type BrandRoles, type Phase,
 import { useRows } from '../lib/data.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
-import { asShown, buildTree, DETAIL_LEVELS, movedBy, passesWork, visibleAtLevel, type DetailLevel, type ShownTask, type WorkFilter } from '../lib/tree.ts'
+import { asShown, buildTree, DETAIL_LEVELS, movedBy, passesWork, workGroupOf, visibleAtLevel, type DetailLevel, type ShownTask, type WorkFilter } from '../lib/tree.ts'
 
 type View = 'timeline' | 'calendar' | 'board'
 type Zoom = 'all' | '12' | '6' | '3'
@@ -100,7 +100,9 @@ export default function Schedule() {
   // What each view shows at the chosen detail level. Parents carry their children's dates.
   const tree = buildTree(tasks.rows)
   // Show: everything, only general tasks (sheets and their views filtered out), or only sheets. Milestones always show.
-  const workApplies = level > 0 && tasks.rows.some((t) => t.kind === 'sheet' || t.kind === 'view')
+  // The filter only means something when the project has more than one kind of work (general, sheets, manual).
+  const kindsHere = new Set(tasks.rows.filter((t) => !t.is_milestone && t.kind !== 'item').map((t) => workGroupOf(tree, t)))
+  const workApplies = level > 0 && kindsHere.size > 1
   const shown = visibleAtLevel(tree, level).filter((v) => !workApplies || passesWork(tree, v.task, work))
   const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
   const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
@@ -138,17 +140,16 @@ export default function Schedule() {
   //  - The General Tasks / Sheets filter does nothing at Detail "Phases" (only phases and milestones show) or
   //    when the project has no sheets.
   const levelOff = view === 'timeline' && mode === 'presentation'
-  const hasSheets = tasks.rows.some((t) => t.kind === 'sheet' || t.kind === 'view')
-  const workOff = levelOff || level === 0 || !hasSheets
+  const workOff = levelOff || level === 0 || kindsHere.size < 2
   const workWhy = levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.'
     : level === 0 ? 'Only phases and milestones show at this detail level, so there are no tasks or sheets to filter.'
-    : !hasSheets ? 'This project has no sheets yet, so everything is a general task.' : undefined
+    : kindsHere.size < 2 ? 'This project has only one kind of work so far, so there’s nothing to filter.' : undefined
   // In presentation view neither control ever applies, so they're left out; elsewhere they're greyed out when idle.
   const levelControl = levelOff ? null : (
     <>
     <span className={`level-group${workOff ? ' off' : ''}`} aria-disabled={workOff} title={workWhy}>
-    <div className="segmented small-seg" aria-label="Show" title={workOff ? undefined : 'Show everything, only general tasks, or only sheets (milestones always show)'}>
-      {([['all', 'All'], ['tasks', 'General Tasks'], ['sheets', 'Sheets']] as [WorkFilter, string][]).map(([w, label]) => (
+    <div className="segmented small-seg" aria-label="Show" title={workOff ? undefined : 'Show everything, or only general tasks, sheets or Project Manual sections (milestones always show)'}>
+      {([['all', 'All'], ['tasks', 'General Tasks'], ['sheets', 'Sheets'], ['manual', 'Project Manual']] as [WorkFilter, string][]).map(([w, label]) => (
         <button key={w} className={work === w ? 'on' : ''} onClick={() => setWork(w)}>{label}</button>
       ))}
     </div>
@@ -189,6 +190,15 @@ export default function Schedule() {
    * Add at a spot: a task (a week long) or a milestone on a date, in a phase, optionally under a sheet or
    * view. With no date it starts this week if the phase is under way, otherwise when the phase starts.
    */
+  /** A sheet or Project Manual section for a phase: spans the phase, like ones added in the Overview. */
+  function addHead(phase: Phase, kind: 'sheet' | 'section') {
+    return addTask({
+      phase_id: phase.id, parent_id: null, kind, title: kind === 'sheet' ? 'New sheet' : 'New section',
+      sheet_type: kind === 'sheet' ? 'other' : null, is_milestone: false, client_visible: false,
+      start_date: phase.start_date, due_date: phase.end_date, effort: 2,
+    })
+  }
+
   function addHere(phase: Phase | null, date: string | null, opts: { milestone?: boolean; parent?: Task | null } = {}) {
     // With no date (the "+ Add task" rows), it starts undated: the user clicks in its row to place it.
     const parent = opts.parent ? real(opts.parent) : null
@@ -212,6 +222,10 @@ export default function Schedule() {
       { label: day ? `Add task on ${day}` : `Add task${where}`, run: () => void addHere(sp.phase, sp.date) },
       { label: day ? `Add milestone on ${day}` : `Add milestone${where}`, run: () => void addHere(sp.phase, sp.date, { milestone: true }) },
       ...(holds ? [{ label: `Add task under “${task.title.slice(0, 28)}”`, run: () => void addHere(sp.phase, sp.date, { parent: task }) }] : []),
+      ...(sp.phase ? [
+        { label: `Add sheet${where}`, run: () => void addHead(sp.phase!, 'sheet') },
+        { label: `Add Project Manual section${where}`, run: () => void addHead(sp.phase!, 'section') },
+      ] : []),
       ...(!task && sp.phase ? [
         'sep' as const,
         { label: sp.phase.client_visible ? 'Hide phase from presentation' : 'Show phase in presentation', run: () => void phases.patch(sp.phase!.id, { client_visible: !sp.phase!.client_visible }) },
@@ -436,7 +450,7 @@ export default function Schedule() {
           <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
             team={project.team ?? []}
             onTeam={(team) => void patchProject(project.id, { team })}
-            sheetOf={level === 0 || (workApplies && work !== 'all') ? undefined : (t) => { let cur: Task | undefined = real(t); for (let i = 0; cur && i < 12; i++) { if (cur.kind === 'sheet') return cur; cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined } return null }}
+            groupOf={level === 0 || (workApplies && work !== 'all') ? undefined : (t) => workGroupOf(tree, real(t))}
             teamBar={<><span className="team-label">Project team</span><ProjectTeam project={project} people={people.rows} compact onChange={(team) => void patchProject(project.id, { team })} /></>}
             onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
         </>

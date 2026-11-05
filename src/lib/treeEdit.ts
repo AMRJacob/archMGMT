@@ -15,8 +15,10 @@ const RANK_KIND: Record<number, TaskKind> = { 1: 'sheet', 2: 'view', 3: 'task', 
 /** The kind a row should become under a new parent: kept when it still fits, otherwise the next level down. */
 export function kindUnder(parent: Task | null, kind: TaskKind): TaskKind {
   if (!parent) return kind === 'view' || kind === 'item' ? 'task' : kind
+  // Spec sections hold tasks and checklist items directly (no views).
+  if (kindOf(parent) === 'section') return kind === 'item' ? 'item' : 'task'
   const pr = KIND_RANK[kindOf(parent)]
-  if (KIND_RANK[kind] > pr && kind !== 'sheet') return kind
+  if (KIND_RANK[kind] > pr && kind !== 'sheet' && kind !== 'section') return kind
   return RANK_KIND[Math.min(4, pr + 1)]
 }
 
