@@ -1416,3 +1416,6 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* Board cards (all boards): the post-it look on the theme's card colour, with rounded corners. */
 .card-task.note { background: var(--panel); border-radius: 8px; }
 .ct-phase { border-radius: 8px 0 0 8px; }
+/* General Tasks / Sheets panels (board zones and Overview groups): a thin border a shade darker than their own tint. */
+.note-zone { border: 1px solid color-mix(in srgb, var(--zc) 28%, transparent); }
+.tgroup { border: 1px solid color-mix(in srgb, var(--zc) 24%, var(--line)); border-right: none; }
