@@ -1397,8 +1397,8 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* Opening things: a phase, a group or a row's children unfold from the top (quick; off for reduced motion). */
 @keyframes unfold { from { opacity: 0; transform: translateY(-6px) scaleY(0.97); } to { opacity: 1; transform: none; } }
 @keyframes row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.phase-sec.open .phase-body { animation: unfold 0.34s cubic-bezier(.2, .7, .3, 1) both; transform-origin: top; }
-.tgroup-list > li.trow, .tgroup-list > li.irow { animation: row-in 0.28s ease-out both; }
+.phase-sec.open .phase-body { animation: unfold 0.34s cubic-bezier(.2, .7, .3, 1); transform-origin: top; }
+.tgroup-list > li.trow, .tgroup-list > li.irow { animation: row-in 0.28s ease-out; }
 .phase-sec .chev, .tgroup-head .caret, .twist { transition: transform 0.26s ease; }
 @media (prefers-reduced-motion: reduce) {
   .phase-sec.open .phase-body, .tgroup-list > li.trow, .tgroup-list > li.irow { animation: none; }
@@ -1427,3 +1427,5 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 }
 .card-task.landed { outline: 2px solid transparent; outline-offset: 2px; animation: landed 1.3s ease-out 0.2s both; }
 @media (prefers-reduced-motion: reduce) { .card-task.landed { animation: none; } }
+/* The + between rows must sit above the neighbouring rows (which have their own backgrounds now). */
+.tlist li.trow:hover, .tlist li.irow:hover, .tlist li.trow:focus-within, .tlist li.irow:focus-within { position: relative; z-index: 6; }
