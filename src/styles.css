@@ -564,7 +564,7 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .twist svg { transition: transform 0.15s; }
 .twist.open svg { transform: rotate(90deg); }
 .twist.empty { opacity: 0.35; }
-.trow.k-sheet { background: var(--subtle); }
+.trow.k-sheet { background: var(--panel); }
 .trow.k-sheet + .trow.k-sheet { border-top-color: var(--line); }
 .sheet-no { width: 70px; flex: none; font-weight: 500; color: var(--ink); }
 .sheet-title { font-weight: 600; }
@@ -1264,14 +1264,6 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .tgroup-head .count { font-weight: 500; letter-spacing: 0; color: var(--faint); }
 .tgroup-head .icon-btn { margin-left: 2px; opacity: 0; font-size: 13px; padding: 0 4px; }
 .tgroup-head:hover .icon-btn, .tgroup-head .icon-btn:focus { opacity: 1; }
-/* Sheets and everything under them keep a light background (so they never look done) and carry their own
-   left bar in a different colour from the current-phase edge; the bar sits just inside so that edge still shows. */
-.tlist .sheet-side { --sheet-bar: color-mix(in srgb, var(--info) 45%, var(--panel)); --row-bg: var(--panel);
-  background: linear-gradient(to right, transparent 0 4px, var(--sheet-bar) 4px 7px, var(--row-bg) 7px); }
-.tlist .trow.k-sheet.sheet-side { --sheet-bar: color-mix(in srgb, var(--info) 80%, var(--panel)); }
-.tlist .trow.sheet-side:hover, .tlist .irow.sheet-side:hover { --row-bg: var(--hover); }
-.tlist .trow.sheet-side.selected, .tlist .irow.sheet-side.selected { --row-bg: color-mix(in srgb, var(--accent) 7%, var(--panel)); box-shadow: none; }
-.tlist .tgroup-head.sheet-side { color: color-mix(in srgb, var(--info) 70%, var(--faint)); }
 .tgroup-head { cursor: pointer; user-select: none; }
 .tgroup-head:hover { color: var(--muted); }
 .tgroup-head .caret { display: inline-block; width: 10px; margin-left: -16px; font-size: 9px; transition: transform .15s; }
@@ -1281,7 +1273,8 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 select.wish-pri.unset { background: var(--chip); color: var(--faint); border-color: var(--line); font-weight: 500; }
 .wish-form > select.wish-pri { grid-column: 1; grid-row: 2; justify-self: start; }
 /* Every phase running today is marked current. */
-.phase-sec.now { box-shadow: inset 3px 0 0 var(--p-accent, var(--accent)); }
+.phase-sec { border-left: 3px solid var(--line-strong); }
+.phase-sec.now { border-left-color: var(--p-accent, var(--accent)); }
 /* Milestone type chip (in the size column for milestones). */
 .ms-chip { display: inline-flex; align-items: center; gap: 2px; padding-right: 9px; background: color-mix(in srgb, var(--mc) 12%, var(--panel)); color: color-mix(in srgb, var(--mc) 75%, var(--ink)); font-weight: 600; }
 .ms-chip .diamond { width: 8px; height: 8px; margin: 0 5px 0 3px; }
@@ -1355,3 +1348,17 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .ym-day.today { outline-offset: -2px; }
 .ym-days > span:empty { background: var(--subtle); }
 .ym-dows span { padding-bottom: 3px; }
+
+/* Overview groups: General Tasks and Sheets each get one continuous coloured bracket "[" down their left side,
+   nested just inside the phase's own left edge. */
+.tgroup { list-style: none; position: relative; padding: 4px 0; }
+.tgroup-list { list-style: none; margin: 0; padding: 0; }
+.tgroup + .tgroup { border-top: 1px solid var(--line); }
+.tgroup::before { content: ''; position: absolute; left: 9px; top: 9px; bottom: 7px; width: 6px; pointer-events: none;
+  border: 2px solid var(--bracket); border-right: none; border-radius: 4px 0 0 4px; z-index: 2; }
+.tgroup.g-tasks { --bracket: color-mix(in srgb, var(--warn) 75%, var(--panel)); }
+.tgroup.g-sheets { --bracket: color-mix(in srgb, #8e3b6e 70%, var(--panel)); }
+.tgroup .tgroup-head { border-bottom: none; padding-top: 6px; }
+.tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--warn) 80%, var(--faint)); }
+.tgroup.g-sheets .tgroup-head { color: color-mix(in srgb, #8e3b6e 70%, var(--faint)); }
+.tgroup .tgroup-list > li:nth-child(2) { border-top: 1px solid var(--line-soft); }

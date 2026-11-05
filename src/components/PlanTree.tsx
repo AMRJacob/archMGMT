@@ -443,10 +443,19 @@ export default function PlanTree({
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHint(null) }}
         onDrop={(e) => { e.preventDefault(); setHint(null); dropRow(e, null, 'after') }}>
         {/* Tasks first, then sheets, each under a quiet heading (only when the phase has some). */}
-        {topTasks.length > 0 && groupHead('tasks', 'General Tasks', topTasks.length)}
-        {!folded.tasks && topTasks.flatMap((t) => node(t, 0))}
-        {topSheets.length > 0 && groupHead('sheets sheet-side', 'Sheets', topSheets.length)}
-        {!folded.sheets && topSheets.flatMap((t) => node(t, 0))}
+        {/* Each group sits in its own block so one continuous bracket runs down its left side. */}
+        {topTasks.length > 0 && (
+          <li className="tgroup g-tasks"><ul className="tgroup-list">
+            {groupHead('tasks', 'General Tasks', topTasks.length)}
+            {!folded.tasks && topTasks.flatMap((t) => node(t, 0))}
+          </ul></li>
+        )}
+        {topSheets.length > 0 && (
+          <li className="tgroup g-sheets"><ul className="tgroup-list">
+            {groupHead('sheets sheet-side', 'Sheets', topSheets.length)}
+            {!folded.sheets && topSheets.flatMap((t) => node(t, 0))}
+          </ul></li>
+        )}
         {top.length === 0 && !addingSheet && (
           <li className="muted small empty-row">
             <button className="btn ghost add-first" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 4, target: null }) }}>+ Add a sheet, task or milestone</button>
