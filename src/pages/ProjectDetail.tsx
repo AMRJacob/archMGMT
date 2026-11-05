@@ -300,7 +300,7 @@ export default function ProjectDetail() {
           const isOpen = open.has(p.id)
           const isNow = currentIds.has(p.id)
           return (
-            <div key={p.id} id={`phase-${p.id}`}
+            <div key={p.id} id={`phase-${p.id}`} style={{ '--pc': phaseColor(i) } as CSSProperties}
               className={`phase-sec${isOpen ? ' open' : ''}${isNow ? ' now' : ''}${p.end_date < t ? ' past' : ''}${dragPhase === p.id ? ' dragging' : ''}${dropPhase?.id === p.id ? ` drop-${dropPhase.side}` : ''}`}
               onDragOver={(e) => {
                 if (!dragPhase || dragPhase === p.id) return

@@ -282,6 +282,7 @@ export default function PlanTree({
     style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
     tabIndex: -1,
     'data-row': t.id,
+    'data-depth': depth,
     onFocus: () => setSelected(t.id),
     onMouseDown: (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('input, button, select, textarea, .pop')) (e.currentTarget as HTMLElement).focus() },
     onKeyDown: rowKeys(t),

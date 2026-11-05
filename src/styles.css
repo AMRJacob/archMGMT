@@ -1349,19 +1349,30 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .ym-days > span:empty { background: var(--subtle); }
 .ym-dows span { padding-bottom: 3px; }
 
-/* Overview groups: General Tasks and Sheets each get one continuous coloured bracket "[" down their left side,
-   nested just inside the phase's own left edge. */
-.tgroup { list-style: none; position: relative; padding: 4px 0; }
+/* Overview as stacked paper: the phase is the base sheet (a faint wash of its own colour); General Tasks and
+   Sheets each sit on a sheet set a little to the right (faint amber / plum); the rows sit on plain sheets nudged
+   right again; and anything under a row steps in further, showing a sliver of the level behind it. */
+.phase-sec.open { background: color-mix(in srgb, var(--pc, var(--line)) 7%, var(--panel)); }
+.phase-sec.open .phase-body { border-top: none; }
+.phase-sec.open .tlist { padding: 0 0 10px; }
+.tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 6px; border-radius: 8px 0 0 8px;
+  background: color-mix(in srgb, var(--zc) 8%, var(--panel)); box-shadow: -1px 1px 3px rgba(0, 0, 0, 0.05); }
 .tgroup-list { list-style: none; margin: 0; padding: 0; }
-.tgroup + .tgroup { border-top: 1px solid var(--line); }
-.tgroup::before { content: ''; position: absolute; left: 9px; top: 9px; bottom: 7px; width: 6px; pointer-events: none;
-  border: 2px solid var(--bracket); border-right: none; border-radius: 4px 0 0 4px; z-index: 2; }
-.tgroup.g-tasks { --bracket: color-mix(in srgb, var(--warn) 75%, var(--panel)); }
-.tgroup.g-sheets { --bracket: color-mix(in srgb, #8e3b6e 70%, var(--panel)); }
-.tgroup .tgroup-head { border-bottom: none; padding-top: 6px; }
-.tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--warn) 80%, var(--faint)); }
-.tgroup.g-sheets .tgroup-head { color: color-mix(in srgb, #8e3b6e 70%, var(--faint)); }
-.tgroup .tgroup-list > li:nth-child(2) { border-top: 1px solid var(--line-soft); }
+.tgroup.g-tasks { --zc: #d39a3a; }
+.tgroup.g-sheets { --zc: #9b4a7c; }
+.tgroup .tgroup-head { border-bottom: none; padding: 7px 12px 5px 26px; background: none; }
+.tgroup .tgroup-head .caret { margin-left: -14px; }
+.tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--zc) 80%, var(--faint)); }
+.tgroup.g-sheets .tgroup-head { color: color-mix(in srgb, var(--zc) 75%, var(--faint)); }
+.tgroup-list > li.trow, .tgroup-list > li.irow { margin-left: 14px; background: var(--panel); box-shadow: -1px 0 2px rgba(0, 0, 0, 0.04); }
+.tgroup-list > li.tgroup-head + li { border-top-left-radius: 6px; }
+.tgroup-list > li:last-child { border-bottom-left-radius: 6px; }
+/* Deeper levels: the part left of the row's indent shows the level behind, a touch darker each step. */
+.tgroup-list > li[data-depth="1"] { background: linear-gradient(to right, color-mix(in srgb, var(--ink) 3%, var(--panel)) 0 34px, var(--panel) 34px); }
+.tgroup-list > li[data-depth="2"] { background: linear-gradient(to right, color-mix(in srgb, var(--ink) 5%, var(--panel)) 0 34px, color-mix(in srgb, var(--ink) 2.5%, var(--panel)) 34px 58px, var(--panel) 58px); }
+.tgroup-list > li[data-depth="3"] { background: linear-gradient(to right, color-mix(in srgb, var(--ink) 6%, var(--panel)) 0 34px, color-mix(in srgb, var(--ink) 4%, var(--panel)) 34px 58px, color-mix(in srgb, var(--ink) 2%, var(--panel)) 58px 82px, var(--panel) 82px); }
+.tgroup-list > li.trow:hover, .tgroup-list > li.irow:hover { background: var(--hover); }
+.tgroup-list > li.selected { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
 /* Post-its: the phase strip down the left side. */
 .card-task.note { position: relative; padding-left: 24px;
   /* A paper note lifted at the bottom edge: a soft contact shadow plus a longer one that falls below it. */
