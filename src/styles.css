@@ -1419,3 +1419,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* General Tasks / Sheets panels (board zones and Overview groups): a thin border a shade darker than their own tint. */
 .note-zone { border: 1px solid color-mix(in srgb, var(--zc) 28%, transparent); }
 .tgroup { border: 1px solid color-mix(in srgb, var(--zc) 24%, var(--line)); border-right: none; }
+/* A card that's just been dropped: a quick ring pulse where it landed. */
+@keyframes landed {
+  0% { outline-color: color-mix(in srgb, var(--accent) 80%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  40% { outline-color: color-mix(in srgb, var(--accent) 80%, transparent); box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 25%, transparent); }
+  100% { outline-color: transparent; box-shadow: 0 0 0 12px transparent; }
+}
+.card-task.landed { outline: 2px solid transparent; outline-offset: 2px; animation: landed 1.3s ease-out 0.2s both; }
+@media (prefers-reduced-motion: reduce) { .card-task.landed { animation: none; } }

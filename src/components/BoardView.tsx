@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { addDays, daysBetween, parseISO, shortDate, today } from '../lib/dates.ts'
 import { TASK_STATUSES, type Person, type Phase, type Task, type TaskStatus } from '../lib/types.ts'
 import { shiftDates } from '../lib/useProjectPlan.ts'
@@ -44,6 +44,23 @@ export default function BoardView({
 }) {
   const [over, setOver] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
+  // After a drop: scroll to where the card landed and flash it, so you can see where it went.
+  const [landed, setLanded] = useState<{ id: string; col: string; at: number } | null>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!landed) return
+    const find = () => boardRef.current?.querySelector<HTMLElement>(`[data-card="${landed.id}"][data-col="${CSS.escape(landed.col)}"]`)
+      ?? boardRef.current?.querySelector<HTMLElement>(`[data-card="${landed.id}"]`)
+    // Wait a frame for the card to render in its new column.
+    const raf = requestAnimationFrame(() => {
+      const el = find()
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+      el.classList.remove('landed'); void el.offsetWidth; el.classList.add('landed')
+    })
+    const done = setTimeout(() => setLanded(null), 1600)
+    return () => { cancelAnimationFrame(raf); clearTimeout(done) }
+  }, [landed])
   const [dragFrom, setDragFrom] = useState<string | null>(null) // column the card was picked up from (person board)
   const [from, setFrom] = useState(() => addDays(mondayOf(today()), -7))
 
@@ -102,6 +119,7 @@ export default function BoardView({
     const t = tasks.find((x) => x.id === (e.dataTransfer.getData('text/plain') || dragId))
     setDragId(null)
     if (!t || !col.droppable) return
+    setLanded({ id: t.id, col: col.key, at: Date.now() })
     if (group === 'person') {
       const ids = assigneesOf(t)
       const fromId = dragFrom
@@ -143,7 +161,7 @@ export default function BoardView({
   }
 
   return (
-    <div className={`board board-${group}`}>
+    <div className={`board board-${group}`} ref={boardRef}>
       {group === 'person' && teamBar && <div className="board-bar">{teamBar}</div>}
       {group === 'week' && (
         <div className="board-bar">
@@ -180,8 +198,8 @@ export default function BoardView({
                   const pi = t.phase_id ? phaseIndex.get(t.phase_id) : undefined
                   const note = true // every board uses the same card: the post-it look on the theme's card colour
                   return (
-                    <div key={t.id} draggable
-                      className={`card-task${t.status === 'done' ? ' done' : ''}${dragId === t.id ? ' dragging' : ''}${note ? ' note' : ''}`}
+                    <div key={t.id} draggable data-card={t.id} data-col={col.key}
+                      className={`card-task${t.status === 'done' ? ' done' : ''}${dragId === t.id ? ' dragging' : ''}${note ? ' note' : ''}${landed?.id === t.id && landed.col === col.key ? ' landed' : ''}`}
                       style={note
                         ? { transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
                         : undefined}
