@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authContext.ts'
 import { DateChip, MilestoneMark, SizeChip, StatusChip } from '../components/TaskChips.tsx'
+import { TextField } from '../components/fields.tsx'
 import { isAssigned } from '../lib/assignees.ts'
 import { phaseColors, projectDot } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
@@ -40,6 +41,7 @@ export default function MyTodo() {
   const [kind, setKind] = useSaved<Kind>('archmgmt.todo.kind', 'all')
   const [due, setDue] = useSaved<Due>('archmgmt.todo.due', 'all')
   const [group, setGroup] = useSaved<Group>('archmgmt.todo.group', 'project')
+  const [showDesc, setShowDesc] = useSaved<boolean>('archmgmt.todo.desc', false)
   const [q, setQ] = useState('')
 
   const email = session?.user.email?.toLowerCase() ?? null
@@ -97,6 +99,42 @@ export default function MyTodo() {
       if (items.length) groups.push({ key: b, title: b, items })
     }
   }
+  const row = (t: Task) => {
+    const ph = phaseOf(t), sh = sheetOf(t), pr = projectOf(t)
+    const c = colorOfPhase(t)
+    const d = dueOf(t)
+    return (
+      <li key={t.id} className={`todo-row${t.status === 'done' ? ' done' : ''}${showDesc ? ' with-desc' : ''}`}>
+        <div className="todo-line">
+          <input type="checkbox" className="todo-tick" checked={t.status === 'done'} title={t.status === 'done' ? 'Mark not done' : 'Mark done'}
+            onChange={(e) => patch(t, { status: e.target.checked ? 'done' : 'todo' })} />
+          <div className="todo-main">
+            <button className="todo-title" onClick={() => open(t)} title="Open in the project's Overview">
+              {t.is_milestone && <MilestoneMark task={t} />}
+              {t.kind === 'sheet' && t.sheet_number && <span className="mono todo-no">{t.sheet_number}</span>}
+              {t.title || 'Untitled'}
+              {!showDesc && t.notes && <span className="has-desc" title={t.notes}>≡</span>}
+            </button>
+            <div className="todo-meta muted small">
+              {group === 'due' && pr && <span><i className="pdot" style={{ background: projectDot(pr) }} />{pr.name}</span>}
+              {ph && <span><i className="phase-sq" style={{ background: c }} />{ph.name}</span>}
+              {sh && sh.id !== t.id && <span className="todo-sheet">{sh.sheet_number ? `${sh.sheet_number} ` : ''}{sh.title}</span>}
+              {d && d < t0 && t.status !== 'done' && <span className="late">Overdue since {formatDate(d)}</span>}
+            </div>
+          </div>
+          <span className="todo-chips">
+            <StatusChip task={t} onPatch={(x) => patch(t, x)} />
+            {!t.is_milestone && <SizeChip task={t} onPatch={(x) => patch(t, x)} />}
+            <DateChip task={t} onPatch={(x) => patch(t, x)} />
+          </span>
+        </div>
+        {showDesc && (
+          <TextField multiline value={t.notes ?? null} placeholder="Add a description…" className="todo-desc"
+            onSave={(v) => patch(t, { notes: v })} />
+        )}
+      </li>
+    )
+  }
   const openCount = mine.filter((t) => t.status !== 'done').length
   const overdue = mine.filter((t) => { const d = dueOf(t); return d && d < t0 && t.status !== 'done' }).length
 
@@ -139,45 +177,30 @@ export default function MyTodo() {
               <button className={group === 'project' ? 'on' : ''} onClick={() => setGroup('project')}>By project</button>
               <button className={group === 'due' ? 'on' : ''} onClick={() => setGroup('due')}>By due date</button>
             </div>
+            <label className="inline-check"><input type="checkbox" checked={showDesc} onChange={(e) => setShowDesc(e.target.checked)} />Show descriptions</label>
             <label className="inline-check"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />Show completed</label>
           </div>
 
           {groups.length === 0 && <div className="card pad"><p className="muted">{mine.length ? 'Nothing matches these filters.' : 'Nothing is assigned to you right now.'}</p></div>}
           {groups.map((g) => (
-            <div key={g.key} className="card todo-group">
+            <div key={g.key} className="todo-group">
               <div className="todo-head">
                 {g.dot && <span className="pdot" style={{ background: g.dot }} />}
                 <strong>{g.title}</strong>
                 <span className="count">{g.items.length}</span>
               </div>
-              <ul className="todo-list">
-                {g.items.map((t) => {
-                  const ph = phaseOf(t), sh = sheetOf(t), pr = projectOf(t)
-                  const c = colorOfPhase(t)
-                  const d = dueOf(t)
-                  return (
-                    <li key={t.id} className={`todo-row${t.status === 'done' ? ' done' : ''}`}>
-                      <input type="checkbox" className="todo-tick" checked={t.status === 'done'} title={t.status === 'done' ? 'Mark not done' : 'Mark done'}
-                        onChange={(e) => patch(t, { status: e.target.checked ? 'done' : 'todo' })} />
-                      <div className="todo-main">
-                        <button className="todo-title" onClick={() => open(t)} title="Open in the project's Overview">
-                          {t.is_milestone && <MilestoneMark task={t} />}{t.title || 'Untitled'}
-                        </button>
-                        <div className="todo-meta muted small">
-                          {group === 'due' && pr && <span><i className="pdot" style={{ background: projectDot(pr) }} />{pr.name}</span>}
-                          {ph && <span><i className="phase-sq" style={{ background: c }} />{ph.name}</span>}
-                          {sh && sh.id !== t.id && <span className="todo-sheet">{sh.sheet_number ? `${sh.sheet_number} ` : ''}{sh.title}</span>}
-                          {d && d < t0 && t.status !== 'done' && <span className="late">Overdue since {formatDate(d)}</span>}
-                        </div>
-                      </div>
-                      <span className="todo-chips">
-                        <StatusChip task={t} onPatch={(x) => patch(t, x)} />
-                        {!t.is_milestone && <SizeChip task={t} onPatch={(x) => patch(t, x)} />}
-                        <DateChip task={t} onPatch={(x) => patch(t, x)} />
-                      </span>
+              {/* As in the Overview: general tasks, then sheet work, each on its own panel. */}
+              <ul className="tlist todo-zones">
+                {([['tasks', 'General Tasks', g.items.filter((t) => !isSheetWork(tree, t))], ['sheets', 'Sheets', g.items.filter((t) => isSheetWork(tree, t))]] as const)
+                  .filter(([, , list]) => list.length > 0)
+                  .map(([zone, label, list]) => (
+                    <li key={zone} className={`tgroup g-${zone}`}>
+                      <ul className="tgroup-list">
+                        <li className={`tgroup-head ${zone}`}><span>{label}</span><span className="count">{list.length}</span></li>
+                        {list.map(row)}
+                      </ul>
                     </li>
-                  )
-                })}
+                  ))}
               </ul>
             </div>
           ))}

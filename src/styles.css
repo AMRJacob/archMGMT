@@ -1440,11 +1440,12 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .me-nav { display: flex; flex-direction: column; padding-top: 14px; margin-top: -10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .todo-filters { margin-top: 0; }
 .todo-search { width: 220px; }
-.todo-group { margin-bottom: 14px; }
-.todo-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--subtle); }
+.todo-group { margin-bottom: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--col-soft); box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 3px 8px -3px rgba(0,0,0,.08); }
+.todo-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px 4px; font-size: 15px; }
 .todo-head .count { color: var(--faint); font-size: 12px; }
 .todo-list { list-style: none; margin: 0; padding: 0; }
-.todo-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; }
+.todo-row { padding: 6px 14px; list-style: none; }
+.todo-line { display: flex; align-items: center; gap: 10px; }
 .todo-row + .todo-row { border-top: 1px solid var(--line-soft); }
 .todo-row:hover { background: var(--hover); }
 .todo-tick { accent-color: var(--ok); width: 16px; height: 16px; flex: none; cursor: pointer; }
@@ -1459,7 +1460,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .todo-sheet { font-family: ui-monospace, monospace; font-size: 11px; }
 .todo-chips { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .late { color: var(--danger); }
-.todo-filters select.field.boxed { width: auto; max-width: 280px; flex: none; }
+section.todo-page .todo-filters select.field.boxed { width: auto !important; max-width: 280px; flex: none; }
 .todo-filters .todo-search { flex: none; }
 /* Board: the area under the columns runs to the bottom of the page, so a card can be dropped anywhere below a column. */
 .board-cols { min-height: calc(100vh - 230px); }
@@ -1471,3 +1472,13 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .qp-desc { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
 .qp-desc > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .qp-desc .field { width: 100%; min-height: 64px; font-size: 13px; resize: vertical; }
+.todo-zones { padding: 4px 0 6px; }
+.tgroup-list > li.todo-row { margin-left: 14px; background: var(--panel); box-shadow: -2px 1px 3px -1px rgba(0, 0, 0, 0.08); }
+.tgroup-list > li.todo-row:hover { background: var(--hover); }
+.todo-no { font-size: 12px; color: var(--muted); margin-right: 8px; }
+.todo-desc { width: calc(100% - 26px); margin: 2px 0 0 26px; min-height: 0; height: auto; font-size: 13px; resize: vertical; field-sizing: content; }
+/* My To Do: the panels sit fully inside their project box. */
+.todo-zones { margin: 0; padding: 4px 14px 8px 0; }
+.todo-zones .tgroup { border-right: 1px solid color-mix(in srgb, var(--zc) 24%, var(--line)); border-radius: 8px; }
+.todo-zones .tgroup-list > li.todo-row { margin-right: 12px; }
+.todo-zones .tgroup-list > li:last-child { border-bottom-right-radius: 6px; }
