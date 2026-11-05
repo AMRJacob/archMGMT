@@ -79,6 +79,13 @@ export default function Schedule() {
   const setXSettings = (s: ExportSettings) => { setXBg(s.bg); setXPage(s.page); setXFit(s.fit) }
   // The on-screen timeline draws at the card's real width, so text stays normal size on wide screens.
   const [chartW, setChartW] = useState<number | undefined>(undefined)
+  const [stickyH, setStickyH] = useState(0)
+  const stickyBox = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setStickyH(Math.round(e.borderBoxSize?.[0]?.blockSize ?? e.contentRect.height)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const chartBox = useCallback((el: HTMLDivElement | null) => {
     if (!el) return
     const ro = new ResizeObserver(([e]) => setChartW(e.contentRect.width))
@@ -308,6 +315,8 @@ export default function Schedule() {
 
       {view === 'timeline' && (
         <>
+          {/* The controls and zoom stay at the top of the window while scrolling the chart (the date header sticks just under them). */}
+          <div className="sched-sticky no-print" ref={stickyBox}>
           <div className="subbar no-print">
             <div className="segmented small-seg" aria-label="Timeline style">
               <button className={mode === 'working' ? 'on' : ''} onClick={() => setMode('working')}>Working view</button>
@@ -370,6 +379,7 @@ export default function Schedule() {
               </div>
             )}
           </div>
+          </div>
           <div className="card chart-card no-print" ref={chartBox}>
             <ScheduleChart project={pres ? xProject : project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
               firmName={FIRM_NAME} editable window={chartWindow} dayMarks={dayMarks === 'on'} width={chartW} colors={pres ? xColors : chartColors(theme)} showHeader={false} keepOrder
@@ -378,6 +388,7 @@ export default function Schedule() {
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask}
               setup={mode === 'working' && setup === 'on'}
+              stickyTop={`${stickyH}px`}
               zones={level > 0 && (!workApplies || work === 'all')}
               onTogglePresented={(t) => togglePres(t as ShownTask)}
               onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}

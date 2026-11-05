@@ -1489,3 +1489,8 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 .todo-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent) !important; }
 .todo-go { opacity: .4; }
 .todo-row:hover .todo-go { opacity: 1; }
+/* Schedule: controls and date header stay in view while scrolling. */
+.sched-sticky { position: sticky; top: 0; z-index: 20; background: var(--paper); padding-top: 8px; margin-top: -8px; box-shadow: 0 6px 8px -8px rgba(0,0,0,.25); }
+.sched-sticky .zoombar { margin-bottom: 8px; }
+.card.chart-card { overflow: visible; }
+.chart-sticky { position: sticky; height: 0; z-index: 6; }

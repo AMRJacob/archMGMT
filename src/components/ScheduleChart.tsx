@@ -66,8 +66,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
 }: {
+  /** On screen: keep the date header in view while scrolling, this far from the top of the window (CSS length). */
+  stickyTop?: string
   /** Working view: General Tasks / Sheets zones (off when the view is filtered to one of them). */
   zones?: boolean
   /** Presentation setup (working view): grey out what the presentation won't show; a click adds or removes it. */
@@ -401,47 +403,8 @@ export default function ScheduleChart({
     </g>
   )
 
-  return (
-    <svg
-      ref={(el) => { inner.current = el; if (svgRef) svgRef.current = el }}
-      xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
-      style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'pan-y' : undefined }}
-      fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
-      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); setPlace(null); setOrder(null); pan.current = null; setPanning(false) }}
-      onWheel={onPan ? (e) => {
-        // Sideways scrolling (trackpad swipe, Shift+wheel) moves through time in the zoomed views.
-        const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
-        if (!dx) return
-        wheelAcc.current += dx
-        const pxPerDay = Math.max(4, dayW * ((inner.current?.getBoundingClientRect().width ?? W) / W))
-        const days = Math.trunc(wheelAcc.current / pxPerDay)
-        if (days) { wheelAcc.current -= days * pxPerDay; onPan(days) }
-      } : undefined}
-      onContextMenu={onContextAt && !setup ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
-      onDoubleClick={onAddAt && !setup ? (e) => {
-        if (!(e.target as Element).closest('[data-pan]')) return
-        const spot = spotAt(e.clientX, e.clientY)
-        if (spot.phase) onAddAt(spot.phase, spot.date)
-      } : undefined}
-    >
-      <rect x={0} y={0} width={W} height={H} fill={C.bg} />
-
-      {/* Header */}
-      {showHeader && <>
-      <text x={M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.accent}>{firmName.toUpperCase()}</text>
-      <text x={M} y={80} fontSize={28} fontWeight={600} fill={C.ink}>{clip(project.name, 60)}</text>
-      <text x={M} y={106} fontSize={14} fill={C.muted}>
-        {[project.number, project.client].filter(Boolean).join('  ·  ') || ' '}
-      </text>
-      <text x={W - M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.muted} textAnchor="end">
-        {pres ? 'PROJECT SCHEDULE' : 'WORKING SCHEDULE'}
-      </text>
-      <text x={W - M} y={80} fontSize={14} fill={C.ink} textAnchor="end">Prepared {formatDate(t)}</text>
-      {has && <text x={W - M} y={106} fontSize={14} fill={C.muted} textAnchor="end">{range(first, last)}</text>}
-      <line x1={M} x2={W - M} y1={HEADER - 8} y2={HEADER - 8} stroke={C.ink} strokeWidth={1.2} />
-      </>}
-      <defs><clipPath id="chart-area"><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
-
+  const axisEl = (
+    <>
       {/* Timeline axis */}
       {scale === 'month' ? (
         <>
@@ -501,6 +464,77 @@ export default function ScheduleChart({
       <line x1={x0 + cw} x2={x0 + cw} y1={axisTop + 2} y2={rowsBottom} stroke={C.line} />
       <line x1={M} x2={W - M} y1={rowsTop} y2={rowsTop} stroke={C.lineStrong} />
 
+    </>
+  )
+  const todayEl = (
+    <>
+      {showToday && (
+        <g pointerEvents="none">
+          <line x1={x(t)} x2={x(t)} y1={axisTop + 22} y2={rowsBottom} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />
+          <rect x={x(t) - 22} y={axisTop + 4} width={44} height={16} rx={8} fill={C.accent} />
+          <text x={x(t)} y={axisTop + 16} fontSize={10} fontWeight={600} fill={C.onAccent} textAnchor="middle">TODAY</text>
+        </g>
+      )}
+    </>
+  )
+  // On screen (working view), a copy of the date header stays at the top of the window while scrolling down.
+  const px = width ? width / W : 1 // screen pixels per chart unit
+  const stickyAxis = stickyTop !== undefined && !pres && (
+    <div className="chart-sticky" style={{ top: `calc(${stickyTop} - ${axisTop * px}px)` }} aria-hidden="true">
+      <svg viewBox={`0 ${axisTop - 2} ${W} ${rowsTop - axisTop + 3}`} width="100%" style={{ display: 'block', position: 'absolute', top: (axisTop - 2) * px, left: 0 }}
+        fontFamily={C.font} pointerEvents="none">
+        <rect x={0} y={axisTop - 2} width={W} height={rowsTop - axisTop + 3} fill={C.bg} />
+        {axisEl}
+        {todayEl}
+      </svg>
+    </div>
+  )
+
+  return (
+    <>
+    {stickyAxis}
+    <svg
+      ref={(el) => { inner.current = el; if (svgRef) svgRef.current = el }}
+      xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
+      style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'pan-y' : undefined }}
+      fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
+      onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={() => { setDrag(null); setPlace(null); setOrder(null); pan.current = null; setPanning(false) }}
+      onWheel={onPan ? (e) => {
+        // Sideways scrolling (trackpad swipe, Shift+wheel) moves through time in the zoomed views.
+        const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
+        if (!dx) return
+        wheelAcc.current += dx
+        const pxPerDay = Math.max(4, dayW * ((inner.current?.getBoundingClientRect().width ?? W) / W))
+        const days = Math.trunc(wheelAcc.current / pxPerDay)
+        if (days) { wheelAcc.current -= days * pxPerDay; onPan(days) }
+      } : undefined}
+      onContextMenu={onContextAt && !setup ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
+      onDoubleClick={onAddAt && !setup ? (e) => {
+        if (!(e.target as Element).closest('[data-pan]')) return
+        const spot = spotAt(e.clientX, e.clientY)
+        if (spot.phase) onAddAt(spot.phase, spot.date)
+      } : undefined}
+    >
+      <rect x={0} y={0} width={W} height={H} fill={C.bg} />
+
+      {/* Header */}
+      {showHeader && <>
+      <text x={M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.accent}>{firmName.toUpperCase()}</text>
+      <text x={M} y={80} fontSize={28} fontWeight={600} fill={C.ink}>{clip(project.name, 60)}</text>
+      <text x={M} y={106} fontSize={14} fill={C.muted}>
+        {[project.number, project.client].filter(Boolean).join('  ·  ') || ' '}
+      </text>
+      <text x={W - M} y={44} fontSize={12} fontWeight={600} letterSpacing={2.4} fill={C.muted} textAnchor="end">
+        {pres ? 'PROJECT SCHEDULE' : 'WORKING SCHEDULE'}
+      </text>
+      <text x={W - M} y={80} fontSize={14} fill={C.ink} textAnchor="end">Prepared {formatDate(t)}</text>
+      {has && <text x={W - M} y={106} fontSize={14} fill={C.muted} textAnchor="end">{range(first, last)}</text>}
+      <line x1={M} x2={W - M} y1={HEADER - 8} y2={HEADER - 8} stroke={C.ink} strokeWidth={1.2} />
+      </>}
+      <defs><clipPath id="chart-area"><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
+
+      {axisEl}
+
       {/* Rows: backgrounds and labels first, bars on top */}
       {rows.map((r, i) => {
         const ry = rowY[i]
@@ -526,8 +560,10 @@ export default function ScheduleChart({
           return (
             <g key={i} pointerEvents="none">
               <rect x={M} y={ry + 3} width={W - 2 * M} height={h - 6} rx={4} fill="none" stroke={zc} strokeOpacity={0.3} />
-              <text x={M + 30} y={ry + 14} fontSize={9.5} fontWeight={600} letterSpacing={1} fill={zc}>{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
-              <text x={M + 30 + (r.zone === 'sheets' ? 52 : 96)} y={ry + 14} fontSize={9.5} fill={C.faint}>{r.rows}</text>
+              {/* The zone's title: a solid band across the whole chart with white lettering. */}
+              <path d={`M${M} ${ry + 7} a4 4 0 0 1 4 -4 H${W - M - 4} a4 4 0 0 1 4 4 V${ry + ROW_ZONE - 1} H${M} Z`} fill={zc} fillOpacity={0.85} />
+              <text x={M + 30} y={ry + 15} fontSize={9.5} fontWeight={700} letterSpacing={1.1} fill="#fff">{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
+              <text x={M + 30 + (r.zone === 'sheets' ? 54 : 100)} y={ry + 15} fontSize={9.5} fill="#fff" fillOpacity={0.8}>{r.rows}</text>
             </g>
           )
         }
@@ -680,13 +716,7 @@ export default function ScheduleChart({
         )
       })}
 
-      {showToday && (
-        <g pointerEvents="none">
-          <line x1={x(t)} x2={x(t)} y1={axisTop + 22} y2={rowsBottom} stroke={C.accent} strokeWidth={1.4} strokeDasharray="4 3" />
-          <rect x={x(t) - 22} y={axisTop + 4} width={44} height={16} rx={8} fill={C.accent} />
-          <text x={x(t)} y={axisTop + 16} fontSize={10} fontWeight={600} fill={C.onAccent} textAnchor="middle">TODAY</text>
-        </g>
-      )}
+      {todayEl}
 
       {!has && <text x={x0 + cw / 2} y={rowsTop + 40} fontSize={14} fill={C.muted} textAnchor="middle">Nothing to show yet.</text>}
 
@@ -709,5 +739,6 @@ export default function ScheduleChart({
         </text>
       </g>
     </svg>
+    </>
   )
 }
