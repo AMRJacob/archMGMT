@@ -561,7 +561,7 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .trow { position: relative; }
 .twist { width: 18px; height: 18px; border: none; background: none; padding: 0; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; flex: none; margin-left: -24px; }
 .twist:hover { background: var(--hover); color: var(--ink); }
-.twist svg { transition: transform 0.15s; }
+.twist svg { transition: transform 0.26s ease; }
 .twist.open svg { transform: rotate(90deg); }
 .twist.empty { opacity: 0.35; }
 .trow.k-sheet { background: var(--panel); }
@@ -1352,14 +1352,14 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* Overview as stacked paper: the phase is the base sheet (a faint wash of its own colour); General Tasks and
    Sheets each sit on a sheet set a little to the right (faint amber / plum); the rows sit on plain sheets nudged
    right again; and anything under a row steps in further, showing a sliver of the level behind it. */
-.phase-sec.open { background: color-mix(in srgb, var(--pc, var(--line)) 7%, var(--panel)); }
+.phase-sec.open { background: var(--col-soft); }
 .phase-sec.open .phase-body { border-top: none; }
 .phase-sec.open .tlist { padding: 0 0 10px; }
 .tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 6px; border-radius: 8px 0 0 8px;
   background: color-mix(in srgb, var(--zc) 8%, var(--panel)); box-shadow: -1px 1px 3px rgba(0, 0, 0, 0.05); }
 .tgroup-list { list-style: none; margin: 0; padding: 0; }
-.tgroup.g-tasks { --zc: #d39a3a; }
-.tgroup.g-sheets { --zc: #9b4a7c; }
+.tgroup.g-tasks { --zc: var(--kind-general); }
+.tgroup.g-sheets { --zc: var(--kind-sheet); }
 .tgroup .tgroup-head { border-bottom: none; padding: 7px 12px 5px 26px; background: none; }
 .tgroup .tgroup-head .caret { margin-left: -14px; }
 .tgroup.g-tasks .tgroup-head { color: color-mix(in srgb, var(--zc) 80%, var(--faint)); }
@@ -1388,29 +1388,31 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .ct-kind:not(:empty) { padding-top: 3px; }
 .ct-kind::after { content: ''; flex: none; width: 18px; height: 18px; margin-top: 0; background: linear-gradient(225deg, var(--kc) 0 50%, rgba(0,0,0,.14) 50% 57%, transparent 57%); border-top-right-radius: 2px; }
 .ct-kind:not(:empty)::after { margin-top: -3px; }
-.ct-kind.general { --kc: #d39a3a; }
-.ct-kind.sheet { --kc: #9b4a7c; }
+.ct-kind.general { --kc: var(--kind-general); }
+.ct-kind.sheet { --kc: var(--kind-sheet); }
 .card-task.note .ct-title { padding-right: 18px; }
 
 /* Post-its fit their text, and gather in a General zone and a Sheets zone in each column. */
 .card-task.note { min-height: 0; width: fit-content; max-width: 100%; min-width: 120px; padding-top: 9px; padding-bottom: 8px; }
 .note-zone { border-radius: 8px; padding: 5px 6px 8px; background: color-mix(in srgb, var(--zc) 9%, transparent); }
-.note-zone.general { --zc: #d39a3a; }
-.note-zone.sheet { --zc: #9b4a7c; }
+.note-zone.general { --zc: var(--kind-general); }
+.note-zone.sheet { --zc: var(--kind-sheet); }
 .nz-label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: color-mix(in srgb, var(--zc) 80%, var(--faint)); margin: 0 0 5px 2px; }
 .nz-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
 /* Layers carry soft shadows instead of outlines: the phase sheet on the page, each group sheet on the phase,
    each row sheet on its group. The left phase edge stays; the thin outline round the phase goes. */
 .phase-sec { border-top-color: transparent; border-right: none; border-bottom-color: transparent;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 3px 8px -2px rgba(0, 0, 0, 0.07); }
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 5px 14px -5px color-mix(in srgb, var(--pc, #000) 60%, transparent); }
 .tgroup { box-shadow: -2px 2px 5px -1px rgba(0, 0, 0, 0.09), 0 1px 1px rgba(0, 0, 0, 0.03); }
 .tgroup-list > li.trow, .tgroup-list > li.irow { box-shadow: -2px 1px 3px -1px rgba(0, 0, 0, 0.08); }
 /* Opening things: a phase, a group or a row's children unfold from the top (quick; off for reduced motion). */
 @keyframes unfold { from { opacity: 0; transform: translateY(-6px) scaleY(0.97); } to { opacity: 1; transform: none; } }
 @keyframes row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.phase-sec.open .phase-body { animation: unfold 0.22s cubic-bezier(.2, .7, .3, 1) both; transform-origin: top; }
-.tgroup-list > li.trow, .tgroup-list > li.irow { animation: row-in 0.18s ease-out both; }
-.phase-sec .chev, .tgroup-head .caret, .twist { transition: transform 0.18s ease; }
+.phase-sec.open .phase-body { animation: unfold 0.34s cubic-bezier(.2, .7, .3, 1) both; transform-origin: top; }
+.tgroup-list > li.trow, .tgroup-list > li.irow { animation: row-in 0.28s ease-out both; }
+.phase-sec .chev, .tgroup-head .caret, .twist { transition: transform 0.26s ease; }
 @media (prefers-reduced-motion: reduce) {
   .phase-sec.open .phase-body, .tgroup-list > li.trow, .tgroup-list > li.irow { animation: none; }
 }
+/* Work kinds in the theme's own colours (General Tasks / Sheets in the Overview and on the board). */
+:root { --kind-general: var(--warn); --kind-sheet: color-mix(in srgb, var(--info) 55%, var(--danger)); }
