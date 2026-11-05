@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as RPointerEvent, type ReactElement, type RefObject } from 'react'
+import { useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react'
 import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { phaseColors } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
@@ -42,13 +42,6 @@ interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number;
 
 function clip(s: string, max: number) {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
-}
-
-/** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */
-function mixHex(a: string, b: string, t: number) {
-  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) || 0)
-  const [x, y] = [p(a), p(b)]
-  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
 }
 
 function range(a: string, b: string) {
@@ -130,13 +123,6 @@ export default function ScheduleChart({
       .forEach((task) => rows.push({ kind: 'task', task, color }))
     if (editable && onAddAt && !pres) rows.push({ kind: 'add', phase, color })
   })
-  // Sheet work: a sheet or view, or anything under one (parents looked up among the tasks drawn here).
-  const byId = new Map(tasks.map((t) => [t.id, t]))
-  const sheetSide = (t: Task) => {
-    let cur: Task | undefined = t
-    for (let n = 0; cur && n < 12; n++) { if (cur.kind === 'sheet' || cur.kind === 'view') return true; cur = cur.parent_id ? byId.get(cur.parent_id) : undefined }
-    return false
-  }
   const loose = tasks.filter((t) => !t.phase_id && (!pres || presented(t))).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
     rows.push({ kind: 'group', label: 'No phase', color: '#8b8f94' })
@@ -485,43 +471,6 @@ export default function ScheduleChart({
       <line x1={x0 + cw} x2={x0 + cw} y1={axisTop + 2} y2={rowsBottom} stroke={C.line} />
       <line x1={M} x2={W - M} y1={rowsTop} y2={rowsTop} stroke={C.lineStrong} />
 
-      {/* Working view only: the Overview's layered paper in the label column. Each phase is a base sheet (framed in a
-          light tint of its colour), general tasks and sheet work sit on sheets stepped in on top, and each row on a
-          plain sheet stepped in again (deeper rows further). The presentation view stays clean. */}
-      {!pres && (() => {
-        const out: ReactElement[] = []
-        const kindColor = (t: Task) => (sheetSide(t) ? '#8e3b6e' : '#c98a12')
-        for (let i = 0; i < rows.length; i++) {
-          const r = rows[i]
-          if (r.kind !== 'phase' && r.kind !== 'group') continue
-          let j = i + 1
-          while (j < rows.length && rows[j].kind !== 'phase' && rows[j].kind !== 'group') j++
-          const top = rowY[i], bottom = j < rows.length ? rowY[j] : rowsBottom
-          out.push(<rect key={`pp${i}`} x={M + 0.5} y={top + 0.5} width={x0 - M - 1} height={bottom - top - 3} rx={6}
-            fill={C.band} stroke={mixHex(r.color, C.line, 0.62)} />)
-          // Runs of rows of one kind (general tasks / sheet work): one stepped sheet each.
-          let k = i + 1
-          while (k < j) {
-            const rk = rows[k]
-            if (rk.kind !== 'task') { k++; continue }
-            const side = sheetSide(rk.task)
-            let e = k
-            while (e + 1 < j && rows[e + 1].kind === 'task' && sheetSide((rows[e + 1] as { task: Task }).task) === side) e++
-            const kc = kindColor(rk.task)
-            const ry0 = rowY[k], ry1 = rowY[e] + ROW_TASK
-            out.push(<rect key={`pk${k}`} x={M + 8} y={ry0 + 1} width={x0 - M - 8} height={ry1 - ry0 - 2} rx={5}
-              fill={mixHex(kc, C.bg, 0.92)} stroke={mixHex(kc, C.line, 0.7)} />)
-            for (let q = k; q <= e; q++) {
-              const t = (rows[q] as { task: Task }).task
-              const d = Math.min(4, (t as ShownTask)._depth ?? 0)
-              const lx = M + 16 + d * 12
-              out.push(<rect key={`pr${q}`} x={lx} y={rowY[q] + 2} width={x0 - lx - 1} height={ROW_TASK - 3} rx={3} fill={C.bg} />)
-            }
-            k = e + 1
-          }
-        }
-        return <g pointerEvents="none">{out}</g>
-      })()}
       {/* Rows: backgrounds and labels first, bars on top */}
       {rows.map((r, i) => {
         const ry = rowY[i]
