@@ -1435,3 +1435,29 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .setup-toggle.on { color: var(--accent); font-weight: 600; }
 .mine-bar { display: flex; justify-content: flex-end; margin: 0 0 4px; }
 .mine-bar .inline-check.on { color: var(--accent); font-weight: 600; }
+
+/* My To Do */
+.me-nav { display: flex; flex-direction: column; padding-top: 14px; margin-top: -10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.todo-filters { margin-top: 0; }
+.todo-search { width: 220px; }
+.todo-group { margin-bottom: 14px; }
+.todo-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--subtle); }
+.todo-head .count { color: var(--faint); font-size: 12px; }
+.todo-list { list-style: none; margin: 0; padding: 0; }
+.todo-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; }
+.todo-row + .todo-row { border-top: 1px solid var(--line-soft); }
+.todo-row:hover { background: var(--hover); }
+.todo-tick { accent-color: var(--ok); width: 16px; height: 16px; flex: none; cursor: pointer; }
+.todo-main { flex: 1; min-width: 0; }
+.todo-title { border: none; background: none; padding: 0; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; display: inline-flex; align-items: center; gap: 2px; }
+.todo-title:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.todo-row.done .todo-title { color: var(--muted); text-decoration: line-through; }
+.todo-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 1px; }
+.todo-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.todo-meta .phase-sq { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.todo-meta .pdot { width: 8px; height: 8px; }
+.todo-sheet { font-family: ui-monospace, monospace; font-size: 11px; }
+.todo-chips { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.late { color: var(--danger); }
+.todo-filters select.field.boxed { width: auto; max-width: 280px; flex: none; }
+.todo-filters .todo-search { flex: none; }

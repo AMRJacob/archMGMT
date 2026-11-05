@@ -17,6 +17,7 @@ import Notes from './pages/Notes.tsx'
 import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
+import MyTodo from './pages/MyTodo.tsx'
 
 export default function App() {
   return (
@@ -80,6 +81,10 @@ function Shell() {
               <NavLink to="/notes">Meeting Notes</NavLink>
             </nav>
           </section>
+          {/* Personal: your own work across every project. */}
+          <nav className="me-nav" aria-label="Me">
+            <NavLink to="/todo">My To Do</NavLink>
+          </nav>
           <div className="sidebar-foot">
             {usingSampleData && (
               <p className="notice">
@@ -111,6 +116,7 @@ function Shell() {
             <Route path="/board" element={<Schedule />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/team" element={<Team />} />
+            <Route path="/todo" element={<MyTodo />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/:section" element={<Settings />} />
             <Route path="/wishlist" element={<Navigate to="/settings/wishlist" replace />} />
