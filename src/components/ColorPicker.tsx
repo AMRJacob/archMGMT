@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { decodeBrand, encodeBrand, projectAccent, projectPalette, ROOT_PRESETS, SCHEMES, textOn } from '../lib/colors.ts'
+import { brandSuggestions, decodeBrand, encodeBrand, projectAccent, projectPalette, ROOT_PRESETS, SCHEMES, textOn } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import type { BrandPalette } from '../lib/types.ts'
 
@@ -17,6 +17,7 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
   onChange: (c: { color?: string | null; color_scheme?: string | null }) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [dragAt, setDragAt] = useState<number | null>(null)
   const brands = useRows<BrandPalette>('brand_palettes')
   const palettes = [...brands.rows].sort((a, b) => a.name.localeCompare(b.name))
   const brand = decodeBrand(scheme)
@@ -38,7 +39,7 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
   const generated = brand ? null : (scheme ?? 'balanced')
 
   /** The palette a colour belongs to (for naming a hand-picked set). */
-  const paletteWith = (cs: string[]) => palettes.find((p) => cs.every((c) => p.colors.includes(c)))
+  const paletteWith = (cs: string[]) => palettes.find((p) => cs.every((c) => p.colors.includes(c))) ?? palettes.find((p) => cs.some((c) => p.colors.includes(c)))
   const brandScheme = (cs: string[]) => encodeBrand(paletteWith(cs)?.name ?? 'Brand colours', cs)
 
   // ---- step 1: base ----
@@ -65,6 +66,15 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
     if (!list.length) return
     onChange({ color: list[0], color_scheme: brandScheme(list) })
   }
+  /** Phase order: drag a colour to a new place (phase 1 is also the base colour). */
+  const moveBrand = (from: number, to: number) => {
+    if (!brand || from === to) return
+    const list = [...brand.colors]
+    const [c] = list.splice(from, 1)
+    list.splice(to, 0, c)
+    onChange({ color: list[0], color_scheme: brandScheme(list) })
+  }
+  const addColor = (c: string) => { if (brand && !brand.colors.includes(c)) onChange({ color: brand.colors[0], color_scheme: brandScheme([...brand.colors, c]) }) }
   const wholePalette = (p: BrandPalette) => onChange({ color: p.colors[0], color_scheme: encodeBrand(p.name, p.colors) })
 
   const preview = (cs: string[]) => (
@@ -127,7 +137,21 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
 
           {brand && (
             <div className="cp-brand-pick">
-              <p className="cp-hint">Click brand colours in the order the phases should use them (numbers show the order; click a numbered one to take it out). Phase 1 is also the base colour.</p>
+              <div className="cp-label">Phase order <span className="cp-label-note">· drag to reorder</span></div>
+              <div className="cp-order">
+                {brand.colors.map((c, i) => (
+                  <span key={c} className={`cp-order-chip${dragAt === i ? ' dragging' : ''}`} draggable title={`Phase ${i + 1}: ${c}. Drag to reorder.`}
+                    style={{ background: c, color: textOn(c) }}
+                    onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); setDragAt(i) }}
+                    onDragOver={(e) => { if (dragAt !== null) e.preventDefault() }}
+                    onDrop={(e) => { e.preventDefault(); if (dragAt !== null) moveBrand(dragAt, i); setDragAt(null) }}
+                    onDragEnd={() => setDragAt(null)}>
+                    <b>{i + 1}</b>
+                    {brand.colors.length > 1 && <button title="Take this colour out" onClick={() => toggleBrand(c)}>×</button>}
+                  </span>
+                ))}
+              </div>
+              <p className="cp-hint">Add brand colours below (click a palette name for all of them). Phase 1 is also the base colour.</p>
               {palettes.map((p) => (
                 <div key={p.id} className="cp-brand-row">
                   <button className="cp-brand-name" title={`Use all ${p.name} colours, in the palette's order`} onClick={() => wholePalette(p)}>{p.name}</button>
@@ -142,6 +166,14 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
                   </span>
                 </div>
               ))}
+              <div className="cp-brand-row">
+                <span className="cp-brand-label muted" title="Colours that go with the brand, for brands without enough colours">Suggested</span>
+                <span className="cp-brand-chips">
+                  {brandSuggestions(brand.colors).map((c) => (
+                    <button key={c} className="cp-chip suggest" style={{ background: c }} title={`${c}: add after the brand colours`} onClick={() => addColor(c)} />
+                  ))}
+                </span>
+              </div>
             </div>
           )}
           {palettes.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Branding &amp; Printing to use them here.</p>}

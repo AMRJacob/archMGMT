@@ -179,3 +179,29 @@ export function phaseColors(
   const pal = projectPalette(project.color, n, project.color_scheme)
   return new Map([...slots].map(([id, s]) => [id, pal[s]]))
 }
+
+/**
+ * Colours that go with a set of brand colours, for brands with too few to colour every phase: a lighter and a
+ * deeper version of each brand colour, then hues that sit between them on the colour wheel. Never repeats a colour
+ * already in the set.
+ */
+export function brandSuggestions(colors: string[], count = 10): string[] {
+  const have = new Set(colors.map((c) => c.toLowerCase()))
+  const out: string[] = []
+  const add = (h: string) => { const k = h.toLowerCase(); if (!have.has(k) && !out.includes(k)) out.push(k) }
+  const vivid = colors.map(hexToOklch).filter((o) => o.c > 0.03)
+  for (const o of vivid) {
+    add(oklchToHex({ ...o, l: clamp(o.l + 0.18, 0.55, 0.88), c: o.c * 0.75 }))
+    add(oklchToHex({ ...o, l: clamp(o.l - 0.14, 0.25, 0.6) }))
+  }
+  if (vivid.length) {
+    const L = vivid.reduce((s, o) => s + o.l, 0) / vivid.length, C = Math.min(0.14, vivid.reduce((s, o) => s + o.c, 0) / vivid.length)
+    const hues = vivid.map((o) => o.h).sort((a, b) => a - b)
+    // Midpoints between neighbouring brand hues (wrapping round), then a few evenly spaced from the first.
+    hues.forEach((h, i) => { const nx = hues[(i + 1) % hues.length] + (i + 1 === hues.length ? 360 : 0); add(oklchToHex({ l: clamp(L, 0.5, 0.7), c: C, h: (h + nx) / 2 })) })
+    for (const dh of [60, 150, 210, 300]) add(oklchToHex({ l: clamp(L, 0.5, 0.7), c: C * 0.85, h: hues[0] + dh }))
+  } else {
+    for (const h of [30, 150, 250, 330]) add(oklchToHex({ l: 0.62, c: 0.08, h }))
+  }
+  return out.slice(0, count)
+}
