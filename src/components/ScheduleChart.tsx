@@ -25,6 +25,7 @@ const AXIS = 48
 const ROW_PHASE = 36
 const ROW_TASK = 26
 const ROW_ADD = 24
+const ROW_ZONE = 20
 const FOOTER = 64
 const EDGE = 7 // grab width for resizing, in chart units
 
@@ -33,12 +34,18 @@ type Row =
   | { kind: 'task'; task: Task; color: string }
   | { kind: 'group'; label: string; color: string }
   | { kind: 'add'; phase: Phase; color: string }
+  /** Working view: the heading of a phase's General Tasks or Sheets zone (its band spans `rows` rows below it). */
+  | { kind: 'zone'; phase: Phase; zone: 'general' | 'sheets'; rows: number; color: string }
 
 type DragMode = 'move' | 'start' | 'end'
 
 /** What's under the pointer on the timeline: the day (null over the labels), the phase and the task row, if any. */
 export interface ChartSpot { date: string | null; phase: Phase | null; task: Task | null; clientX: number; clientY: number }
 interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number; delta: number; moved: boolean }
+
+/** Zone colours (as in the Overview), used see-through so they sit lightly on any theme. */
+const ZONE_GENERAL = '#c98a12'
+const ZONE_SHEETS = '#8e3b6e'
 
 function clip(s: string, max: number) {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
@@ -116,15 +123,32 @@ export default function ScheduleChart({
 
   const colorOf = phaseColors(project, sorted)
   const palette = sorted.map((p) => colorOf.get(p.id)!)
+  // Sheet work: a sheet or view, or anything under one (parents looked up among the tasks drawn here).
+  const byId = new Map(tasks.map((t) => [t.id, t]))
+  const sheetSide = (t: Task) => {
+    let cur: Task | undefined = t
+    for (let n = 0; cur && n < 12; n++) { if (cur.kind === 'sheet' || cur.kind === 'view') return true; cur = cur.parent_id ? byId.get(cur.parent_id) : undefined }
+    return false
+  }
   const rows: Row[] = []
   sorted.forEach((phase, i) => {
     if (pres && !phase.client_visible) return
     const color = palette[i]
     rows.push({ kind: 'phase', phase, color })
-    tasks
+    const list = tasks
       .filter((t) => t.phase_id === phase.id && (!pres || presented(t)))
       .sort(keepOrder ? () => 0 : byStart)
-      .forEach((task) => rows.push({ kind: 'task', task, color }))
+    if (pres) list.forEach((task) => rows.push({ kind: 'task', task, color }))
+    else {
+      // Working view: like the Overview, general tasks first and sheet work after, each in its own zone. Branches stay
+      // together (everything under a sheet is sheet work), and each keeps its order.
+      const gen = list.filter((t) => !sheetSide(t)), sh = list.filter((t) => sheetSide(t))
+      for (const [zone, part] of [['general', gen], ['sheets', sh]] as const) {
+        if (!part.length) continue
+        rows.push({ kind: 'zone', phase, zone, rows: part.length, color })
+        part.forEach((task) => rows.push({ kind: 'task', task, color }))
+      }
+    }
     if (editable && onAddAt && !pres) rows.push({ kind: 'add', phase, color })
   })
   const loose = tasks.filter((t) => !t.phase_id && (!pres || presented(t))).sort(keepOrder ? () => 0 : byStart)
@@ -174,7 +198,7 @@ export default function ScheduleChart({
     for (let k = 0; k < rowY.length; k++) if (cy >= rowY[k]) i = k
     const row = i >= 0 && cy < rowsBottom ? rows[i] : null
     const date = cx >= x0 && cx <= x0 + cw ? addDays(start, Math.floor((cx - x0) / dayW)) : null
-    const phase = !row ? null : row.kind === 'phase' || row.kind === 'add' ? row.phase
+    const phase = !row ? null : row.kind === 'phase' || row.kind === 'add' || row.kind === 'zone' ? row.phase
       : row.kind === 'task' ? sorted.find((p) => p.id === row.task.phase_id) ?? null : null
     return { date, phase, task: row?.kind === 'task' ? row.task : null, clientX, clientY }
   }
@@ -326,7 +350,7 @@ export default function ScheduleChart({
   const rowsTop = axisTop + (daily ? AXIS + 12 : AXIS)
   const rowY: number[] = []
   let y = rowsTop
-  for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : r.kind === 'add' ? ROW_ADD : ROW_PHASE }
+  for (const r of rows) { rowY.push(y); y += r.kind === 'task' ? ROW_TASK : r.kind === 'add' ? ROW_ADD : r.kind === 'zone' ? ROW_ZONE : ROW_PHASE }
   const rowsBottom = y
   const H = rowsBottom + FOOTER
 
@@ -490,6 +514,18 @@ export default function ScheduleChart({
               {r.kind === 'phase' && (
                 <text x={x0 - 14} y={ry + 23} fontSize={11} fill={C.muted} textAnchor="end">{`${shortDate(ps)} – ${shortDate(pe)}`}</text>
               )}
+            </g>
+          )
+        }
+        if (r.kind === 'zone') {
+          // A faint band across the whole schedule (see-through, so the grid shows), a thin edge, and the heading.
+          const zc = r.zone === 'sheets' ? ZONE_SHEETS : ZONE_GENERAL
+          const h = ROW_ZONE + r.rows * ROW_TASK
+          return (
+            <g key={i} pointerEvents="none">
+              <rect x={M} y={ry + 1} width={W - 2 * M} height={h - 2} rx={4} fill={zc} fillOpacity={0.06} stroke={zc} strokeOpacity={0.22} />
+              <text x={M + 30} y={ry + 14} fontSize={9.5} fontWeight={600} letterSpacing={1} fill={zc}>{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
+              <text x={M + 30 + (r.zone === 'sheets' ? 52 : 96)} y={ry + 14} fontSize={9.5} fill={C.faint}>{r.rows}</text>
             </g>
           )
         }
