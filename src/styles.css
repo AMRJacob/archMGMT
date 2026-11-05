@@ -1285,3 +1285,21 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .ms-chip.unset { background: none; border: 1px dashed var(--line-strong); color: var(--muted); font-weight: 500; }
 .qp-head .diamond { margin-left: 2px; }
 .ms-chip.compact { padding: 2px 6px 2px 2px; }
+
+/* Brand palettes: each colour labelled with the phase it paints; role pickers for the printed schedule. */
+.brand-slot { display: inline-flex; flex-direction: column; gap: 2px; }
+.brand-slot small { font-size: 10px; color: var(--faint); padding-left: 4px; white-space: nowrap; }
+.brand-colors { align-items: flex-end; }
+.brand-roles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.role-pick { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px 3px 4px; background: var(--panel); cursor: pointer; }
+.role-pick i { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); }
+.role-pick i.auto { background: repeating-linear-gradient(135deg, var(--chip) 0 3px, var(--panel) 3px 6px); }
+.role-pick span { display: flex; flex-direction: column; line-height: 1.15; }
+.role-pick b { font-size: 11.5px; font-weight: 600; }
+.role-pick small { font-size: 10.5px; color: var(--muted); font-family: ui-monospace, monospace; }
+.role-menu { padding: 4px 6px; width: 230px; }
+.role-menu p { margin: 2px 0 8px; }
+.role-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.role-chip { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(0,0,0,.15); padding: 0; cursor: pointer; }
+.role-chip.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink); }
+.field.boxed.small-select { padding: 5px 8px; font-size: 13px; width: auto; flex: none; }

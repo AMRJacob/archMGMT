@@ -178,9 +178,19 @@ export const MEETING_TYPES: { value: string; label: string; color: string }[] = 
 export interface BrandPalette {
   id: string
   name: string
+  /** Phase colours, in order: the first is the project's main colour. */
   colors: string[]
   notes: string | null
+  /** Which colour paints which part of a presented / printed schedule. Missing = automatic. */
+  roles?: BrandRoles | null
 }
+export interface BrandRoles { background?: string; band?: string; accent?: string; text?: string }
+export const BRAND_ROLES: { key: keyof BrandRoles; label: string; hint: string }[] = [
+  { key: 'background', label: 'Background', hint: 'The page behind the schedule' },
+  { key: 'band', label: 'Cells', hint: 'Phase rows and the bands behind them' },
+  { key: 'accent', label: 'Headings & accent', hint: 'Firm name, today marker, highlights' },
+  { key: 'text', label: 'Text', hint: 'Titles, labels and dates' },
+]
 
 export type WishStatus = 'new' | 'under_review' | 'approved' | 'planned' | 'in_progress' | 'complete' | 'infeasible' | 'duplicate'
 export const WISH_STATUSES: { value: WishStatus; label: string; closed: boolean }[] = [

@@ -13,11 +13,12 @@ import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
 import ExportPreview, { renderPng, type ExportSettings } from '../components/ExportPreview.tsx'
-import { exportColors, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
+import { brandOnlyProject, EXPORT_BGS, exportColors, paletteOf, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
 import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { KIND_RANK, type Phase, type Task } from '../lib/types.ts'
+import { KIND_RANK, type BrandPalette, type Phase, type Task } from '../lib/types.ts'
+import { useRows } from '../lib/data.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
 import { asShown, buildTree, DETAIL_LEVELS, movedBy, passesWork, visibleAtLevel, type DetailLevel, type ShownTask, type WorkFilter } from '../lib/tree.ts'
@@ -61,6 +62,7 @@ export default function Schedule() {
   const exportSvg = useRef<SVGSVGElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const brandPalettes = useRows<BrandPalette>('brand_palettes')
   const [work, setWork] = useSaved<WorkFilter>('archmgmt.workFilter', 'all')
   const [dayMarks, setDayMarks] = useSaved<'on' | 'off'>('archmgmt.dayMarks', 'on')
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
@@ -235,7 +237,10 @@ export default function Schedule() {
 
   // One colour per phase, in phase order (each phase keeps its own colour when phases are reordered).
   const colorOf = phaseColors(project, phases.rows)
-  const xColors = exportColors(project, xBg)
+  const xColors = exportColors(project, xBg, paletteOf(project, brandPalettes.rows))
+  // "Brand palette": phases use the brand colours exactly. Presentation view on screen shows the printed look.
+  const xProject = xBg === 'brand' ? brandOnlyProject(project) : project
+  const pres = mode === 'presentation'
   const palette = [...phases.rows].sort((a, b) => a.sort_order - b.sort_order).map((p) => colorOf.get(p.id)!)
 
 
@@ -273,6 +278,12 @@ export default function Schedule() {
                 hiddenPhases={phases.rows.filter((p) => !p.client_visible).length} />
             )}
             {levelControl}
+            {mode === 'presentation' && (
+              <select className="field boxed small-select" value={xBg} title="Colours for the presentation view, PDF and PNG" aria-label="Presentation colours"
+                onChange={(e) => setXBg(e.target.value as ExportBg)}>
+                {EXPORT_BGS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            )}
             <button className="btn" onClick={() => setPreviewing(true)} title="See the PDF / PNG pages and choose paper, background and fit">Preview…</button>
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
             <button className="btn primary" onClick={printPdf}>Save as PDF</button>
@@ -308,8 +319,8 @@ export default function Schedule() {
             )}
           </div>
           <div className="card chart-card no-print" ref={chartBox}>
-            <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
-              firmName={FIRM_NAME} editable window={chartWindow} dayMarks={dayMarks === 'on'} width={chartW} colors={chartColors(theme)} showHeader={false} keepOrder
+            <ScheduleChart project={pres ? xProject : project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
+              firmName={FIRM_NAME} editable window={chartWindow} dayMarks={dayMarks === 'on'} width={chartW} colors={pres ? xColors : chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
@@ -320,7 +331,7 @@ export default function Schedule() {
           </div>
           <p className="muted small no-print">
             “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Exports use {pageOf(xPage).name.split(' (')[0].toLowerCase()} paper,
-            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : 'brand dark'} background`}; change these in Preview.
+            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : xBg === 'dark' ? 'brand dark' : 'brand palette'} background`}; change these in Preview.
           </p>
         </>
       )}
@@ -360,7 +371,7 @@ export default function Schedule() {
       {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
       <div className={`print-area export-only sched-export${xFit === 'fit' ? ' fit' : ''}`} aria-hidden="true"
         style={{ '--pbg': xColors.bg, '--ph': `${pageOf(xPage).h}in`, '--pm': `${PAGE_MARGIN}in` } as CSSProperties}>
-        <ScheduleChart project={project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
+        <ScheduleChart project={xProject} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
           firmName={FIRM_NAME} svgRef={exportSvg} keepOrder colors={xColors} />
       </div>
       {previewing && (

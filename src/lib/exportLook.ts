@@ -1,9 +1,9 @@
-import { decodeBrand, hexToOklch, oklchToHex, projectAccent } from './colors.ts'
+import { decodeBrand, encodeBrand, hexToOklch, oklchToHex, projectAccent, textOn } from './colors.ts'
 import { STUDIO_CHART, type ChartColors } from './theme.ts'
-import type { Project } from './types.ts'
+import type { BrandPalette, Project } from './types.ts'
 
 /** How a schedule export looks on the page: paper size, background, and whether it's squeezed onto one page. */
-export type ExportBg = 'white' | 'tint' | 'dark'
+export type ExportBg = 'white' | 'tint' | 'dark' | 'brand'
 export type ExportPage = 'letter' | 'tabloid' | 'arch-b'
 export type ExportFit = 'fit' | 'width'
 
@@ -11,6 +11,7 @@ export const EXPORT_BGS: { id: ExportBg; name: string; hint: string }[] = [
   { id: 'white', name: 'White', hint: 'Plain white page.' },
   { id: 'tint', name: 'Brand tint', hint: 'A light wash of the project’s main colour.' },
   { id: 'dark', name: 'Brand dark', hint: 'A deep shade of the project’s main colour, with light text.' },
+  { id: 'brand', name: 'Brand palette', hint: 'Only the brand’s own colours, placed as set in Settings → Branding & Printing.' },
 ]
 export const EXPORT_PAGES: { id: ExportPage; name: string; w: number; h: number }[] = [
   { id: 'letter', name: 'Letter (11 × 8.5)', w: 11, h: 8.5 },
@@ -27,9 +28,47 @@ function rootOf(project: Project): string | null {
   return project.color ?? decodeBrand(project.color_scheme)?.colors[0] ?? null
 }
 
+/** The saved brand palette a project's colours come from (by name, else the one holding its main colour). */
+export function paletteOf(project: Project, palettes: BrandPalette[]): BrandPalette | null {
+  const b = decodeBrand(project.color_scheme)
+  if (!b) return null
+  return palettes.find((p) => p.name === b.name) ?? palettes.find((p) => p.colors.includes(b.colors[0])) ?? null
+}
+
+/** For "Brand palette": phases cycle through the brand colours exactly (no lighter or darker versions). */
+export function brandOnlyProject(project: Project): Project {
+  const b = decodeBrand(project.color_scheme)
+  if (!b) return project
+  const many = Array.from({ length: 24 }, (_, i) => b.colors[i % b.colors.length])
+  return { ...project, color_scheme: encodeBrand(b.name, many) }
+}
+
+const hexMix = (a: string, b: string, t: number) => {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+  const [x, y] = [p(a), p(b)]
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
+}
+
 /** Chart colours for an export background. White is the standard presentation look. */
-export function exportColors(project: Project, bg: ExportBg): ChartColors {
+export function exportColors(project: Project, bg: ExportBg, palette?: BrandPalette | null): ChartColors {
   const root = rootOf(project)
+  if (bg === 'brand') {
+    // Only brand colours: each part takes the colour chosen for it, or a sensible one from the palette.
+    const colors = decodeBrand(project.color_scheme)?.colors ?? palette?.colors ?? (root ? [root] : [])
+    const r = palette?.roles ?? {}
+    const back = r.background ?? '#ffffff'
+    const dark = textOn(back) === '#ffffff'
+    const ink = r.text ?? (dark ? '#f4f5f7' : '#1c1f23')
+    // Auto accent: the brand colour that stands out most from the background.
+    const lum = (h: string) => hexToOklch(h).l
+    const accent = r.accent ?? [...colors].sort((a, b) => Math.abs(lum(b) - lum(back)) - Math.abs(lum(a) - lum(back)))[0] ?? STUDIO_CHART.accent
+    const band = r.band ?? hexMix(back, colors[0] ?? ink, 0.09)
+    return {
+      ...STUDIO_CHART, bg: back, band, ink, accent, onAccent: textOn(accent),
+      muted: hexMix(ink, back, 0.32), faint: hexMix(ink, back, 0.6),
+      line: hexMix(back, ink, 0.12), lineStrong: hexMix(back, ink, 0.2), lineFaint: hexMix(back, ink, 0.06),
+    }
+  }
   if (bg === 'white' || !root) return bg === 'dark' && !root ? DARK_NEUTRAL : STUDIO_CHART
   const b = hexToOklch(root)
   const c = (l: number, chroma: number) => oklchToHex({ l, c: chroma, h: b.h })

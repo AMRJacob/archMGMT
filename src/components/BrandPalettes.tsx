@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { TextField } from './fields.tsx'
 import { useRows } from '../lib/data.ts'
 import { supabase } from '../lib/supabase.ts'
-import type { BrandPalette } from '../lib/types.ts'
+import { BRAND_ROLES, type BrandPalette, type BrandRoles } from '../lib/types.ts'
+import { Pop } from './TaskChips.tsx'
 
 interface SiteColors { title: string; colors: string[]; neutrals: string[] }
 
@@ -136,8 +137,9 @@ export default function BrandPalettes() {
       <h2>Brand Palettes</h2>
       <p className="muted">
         Save a school’s or company’s brand colours, then choose them in a project’s colour picker (the dot next to its number).
-        Enter the hex values from the client’s brand guide, or pull them from the client’s website. The first colour is the
-        project’s main colour; drag a colour by its handle to reorder.
+        Enter the hex values from the client’s brand guide, or pull them from the client’s website. Phases take the colours in order
+        (Phase 1 is the project’s main colour); drag a colour by its handle to reorder. Below each palette, choose which colour paints
+        each part of a presented or printed schedule (Schedule → Presentation view → “Brand palette”).
       </p>
       <ul className="brand-list">
         {sorted.map((p) => (
@@ -145,7 +147,9 @@ export default function BrandPalettes() {
             <TextField value={p.name} className="brand-name" onSave={(v) => v && palettes.patch(p.id, { name: v })} />
             <span className="brand-colors">
               {p.colors.map((c, i) => (
-                <span key={i} className={`brand-swatch${drag?.id === p.id && drag.i === i ? ' dragging' : ''}`}
+                <span key={i} className="brand-slot">
+                <small>{i === 0 ? 'Phase 1 · main' : `Phase ${i + 1}`}</small>
+                <span className={`brand-swatch${drag?.id === p.id && drag.i === i ? ' dragging' : ''}`}
                   onDragOver={(e) => { if (drag?.id === p.id) e.preventDefault() }}
                   onDrop={(e) => { e.preventDefault(); if (drag?.id === p.id && drag.i !== i) setColors(p, move(p.colors, drag.i, i)); setDrag(null) }}>
                   {p.colors.length > 1 && <span className="brand-grip" draggable title="Drag to reorder"
@@ -163,9 +167,17 @@ export default function BrandPalettes() {
                     }} />
                   {p.colors.length > 1 && <button className="icon-btn" title="Remove this colour" onClick={() => setColors(p, p.colors.filter((_, j) => j !== i))}>×</button>}
                 </span>
+                </span>
               ))}
               {p.colors.length < 8 && <button className="btn ghost small-btn" onClick={() => setColors(p, [...p.colors, p.colors[p.colors.length - 1] ?? '#888888'])}>+ Colour</button>}
             </span>
+            <div className="brand-roles">
+              <span className="muted small">Presented &amp; printed schedule</span>
+              {BRAND_ROLES.map((r) => (
+                <RolePick key={r.key} label={r.label} hint={r.hint} value={p.roles?.[r.key] ?? null} colors={p.colors}
+                  onChange={(v) => { const next: BrandRoles = { ...(p.roles ?? {}) }; if (v) next[r.key] = v; else delete next[r.key]; void palettes.patch(p.id, { roles: next }) }} />
+              ))}
+            </div>
             <TextField value={p.notes} placeholder="Notes (e.g. from the 2025 brand guide)" className="brand-notes" onSave={(v) => palettes.patch(p.id, { notes: v })} />
             <button className="icon-btn" title="Delete palette" onClick={() => { if (window.confirm(`Delete the ${p.name} palette? Projects using it keep their colours.`)) void palettes.drop(p.id) }}>×</button>
           </li>
@@ -182,5 +194,34 @@ export default function BrandPalettes() {
           onAppend={(p, colors) => setColors(p, [...p.colors, ...colors.filter((c) => !p.colors.includes(c))].slice(0, 8))} />
       )}
     </div>
+  )
+}
+
+/** One part of the printed schedule (background, cells…): pick one of the brand colours, a custom one, or Auto. */
+function RolePick({ label, hint, value, colors, onChange }: {
+  label: string; hint: string; value: string | null; colors: string[]; onChange: (v: string | null) => void
+}) {
+  return (
+    <Pop title={`${label}: ${hint}`} label={
+      <span className="role-pick">
+        <i style={value ? { background: value } : undefined} className={value ? '' : 'auto'} />
+        <span><b>{label}</b><small>{value ?? 'Auto'}</small></span>
+      </span>}>
+      {(close) => (
+        <div className="role-menu">
+          <div className="pm-label">{label}</div>
+          <p className="muted small">{hint}</p>
+          <div className="role-chips">
+            {[...new Set([...colors, '#ffffff', '#1c1f23'])].map((c) => (
+              <button key={c} className={`role-chip${value === c ? ' on' : ''}`} style={{ background: c }} title={c} onClick={() => { onChange(c); close() }} />
+            ))}
+          </div>
+          <div className="row-gap">
+            <label className="cp-custom"><input type="color" value={value ?? colors[0] ?? '#888888'} onChange={(e) => onChange(e.target.value)} />Custom…</label>
+            <button className="btn ghost small-btn" onClick={() => { onChange(null); close() }}>Auto</button>
+          </div>
+        </div>
+      )}
+    </Pop>
   )
 }
