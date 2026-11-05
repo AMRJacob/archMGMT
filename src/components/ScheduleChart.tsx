@@ -151,7 +151,7 @@ export default function ScheduleChart({
         part.forEach((task) => rows.push({ kind: 'task', task, color }))
       }
     }
-    if (editable && onAddAt && !pres) rows.push({ kind: 'add', phase, color })
+    if (editable && onAddAt && !pres && !setup) rows.push({ kind: 'add', phase, color })
   })
   const loose = tasks.filter((t) => !t.phase_id && (!pres || presented(t))).sort(keepOrder ? () => 0 : byStart)
   if (loose.length) {
@@ -417,8 +417,8 @@ export default function ScheduleChart({
         const days = Math.trunc(wheelAcc.current / pxPerDay)
         if (days) { wheelAcc.current -= days * pxPerDay; onPan(days) }
       } : undefined}
-      onContextMenu={onContextAt ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
-      onDoubleClick={onAddAt ? (e) => {
+      onContextMenu={onContextAt && !setup ? (e) => { e.preventDefault(); e.stopPropagation(); onContextAt(spotAt(e.clientX, e.clientY)) } : undefined}
+      onDoubleClick={onAddAt && !setup ? (e) => {
         if (!(e.target as Element).closest('[data-pan]')) return
         const spot = spotAt(e.clientX, e.clientY)
         if (spot.phase) onAddAt(spot.phase, spot.date)
@@ -676,7 +676,6 @@ export default function ScheduleChart({
             <title>{label}</title>
             <rect x={M} y={ry} width={W - 2 * M} height={h} fill={on ? 'transparent' : C.bg} opacity={on ? 1 : 0.68} />
             <rect className="setup-hover" x={M + 0.5} y={ry + 0.5} width={W - 2 * M - 1} height={h - 1} rx={3} fill="none" stroke={C.accent} strokeWidth={1.5} />
-            <circle cx={M + (r.kind === 'phase' ? -12 : 18)} cy={ry + h / 2} r={4.5} fill={on ? C.accent : 'none'} stroke={on ? C.accent : C.faint} strokeWidth={1.3} />
           </g>
         )
       })}

@@ -321,7 +321,6 @@ export default function Schedule() {
             )}
             {mode === 'working' ? (
               <span className="muted small grow">
-                {setup === 'on' ? 'Presentation setup: greyed rows won’t show in the presentation. Click a phase or task to add or remove it.' : null}
                 {setup === 'on' ? null : `Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
               </span>
             ) : (
