@@ -59,8 +59,12 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase,
 }: {
+  /** Presentation setup (working view): grey out what the presentation won't show; a click adds or removes it. */
+  setup?: boolean
+  onTogglePresented?: (t: Task) => void
+  onTogglePhase?: (p: Phase) => void
   /** Drag a task's title up or down to reorder it among the rows beside it (same phase and parent). */
   onReorder?: (task: Task, target: Task, place: 'before' | 'after') => void
   /** At day scale (3-month zoom): draw a line and weekday letter for every day and shade weekends. Off: Mondays only. */
@@ -614,6 +618,28 @@ export default function ScheduleChart({
       })}
       </g>
       <line x1={M} x2={W - M} y1={rowsBottom} y2={rowsBottom} stroke={C.lineStrong} />
+
+      {/* Presentation setup: a wash over everything the presentation won't show, and a click target on each row
+          (on top, so nothing drags while choosing). Tasks in a hidden phase are hidden with it. */}
+      {setup && rows.map((r, i) => {
+        if (r.kind !== 'phase' && r.kind !== 'task') return null
+        const ry = rowY[i], h = r.kind === 'phase' ? ROW_PHASE : ROW_TASK
+        const phaseOf = r.kind === 'task' ? sorted.find((p) => p.id === r.task.phase_id) : r.phase
+        const phaseOn = !phaseOf || phaseOf.client_visible
+        const on = r.kind === 'phase' ? r.phase.client_visible : phaseOn && presented(r.task)
+        const label = r.kind === 'phase'
+          ? `${r.phase.name}: ${on ? 'shown in the presentation (click to hide)' : 'hidden from the presentation (click to show)'}`
+          : `${r.task.title}: ${on ? 'shown in the presentation (click to hide)' : !phaseOn ? 'its phase is hidden, so it is too (click the phase first)' : 'not in the presentation (click to show)'}`
+        return (
+          <g key={`setup${i}`} className={`setup-row${on ? ' on' : ' off'}`} style={{ cursor: r.kind === 'task' && !phaseOn ? 'not-allowed' : 'pointer' }}
+            onClick={() => { if (r.kind === 'phase') onTogglePhase?.(r.phase); else if (phaseOn) onTogglePresented?.(r.task) }}>
+            <title>{label}</title>
+            <rect x={M} y={ry} width={W - 2 * M} height={h} fill={on ? 'transparent' : C.bg} opacity={on ? 1 : 0.68} />
+            <rect className="setup-hover" x={M + 0.5} y={ry + 0.5} width={W - 2 * M - 1} height={h - 1} rx={3} fill="none" stroke={C.accent} strokeWidth={1.5} />
+            <circle cx={M + (r.kind === 'phase' ? -12 : 18)} cy={ry + h / 2} r={4.5} fill={on ? C.accent : 'none'} stroke={on ? C.accent : C.faint} strokeWidth={1.3} />
+          </g>
+        )
+      })}
 
       {showToday && (
         <g pointerEvents="none">

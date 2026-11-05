@@ -69,6 +69,7 @@ export default function Schedule() {
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const brandPalettes = useRows<BrandPalette>('brand_palettes')
+  const [setup, setSetup] = useSaved<'on' | 'off'>('archmgmt.presSetup', 'off')
   const [work, setWork] = useSaved<WorkFilter>('archmgmt.workFilter', 'all')
   const [dayMarks, setDayMarks] = useSaved<'on' | 'off'>('archmgmt.dayMarks', 'on')
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
@@ -312,9 +313,16 @@ export default function Schedule() {
               <button className={mode === 'working' ? 'on' : ''} onClick={() => setMode('working')}>Working view</button>
               <button className={mode === 'presentation' ? 'on' : ''} onClick={() => setMode('presentation')}>Presentation view</button>
             </div>
+            {mode === 'working' && (
+              <label className={`inline-check setup-toggle${setup === 'on' ? ' on' : ''}`} title="Grey out what the presentation view won't show; click phases and tasks to add or remove them">
+                <input type="checkbox" checked={setup === 'on'} onChange={(e) => setSetup(e.target.checked ? 'on' : 'off')} />
+                Presentation setup
+              </label>
+            )}
             {mode === 'working' ? (
               <span className="muted small grow">
-                {`Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
+                {setup === 'on' ? 'Presentation setup: greyed rows won’t show in the presentation. Click a phase or task to add or remove it.' : null}
+                {setup === 'on' ? null : `Right-click or double-click a spot to add a task there; right-click an item to show it in the presentation. Drag bars and milestones to move them.${months ? ' Scroll sideways, use the bar below, or click and hold empty space to move through time.' : ''}`}
               </span>
             ) : (
               <PresentationFilter rules={rules} onChange={setRules}
@@ -370,6 +378,9 @@ export default function Schedule() {
               onMovePhase={plan.movePhase}
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask}
+              setup={mode === 'working' && setup === 'on'}
+              onTogglePresented={(t) => togglePres(t as ShownTask)}
+              onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}
               onReorder={(t, target, at) => { const c = moveTo(tree, real(t), real(target), at, target.phase_id); if (c.length) plan.patchMany(c) }}
               onAddAt={(ph, d) => void addHere(ph, d)}
               onContextAt={(sp) => setSpot(sp)} />

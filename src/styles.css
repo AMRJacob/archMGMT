@@ -1429,3 +1429,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 @media (prefers-reduced-motion: reduce) { .card-task.landed { animation: none; } }
 /* The + between rows must sit above the neighbouring rows (which have their own backgrounds now). */
 .tlist li.trow:hover, .tlist li.irow:hover, .tlist li.trow:focus-within, .tlist li.irow:focus-within { position: relative; z-index: 6; }
+/* Presentation setup on the timeline. */
+.setup-row .setup-hover { opacity: 0; transition: opacity .12s; }
+.setup-row:hover .setup-hover { opacity: 1; }
+.setup-toggle.on { color: var(--accent); font-weight: 600; }
