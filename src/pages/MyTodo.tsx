@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authContext.ts'
 import { DateChip, MilestoneMark, SizeChip, StatusChip } from '../components/TaskChips.tsx'
-import { TextField } from '../components/fields.tsx'
+import TaskEditor from '../components/TaskEditor.tsx'
 import { isAssigned } from '../lib/assignees.ts'
 import { phaseColors, projectDot } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
@@ -27,7 +27,8 @@ function useSaved<T extends string | boolean>(key: string, initial: T): [T, (v: 
 /**
  * My To Do: everything assigned to the signed-in person across all active projects (matched to the Team list by
  * email). Work you can do (the bottom level of each branch, plus milestones), open by default; completed optional.
- * Filter by project, kind and due date, or search; group by project or by when it's due. Tick things off here.
+ * Filter by project, kind and due date, or search; group by project or by when it's due. Click a task for its details
+ * (description included); drag to put them in your own order (saved in this browser). Tick things off here.
  */
 export default function MyTodo() {
   const { session } = useAuth()
@@ -41,8 +42,12 @@ export default function MyTodo() {
   const [kind, setKind] = useSaved<Kind>('archmgmt.todo.kind', 'all')
   const [due, setDue] = useSaved<Due>('archmgmt.todo.due', 'all')
   const [group, setGroup] = useSaved<Group>('archmgmt.todo.group', 'project')
-  const [showDesc, setShowDesc] = useSaved<boolean>('archmgmt.todo.desc', false)
   const [q, setQ] = useState('')
+  const [openId, setOpenId] = useState<string | null>(null)
+  // Your own order (this browser only; it doesn't change the project for anyone else). Unordered tasks go by due date.
+  const [order, setOrderRaw] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('archmgmt.todo.order') ?? '[]') } catch { return [] } })
+  const setOrder = (o: string[]) => { setOrderRaw(o); try { localStorage.setItem('archmgmt.todo.order', JSON.stringify(o)) } catch { /* private mode */ } }
+  const [drag, setDrag] = useState<{ id: string; over: string | null; place: 'before' | 'after' } | null>(null)
 
   const email = session?.user.email?.toLowerCase() ?? null
   const me = email ? people.rows.find((p) => (p.email ?? '').toLowerCase() === email) ?? null : null
@@ -66,7 +71,11 @@ export default function MyTodo() {
     if (due === 'nodate' && d) return false
     if (q.trim() && !t.title.toLowerCase().includes(q.trim().toLowerCase())) return false
     return true
-  }).sort((a, b) => (dueOf(a) ?? '9999').localeCompare(dueOf(b) ?? '9999') || a.title.localeCompare(b.title))
+  }).sort((a, b) => {
+    const ra = order.indexOf(a.id), rb = order.indexOf(b.id)
+    if (ra >= 0 || rb >= 0) return (ra < 0 ? Infinity : ra) - (rb < 0 ? Infinity : rb)
+    return (dueOf(a) ?? '9999').localeCompare(dueOf(b) ?? '9999') || a.title.localeCompare(b.title)
+  })
 
   const projectOf = (t: Task) => projects.find((p) => p.id === t.project_id)
   const phaseOf = (t: Task) => phases.rows.find((p) => p.id === t.phase_id)
@@ -99,21 +108,41 @@ export default function MyTodo() {
       if (items.length) groups.push({ key: b, title: b, items })
     }
   }
-  const row = (t: Task) => {
+  /** Drop a dragged task before or after `target` within the same list; the list's new order is saved first. */
+  const dropOn = (list: Task[], target: Task) => {
+    if (!drag || drag.id === target.id || !list.some((x) => x.id === drag.id)) { setDrag(null); return }
+    const ids = list.map((x) => x.id).filter((id) => id !== drag.id)
+    const at = ids.indexOf(target.id) + (drag.place === 'after' ? 1 : 0)
+    ids.splice(at, 0, drag.id)
+    setOrder([...ids, ...order.filter((id) => !ids.includes(id))])
+    setDrag(null)
+  }
+  const row = (t: Task, _i: number, list: Task[]) => {
     const ph = phaseOf(t), sh = sheetOf(t), pr = projectOf(t)
     const c = colorOfPhase(t)
     const d = dueOf(t)
     return (
-      <li key={t.id} className={`todo-row${t.status === 'done' ? ' done' : ''}${showDesc ? ' with-desc' : ''}`}>
+      <li key={t.id} draggable data-task={t.id}
+        className={`todo-row${t.status === 'done' ? ' done' : ''}${drag?.id === t.id ? ' dragging' : ''}${drag?.over === t.id ? ` drop-${drag.place}` : ''}${openId === t.id ? ' open' : ''}`}
+        onDragStart={(e) => { if ((e.target as HTMLElement).closest('input, textarea, select')) { e.preventDefault(); return } e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setDrag({ id: t.id, over: null, place: 'before' }) }}
+        onDragOver={(e) => {
+          if (!drag || !list.some((x) => x.id === drag.id)) return
+          e.preventDefault()
+          const r = e.currentTarget.getBoundingClientRect(), place = e.clientY < r.top + r.height / 2 ? 'before' : 'after'
+          if (drag.over !== t.id || drag.place !== place) setDrag({ ...drag, over: t.id, place })
+        }}
+        onDrop={(e) => { e.preventDefault(); dropOn(list, t) }}
+        onDragEnd={() => setDrag(null)}
+        onClick={(e) => { if (!(e.target as HTMLElement).closest('button, input, textarea, select, .pop, .pop-menu')) setOpenId(t.id) }}>
         <div className="todo-line">
           <input type="checkbox" className="todo-tick" checked={t.status === 'done'} title={t.status === 'done' ? 'Mark not done' : 'Mark done'}
             onChange={(e) => patch(t, { status: e.target.checked ? 'done' : 'todo' })} />
           <div className="todo-main">
-            <button className="todo-title" onClick={() => open(t)} title="Open in the project's Overview">
+            <button className="todo-title" onClick={() => setOpenId(t.id)} title="Show details">
               {t.is_milestone && <MilestoneMark task={t} />}
               {t.kind === 'sheet' && t.sheet_number && <span className="mono todo-no">{t.sheet_number}</span>}
               {t.title || 'Untitled'}
-              {!showDesc && t.notes && <span className="has-desc" title={t.notes}>≡</span>}
+              {t.notes && <span className="has-desc" title={t.notes}>≡</span>}
             </button>
             <div className="todo-meta muted small">
               {group === 'due' && pr && <span><i className="pdot" style={{ background: projectDot(pr) }} />{pr.name}</span>}
@@ -126,12 +155,9 @@ export default function MyTodo() {
             <StatusChip task={t} onPatch={(x) => patch(t, x)} />
             {!t.is_milestone && <SizeChip task={t} onPatch={(x) => patch(t, x)} />}
             <DateChip task={t} onPatch={(x) => patch(t, x)} />
+            <button className="icon-btn todo-go" title={`Open in ${pr?.name ?? 'the project'}'s Overview`} onClick={() => open(t)}>↗</button>
           </span>
         </div>
-        {showDesc && (
-          <TextField multiline value={t.notes ?? null} placeholder="Add a description…" className="todo-desc"
-            onSave={(v) => patch(t, { notes: v })} />
-        )}
       </li>
     )
   }
@@ -177,7 +203,6 @@ export default function MyTodo() {
               <button className={group === 'project' ? 'on' : ''} onClick={() => setGroup('project')}>By project</button>
               <button className={group === 'due' ? 'on' : ''} onClick={() => setGroup('due')}>By due date</button>
             </div>
-            <label className="inline-check"><input type="checkbox" checked={showDesc} onChange={(e) => setShowDesc(e.target.checked)} />Show descriptions</label>
             <label className="inline-check"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />Show completed</label>
           </div>
 
@@ -197,7 +222,7 @@ export default function MyTodo() {
                     <li key={zone} className={`tgroup g-${zone}`}>
                       <ul className="tgroup-list">
                         <li className={`tgroup-head ${zone}`}><span>{label}</span><span className="count">{list.length}</span></li>
-                        {list.map(row)}
+                        {list.map((t, i) => row(t, i, list))}
                       </ul>
                     </li>
                   ))}
@@ -206,6 +231,14 @@ export default function MyTodo() {
           ))}
         </>
       )}
+      {(() => {
+        const t = tasks.rows.find((x) => x.id === openId)
+        if (!t) return null
+        return (
+          <TaskEditor task={t} phases={phases.rows.filter((p) => p.project_id === t.project_id)} people={people.rows}
+            onPatch={(c) => patch(t, c)} onDelete={() => { void tasks.drop(t.id); setOpenId(null) }} onClose={() => setOpenId(null)} />
+        )
+      })()}
     </section>
   )
 }

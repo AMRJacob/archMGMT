@@ -55,7 +55,8 @@ carrying about three medium tasks at once.
   (from one or several palettes) in the order the phases should use them. Used on every view and export.
 - **My To Do** (sidebar, between the project pages and Office): everything assigned to you across all projects,
   filterable by project, kind (general / sheets), due date and search, grouped by project or due date; completed
-  optional. Tick tasks off or change status, size and dates in place.
+  optional. Click a task for its details (description included); drag tasks into your own order (saved in your
+  browser). Tick tasks off or change status, size and dates in place; ↗ opens the task's project.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week heat map per staff member (Light / Steady / Busy / Overloaded), ◆ for due dates,
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.

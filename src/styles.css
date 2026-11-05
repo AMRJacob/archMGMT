@@ -1482,3 +1482,10 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 .todo-zones .tgroup { border-right: 1px solid color-mix(in srgb, var(--zc) 24%, var(--line)); border-radius: 8px; }
 .todo-zones .tgroup-list > li.todo-row { margin-right: 12px; }
 .todo-zones .tgroup-list > li:last-child { border-bottom-right-radius: 6px; }
+.todo-row { cursor: grab; position: relative; }
+.todo-row.dragging { opacity: .4; }
+.todo-row.open { background: color-mix(in srgb, var(--accent) 6%, var(--panel)) !important; }
+.todo-row.drop-before { box-shadow: inset 0 2px 0 var(--accent) !important; }
+.todo-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent) !important; }
+.todo-go { opacity: .4; }
+.todo-row:hover .todo-go { opacity: 1; }
