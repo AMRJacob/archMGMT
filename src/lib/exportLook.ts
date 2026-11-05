@@ -1,9 +1,9 @@
 import { decodeBrand, encodeBrand, hexToOklch, oklchToHex, projectAccent, textOn } from './colors.ts'
 import { STUDIO_CHART, type ChartColors } from './theme.ts'
-import type { BrandPalette, Project } from './types.ts'
+import type { BrandPalette, BrandRoles, Project } from './types.ts'
 
 /** How a schedule export looks on the page: paper size, background, and whether it's squeezed onto one page. */
-export type ExportBg = 'white' | 'tint' | 'dark' | 'brand'
+export type ExportBg = 'white' | 'tint' | 'dark' | 'brand' | 'custom'
 export type ExportPage = 'letter' | 'tabloid' | 'arch-b'
 export type ExportFit = 'fit' | 'width'
 
@@ -11,6 +11,7 @@ export const EXPORT_BGS: { id: ExportBg; name: string; hint: string }[] = [
   { id: 'white', name: 'White', hint: 'Plain white page.' },
   { id: 'tint', name: 'Brand tint', hint: 'A light wash of the project’s main colour.' },
   { id: 'dark', name: 'Brand dark', hint: 'A deep shade of the project’s main colour, with light text.' },
+  { id: 'custom', name: 'Custom', hint: 'Your own background, cell, heading and text colours for this project.' },
   { id: 'brand', name: 'Brand palette', hint: 'Only the brand’s own colours, placed as set in Settings → Branding & Printing.' },
 ]
 export const EXPORT_PAGES: { id: ExportPage; name: string; w: number; h: number }[] = [
@@ -49,25 +50,29 @@ const hexMix = (a: string, b: string, t: number) => {
   return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
 }
 
+/** Chart colours from chosen parts (background, cells, headings & accent, text); the rest worked out to match. */
+function fromRoles(r: BrandRoles, colors: string[]): ChartColors {
+  const back = r.background ?? '#ffffff'
+  const dark = textOn(back) === '#ffffff'
+  const ink = r.text ?? (dark ? '#f4f5f7' : '#1c1f23')
+  // Auto accent: the colour that stands out most from the background.
+  const lum = (h: string) => hexToOklch(h).l
+  const accent = r.accent ?? [...colors].sort((a, b) => Math.abs(lum(b) - lum(back)) - Math.abs(lum(a) - lum(back)))[0] ?? STUDIO_CHART.accent
+  const band = r.band ?? hexMix(back, colors[0] ?? ink, 0.09)
+  return {
+    ...STUDIO_CHART, bg: back, band, ink, accent, onAccent: textOn(accent),
+    muted: hexMix(ink, back, 0.32), faint: hexMix(ink, back, 0.6),
+    line: hexMix(back, ink, 0.12), lineStrong: hexMix(back, ink, 0.2), lineFaint: hexMix(back, ink, 0.06),
+  }
+}
+
 /** Chart colours for an export background. White is the standard presentation look. */
 export function exportColors(project: Project, bg: ExportBg, palette?: BrandPalette | null): ChartColors {
   const root = rootOf(project)
-  if (bg === 'brand') {
-    // Only brand colours: each part takes the colour chosen for it, or a sensible one from the palette.
+  if (bg === 'brand' || bg === 'custom') {
+    // Brand palette: only brand colours, placed as set in Branding. Custom: this project's own choices.
     const colors = decodeBrand(project.color_scheme)?.colors ?? palette?.colors ?? (root ? [root] : [])
-    const r = palette?.roles ?? {}
-    const back = r.background ?? '#ffffff'
-    const dark = textOn(back) === '#ffffff'
-    const ink = r.text ?? (dark ? '#f4f5f7' : '#1c1f23')
-    // Auto accent: the brand colour that stands out most from the background.
-    const lum = (h: string) => hexToOklch(h).l
-    const accent = r.accent ?? [...colors].sort((a, b) => Math.abs(lum(b) - lum(back)) - Math.abs(lum(a) - lum(back)))[0] ?? STUDIO_CHART.accent
-    const band = r.band ?? hexMix(back, colors[0] ?? ink, 0.09)
-    return {
-      ...STUDIO_CHART, bg: back, band, ink, accent, onAccent: textOn(accent),
-      muted: hexMix(ink, back, 0.32), faint: hexMix(ink, back, 0.6),
-      line: hexMix(back, ink, 0.12), lineStrong: hexMix(back, ink, 0.2), lineFaint: hexMix(back, ink, 0.06),
-    }
+    return fromRoles(bg === 'custom' ? project.export_colors ?? {} : palette?.roles ?? {}, colors)
   }
   if (bg === 'white' || !root) return bg === 'dark' && !root ? DARK_NEUTRAL : STUDIO_CHART
   const b = hexToOklch(root)

@@ -45,6 +45,8 @@ export interface Project {
   archived_at?: string | null
   /** The people on this project (Overview → Team). Assigning tasks offers these first. */
   team?: string[] | null
+  /** Custom presentation colours (Schedule → Presentation view → Custom). */
+  export_colors?: BrandRoles | null
   created_at?: string
 }
 

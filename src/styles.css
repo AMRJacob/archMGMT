@@ -1336,3 +1336,13 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .cp-label-note { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); }
 .cp-order-chip.suggested { outline: 1.5px dashed var(--muted); outline-offset: 1.5px; }
 .cp-order-chip b { font-size: 10px; }
+
+/* Presentation view: the Detail slider and General Tasks / Sheets filter don't apply, so they're greyed out. */
+.level-group { display: contents; }
+.level-group.off > * { opacity: .4; pointer-events: none; filter: grayscale(1); }
+/* Custom presentation colours. */
+.custom-colors { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cc-pick { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px 2px 3px; font-size: 12px; background: var(--panel); cursor: pointer; }
+.cc-pick input { width: 22px; height: 20px; border: none; padding: 0; background: none; cursor: pointer; }
+.cc-pick .icon-btn { padding: 0 3px; opacity: .5; }
+.xp-custom { margin: 2px 0 8px; }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import Modal from './Modal.tsx'
 import { EXPORT_BGS, EXPORT_PAGES, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
 
@@ -41,7 +41,9 @@ export async function renderPng(el: SVGSVGElement, s: ExportSettings, bgColor: s
 }
 
 /** Preview of the PDF / PNG: pick paper, background and fit, see the pages, then export. */
-export default function ExportPreview({ svg, settings, onSettings, bgColor, onClose, onPdf, onPng, saving }: {
+export default function ExportPreview({ svg, settings, onSettings, bgColor, onClose, onPdf, onPng, saving, customControls }: {
+  /** Colour pickers for the Custom background. */
+  customControls?: ReactNode
   svg: RefObject<SVGSVGElement | null>
   settings: ExportSettings
   onSettings: (s: ExportSettings) => void
@@ -56,7 +58,7 @@ export default function ExportPreview({ svg, settings, onSettings, bgColor, onCl
   useEffect(() => {
     const id = requestAnimationFrame(() => { if (svg.current) setImg(svgUrl(svg.current)) })
     return () => cancelAnimationFrame(id)
-  }, [svg, settings, bgColor])
+  }, [svg, settings, bgColor, customControls])
 
   const p = pageOf(settings.page)
   const PW = 760 // preview paper width, px
@@ -97,6 +99,7 @@ export default function ExportPreview({ svg, settings, onSettings, bgColor, onCl
           </div>
         </div>
       </div>
+      {customControls && <div className="xp-custom">{customControls}</div>}
       <p className="muted small">
         {settings.fit === 'fit'
           ? 'The whole schedule is scaled down to fit one page.'

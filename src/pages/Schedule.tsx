@@ -18,7 +18,7 @@ import { brandOnlyProject, EXPORT_BGS, exportColors, paletteOf, PAGE_MARGIN, pag
 import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { KIND_RANK, type BrandPalette, type Phase, type Task } from '../lib/types.ts'
+import { BRAND_ROLES, KIND_RANK, type BrandPalette, type BrandRoles, type Phase, type Task } from '../lib/types.ts'
 import { useRows } from '../lib/data.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
@@ -92,7 +92,8 @@ export default function Schedule() {
   // What each view shows at the chosen detail level. Parents carry their children's dates.
   const tree = buildTree(tasks.rows)
   // Show: everything, only general tasks (sheets and their views filtered out), or only sheets. Milestones always show.
-  const shown = visibleAtLevel(tree, level).filter((v) => passesWork(tree, v.task, work))
+  const workApplies = level > 0 && tasks.rows.some((t) => t.kind === 'sheet' || t.kind === 'view')
+  const shown = visibleAtLevel(tree, level).filter((v) => !workApplies || passesWork(tree, v.task, work))
   const treeRows: ShownTask[] = shown.map((v) => asShown(tree, v.task, v.depth))
   const frontierRows: ShownTask[] = shown.filter((v) => v.frontier).map((v) => asShown(tree, v.task, v.depth))
   const real = (t: Task) => tree.byId.get(t.id) ?? t
@@ -106,8 +107,9 @@ export default function Schedule() {
     if (c.task) plan.patchTask(real(t), c.task)
     if (c.rules) setRules(c.rules)
   }
+  // Presentation view has its own Show rules, so the Detail slider and the General Tasks / Sheets filter don't apply.
   const chartRows: ShownTask[] = mode === 'presentation'
-    ? visibleAtLevel(tree, 3).filter((v) => passesWork(tree, v.task, work)).map((v) => asShown(tree, v.task, 0))
+    ? visibleAtLevel(tree, 3).map((v) => asShown(tree, v.task, 0))
     : treeRows
   /** A drag on a shown copy: whole branches move together; plain tasks take the new dates. */
   const moveShown = (t: ShownTask, s: string | null, d: string | null) => {
@@ -123,19 +125,35 @@ export default function Schedule() {
   }
   const openTask = (t: Task) => { setEditingId(t.id); setNewTaskId(null) }
 
-  const levelControl = (
+  // Grey out the filters wherever they'd do nothing:
+  //  - Presentation view (timeline) has its own Show rules, so neither the Detail slider nor the work filter applies.
+  //  - The General Tasks / Sheets filter does nothing at Detail "Phases" (only phases and milestones show) or
+  //    when the project has no sheets.
+  const levelOff = view === 'timeline' && mode === 'presentation'
+  const hasSheets = tasks.rows.some((t) => t.kind === 'sheet' || t.kind === 'view')
+  const workOff = levelOff || level === 0 || !hasSheets
+  const workWhy = levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.'
+    : level === 0 ? 'Only phases and milestones show at this detail level, so there are no tasks or sheets to filter.'
+    : !hasSheets ? 'This project has no sheets yet, so everything is a general task.' : undefined
+  // In presentation view neither control ever applies, so they're left out; elsewhere they're greyed out when idle.
+  const levelControl = levelOff ? null : (
     <>
-    <div className="segmented small-seg" aria-label="Show" title="Show everything, only general tasks, or only sheets (milestones always show)">
+    <span className={`level-group${workOff ? ' off' : ''}`} aria-disabled={workOff} title={workWhy}>
+    <div className="segmented small-seg" aria-label="Show" title={workOff ? undefined : 'Show everything, only general tasks, or only sheets (milestones always show)'}>
       {([['all', 'All'], ['tasks', 'General Tasks'], ['sheets', 'Sheets']] as [WorkFilter, string][]).map(([w, label]) => (
         <button key={w} className={work === w ? 'on' : ''} onClick={() => setWork(w)}>{label}</button>
       ))}
     </div>
+    </span>
+    <span className={`level-group${levelOff ? ' off' : ''}`} aria-disabled={levelOff}
+      title={levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.' : undefined}>
     <div className="level-ctl" title="How much detail to show">
       <span className="muted small">Detail</span>
       <input type="range" min={0} max={3} step={1} value={level} aria-label="Detail level"
-        onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
+        disabled={levelOff} onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
       <span className="level-name">{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
     </div>
+    </span>
     </>
   )
   const fileBase = `${[project.number, project.name].filter(Boolean).join(' ')} schedule ${today()}`.replace(/[\\/:*?"<>|]/g, '')
@@ -247,6 +265,26 @@ export default function Schedule() {
   // "Brand palette": phases use the brand colours exactly. Presentation view on screen shows the printed look.
   const xProject = xBg === 'brand' ? brandOnlyProject(project) : project
   const pres = mode === 'presentation'
+  // Custom presentation colours, kept on the project so everyone's exports match.
+  const custom = project.export_colors ?? {}
+  const setCustom = (k: keyof BrandRoles, v: string | null) => {
+    const next: BrandRoles = { ...custom }
+    if (v) next[k] = v; else delete next[k]
+    void patchProject(project.id, { export_colors: next })
+  }
+  const auto: Record<keyof BrandRoles, string> = { background: xColors.bg, band: xColors.band, accent: xColors.accent, text: xColors.ink }
+  const customControls = (
+    <span className="custom-colors" title="Custom presentation colours for this project">
+      {BRAND_ROLES.map((r) => (
+        <label key={r.key} className="cc-pick" title={`${r.label}: ${r.hint}${custom[r.key] ? '' : ' (automatic)'}`}>
+          <input type="color" value={custom[r.key] ?? auto[r.key]}
+            onChange={(e) => setCustom(r.key, e.target.value)} />
+          <span>{r.label}</span>
+          {custom[r.key] && <button className="icon-btn" title="Back to automatic" onClick={(e) => { e.preventDefault(); setCustom(r.key, null) }}>×</button>}
+        </label>
+      ))}
+    </span>
+  )
   const palette = [...phases.rows].sort((a, b) => a.sort_order - b.sort_order).map((p) => colorOf.get(p.id)!)
 
 
@@ -290,6 +328,7 @@ export default function Schedule() {
                 {EXPORT_BGS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
+            {mode === 'presentation' && xBg === 'custom' && customControls}
             <button className="btn" onClick={() => setPreviewing(true)} title="See the PDF / PNG pages and choose paper, background and fit">Preview…</button>
             <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
             <button className="btn primary" onClick={printPdf}>Save as PDF</button>
@@ -337,7 +376,7 @@ export default function Schedule() {
           </div>
           <p className="muted small no-print">
             “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Exports use {pageOf(xPage).name.split(' (')[0].toLowerCase()} paper,
-            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : xBg === 'dark' ? 'brand dark' : 'brand palette'} background`}; change these in Preview.
+            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : xBg === 'dark' ? 'brand dark' : xBg === 'custom' ? 'custom' : 'brand palette'} background`}; change these in Preview.
           </p>
         </>
       )}
@@ -386,7 +425,7 @@ export default function Schedule() {
           firmName={FIRM_NAME} svgRef={exportSvg} keepOrder colors={xColors} />
       </div>
       {previewing && (
-        <ExportPreview svg={exportSvg} settings={xSettings} onSettings={setXSettings} bgColor={xColors.bg} saving={saving}
+        <ExportPreview svg={exportSvg} settings={xSettings} customControls={xBg === 'custom' ? customControls : undefined} onSettings={setXSettings} bgColor={xColors.bg} saving={saving}
           onClose={() => setPreviewing(false)} onPng={() => void downloadPng()} onPdf={() => { setPreviewing(false); setTimeout(printPdf, 50) }} />
       )}
 
