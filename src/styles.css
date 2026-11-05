@@ -1380,3 +1380,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .ct-kind.general { --kc: #d39a3a; }
 .ct-kind.sheet { --kc: #9b4a7c; }
 .card-task.note .ct-title { padding-right: 18px; }
+
+/* Post-its fit their text, and gather in a General zone and a Sheets zone in each column. */
+.card-task.note { min-height: 0; width: fit-content; max-width: 100%; min-width: 120px; padding-top: 9px; padding-bottom: 8px; }
+.note-zone { border-radius: 8px; padding: 5px 6px 8px; background: color-mix(in srgb, var(--zc) 9%, transparent); }
+.note-zone.general { --zc: #d39a3a; }
+.note-zone.sheet { --zc: #9b4a7c; }
+.nz-label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: color-mix(in srgb, var(--zc) 80%, var(--faint)); margin: 0 0 5px 2px; }
+.nz-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }

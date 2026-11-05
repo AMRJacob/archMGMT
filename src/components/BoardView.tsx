@@ -176,7 +176,8 @@ export default function BoardView({
                 )}
               </div>
               <div className="board-cards">
-                {col.tasks.map((t, i) => {
+                {(() => {
+                  const card = (t: Task, i: number) => {
                   const crew = assigneesOf(t).map((id) => person(id)).filter((x): x is Person => Boolean(x))
                   const pi = t.phase_id ? phaseIndex.get(t.phase_id) : undefined
                   const note = group === 'week' || group === 'person'
@@ -224,7 +225,17 @@ export default function BoardView({
                       </div>
                     </div>
                   )
-                })}
+                }
+                  if (!(group === 'week' || group === 'person') || !sheetOf) return col.tasks.map(card)
+                  // Post-its gather in two zones on the column itself: general tasks, then sheet work.
+                  const gen = col.tasks.filter((t) => !sheetOf(t)), sh = col.tasks.filter((t) => sheetOf(t))
+                  return (
+                    <>
+                      {gen.length > 0 && <div className="note-zone general"><span className="nz-label">General</span><div className="nz-cards">{gen.map(card)}</div></div>}
+                      {sh.length > 0 && <div className="note-zone sheet"><span className="nz-label">Sheets</span><div className="nz-cards">{sh.map(card)}</div></div>}
+                    </>
+                  )
+                })()}
                 {defaults && <button className="board-add" onClick={() => onAdd(defaults)}>+ Add task</button>}
               </div>
             </div>
