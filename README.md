@@ -53,6 +53,9 @@ carrying about three medium tasks at once.
   Every phase gets a different hue that harmonises with the root (Balanced, Triad or Complementary), all at one
   soft lightness and chroma (computed in OKLCH). The first phase is the root colour. Or use brand colours: a whole saved palette, or single colours picked
   (from one or several palettes) in the order the phases should use them. Used on every view and export.
+- **My To Do** (sidebar, between the project pages and Office): everything assigned to you across all projects,
+  filterable by project, kind (general / sheets), due date and search, grouped by project or due date; completed
+  optional. Tick tasks off or change status, size and dates in place.
 - **All projects**: every project with PM, current phase, schedule span and open tasks.
 - **Team & workload**: 12-week heat map per staff member (Light / Steady / Busy / Overloaded), ◆ for due dates,
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
