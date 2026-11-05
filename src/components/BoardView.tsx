@@ -17,8 +17,6 @@ const initialsOfPhase = (name: string) => name.split(/[\s/&-]+/).filter(Boolean)
 
 export type BoardGroup = 'status' | 'phase' | 'week' | 'person'
 
-/** One paper colour for every post-it; the phase strip carries the colour. */
-const NOTE_PAPER = '#fdf3c4'
 const WEEK_COLS = 8
 
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
@@ -180,13 +178,13 @@ export default function BoardView({
                   const card = (t: Task, i: number) => {
                   const crew = assigneesOf(t).map((id) => person(id)).filter((x): x is Person => Boolean(x))
                   const pi = t.phase_id ? phaseIndex.get(t.phase_id) : undefined
-                  const note = group === 'week' || group === 'person'
+                  const note = true // every board uses the same card: the post-it look on the theme's card colour
                   return (
                     <div key={t.id} draggable
                       className={`card-task${t.status === 'done' ? ' done' : ''}${dragId === t.id ? ' dragging' : ''}${note ? ' note' : ''}`}
                       style={note
-                        ? { background: NOTE_PAPER, transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
-                        : { borderLeftColor: pi === undefined ? '#c9c6bf' : phaseColor(pi) }}
+                        ? { transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
+                        : undefined}
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; setDragId(t.id); setDragFrom(col.key) }}
                       onDragEnd={() => { setDragId(null); setOver(null) }}
                       onClick={() => onOpenTask(t)}>

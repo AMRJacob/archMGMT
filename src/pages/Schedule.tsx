@@ -399,8 +399,8 @@ export default function Schedule() {
             <div className="segmented small-seg" aria-label="Board columns">
               <button className={group === 'status' ? 'on' : ''} onClick={() => setGroup('status')}>By status</button>
               <button className={group === 'phase' ? 'on' : ''} onClick={() => setGroup('phase')}>By phase</button>
-              <button className={group === 'week' ? 'on' : ''} onClick={() => setGroup('week')}>By week (post-it)</button>
-              <button className={group === 'person' ? 'on' : ''} onClick={() => setGroup('person')}>By person (post-it)</button>
+              <button className={group === 'week' ? 'on' : ''} onClick={() => setGroup('week')}>By week</button>
+              <button className={group === 'person' ? 'on' : ''} onClick={() => setGroup('person')}>By person</button>
             </div>
             <span className="muted small grow">
               {group === 'person'

@@ -634,7 +634,6 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 /* ---------- themes (Settings → Look) ---------- */
 h1, h2, .brand .mgmt { font-family: var(--font-display); }
 /* Sticky notes stay paper-coloured with dark ink in every theme. */
-.card-task.note { --ink: #1c1f23; --muted: #5d636a; --chip: rgba(0, 0, 0, 0.07); color: var(--ink); }
 
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
 .theme-tile {
@@ -751,7 +750,6 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 .avatar-stack { display: inline-flex; align-items: center; }
 .avatar-stack .avatar + .avatar { margin-left: -7px; box-shadow: 0 0 0 2px var(--panel); }
 .avatar-stack .avatar.more { background: var(--chip); color: var(--muted); }
-.card-task.note .avatar-stack .avatar + .avatar { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 .pm-item.pick { gap: 8px; }
 .pick-box { width: 15px; height: 15px; border: 1.5px solid var(--line-strong); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--on-accent); flex: none; }
 .pm-item.pick.on .pick-box { background: var(--accent); border-color: var(--accent); }
@@ -1415,3 +1413,6 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .nz-phase:first-child { margin-top: 0; }
 .nz-phase i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .note-zone .nz-cards > .card-task:not(.note) { width: 100%; }
+/* Board cards (all boards): the post-it look on the theme's card colour, with rounded corners. */
+.card-task.note { background: var(--panel); border-radius: 8px; }
+.ct-phase { border-radius: 8px 0 0 8px; }
