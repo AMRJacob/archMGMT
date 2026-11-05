@@ -49,6 +49,9 @@ export default function TaskEditor({
       </div>
       <div className="qp-sub muted small">{phase?.name ?? 'No phase'}{task.is_milestone ? ` · ${milestoneType(task.milestone_type)?.label ?? 'Untyped'} milestone` : ''}</div>
       <TaskControls task={task} people={people} phases={phases} onPatch={onPatch} onDelete={() => { onDelete(); onClose() }} />
+      <label className="qp-desc"><span>Description</span>
+        <TextField multiline value={task.notes ?? null} placeholder="Add a description…" onSave={(v) => onPatch({ notes: v })} />
+      </label>
     </div>
   )
 }

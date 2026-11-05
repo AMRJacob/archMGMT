@@ -362,6 +362,7 @@ export default function PlanTree({
         )}
         {kind === 'view' && <span className="kind-tag">View</span>}
         <div className="trow-title">{title(t, kind === 'sheet' ? 'sheet-title' : '')}</div>
+        {t.notes && selected !== t.id && <span className="has-desc" title={t.notes}>≡</span>}
         {kind === 'sheet' && (
           <Pop className="type-pop" title="Sheet type" label={<span className="type-chip">{type?.name ?? 'Type'}</span>}>
             {(close) => (
@@ -400,6 +401,13 @@ export default function PlanTree({
         {firstOf(t) && seam([{ task: t, depth }], 'before')}
         {!(isOpen && kids.length) && seam([{ task: t, depth }, ...enders], 'after')}
       </li>,
+      // The selected row shows its description underneath, to read or edit (it never shows on cards).
+      ...(selected === t.id ? [
+        <li key={`${t.id}-desc`} className="tdesc" style={{ paddingLeft: 40 + depth * 24 + 34 } as CSSProperties}>
+          <TextField multiline value={t.notes ?? null} placeholder="Add a description…" className="tdesc-field"
+            onSave={(v) => onPatch(t, { notes: v }, false)} />
+        </li>,
+      ] : []),
       ...(isOpen ? kids.flatMap((c, i): ReactNode[] => node(c, depth + 1, i === kids.length - 1 ? [{ task: t, depth }, ...enders] : [])) : []),
       ...(isOpen && kids.length === 0 ? [
         <li key={`${t.id}-add`} className="tree-add" style={{ paddingLeft: 40 + (depth + 1) * 24 }}>

@@ -1463,3 +1463,11 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .todo-filters .todo-search { flex: none; }
 /* Board: the area under the columns runs to the bottom of the page, so a card can be dropped anywhere below a column. */
 .board-cols { min-height: calc(100vh - 230px); }
+/* Task descriptions: under the selected row in the Overview, and in the task panel. */
+.tlist li.tdesc { list-style: none; padding: 0 14px 8px; }
+.tgroup-list > li.tdesc { margin-left: 14px; background: var(--panel); }
+.tdesc-field { width: 100%; min-height: 52px; font-size: 13px; color: var(--ink); resize: vertical; }
+.has-desc { color: var(--faint); font-size: 13px; margin-left: -4px; cursor: help; }
+.qp-desc { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.qp-desc > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.qp-desc .field { width: 100%; min-height: 64px; font-size: 13px; resize: vertical; }
