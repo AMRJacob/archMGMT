@@ -1,4 +1,4 @@
-import { useCallback, useState, type KeyboardEvent } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import NotePrint from './NotePrint.tsx'
 import { useLockedBy } from '../lib/live.ts'
 import Modal from './Modal.tsx'
@@ -135,6 +135,44 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
   const [title, setTitle] = useState(note.title)
   const [location, setLocation] = useState(note.location ?? '')
   const [body, setBody] = useState(note.body ?? '')
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  /** Put the cursor at `pos` as soon as the new text is on screen (before the next keystroke lands). */
+  const pendingCaret = useRef<number | null>(null)
+  const caret = (pos: number) => { pendingCaret.current = pos }
+  useLayoutEffect(() => {
+    const el = bodyRef.current, pos = pendingCaret.current
+    if (el && pos !== null) { pendingCaret.current = null; el.focus(); el.setSelectionRange(pos, pos) }
+  }, [body])
+  /**
+   * Topic / item buttons: start a new line with "# " (a topic heading) or "• " (a bullet), right after the line
+   * the cursor is on. A topic gets a blank line before it so topics read as separate blocks.
+   */
+  const insertLine = (prefix: '# ' | '• ') => {
+    const el = bodyRef.current
+    const at = el ? el.selectionEnd : body.length
+    const lineEnd = body.indexOf('\n', at) < 0 ? body.length : body.indexOf('\n', at)
+    const before = body.slice(0, lineEnd), after = body.slice(lineEnd)
+    const lineNow = before.slice(before.lastIndexOf('\n') + 1)
+    const lead = !before.trim() ? '' : lineNow.trim() === '' ? '' : prefix === '# ' ? '\n\n' : '\n'
+    const next = before + lead + prefix + after
+    setBody(next)
+    caret(before.length + lead.length + prefix.length)
+  }
+  /** Enter on a bullet starts the next bullet; Enter on an empty bullet ends the list. */
+  const bodyKeys = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return
+    const el = e.currentTarget
+    const at = el.selectionStart
+    const line = body.slice(body.lastIndexOf('\n', at - 1) + 1, at)
+    if (!line.startsWith('• ') && !line.startsWith('# ')) return
+    e.preventDefault()
+    if (line === '• ') { // empty bullet: drop it and leave the list
+      const start = at - 2
+      setBody(body.slice(0, start) + body.slice(at)); caret(start); return
+    }
+    const ins = '\n• '
+    setBody(body.slice(0, at) + ins + body.slice(el.selectionEnd)); caret(at + ins.length)
+  }
   const [decisions, setDecisions] = useState(note.decisions ?? '')
   // Someone else has this note open: show theirs as it changes, read-only, until they close it.
   const lockedBy = useLockedBy(note.id)
@@ -229,9 +267,16 @@ export function NoteEditor({ note, tasks, people, project, onPatch, onDelete, on
 
       <div className="note-sections">
         <section className="note-sec notes">
-          <span className="note-label">Notes</span>
-          <textarea className="field boxed note-body" value={body} autoFocus={Boolean(note.title)} placeholder="What was discussed…"
-            onChange={(e) => setBody(e.target.value)} onBlur={() => body !== (note.body ?? '') && save({ body: body || null })} />
+          <div className="note-label-row">
+            <span className="note-label">Notes</span>
+            <span className="note-tools">
+              <button type="button" className="btn ghost small-btn" title="Start a new topic (a heading)" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLine('# ')}>+ Topic</button>
+              <button type="button" className="btn ghost small-btn" title="Add a bullet point under the topic (Enter adds the next one)" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLine('• ')}>+ Item discussed</button>
+            </span>
+          </div>
+          <textarea ref={bodyRef} className="field boxed note-body" value={body} autoFocus={Boolean(note.title)}
+            placeholder={'What was discussed…\n\nUse + Topic for a heading, then + Item discussed for bullet points under it.'}
+            onChange={(e) => setBody(e.target.value)} onKeyDown={bodyKeys} onBlur={() => body !== (note.body ?? '') && save({ body: body || null })} />
         </section>
         <aside className="note-side">
           <section className="note-sec">

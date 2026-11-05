@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { formatDate } from '../lib/dates.ts'
 import { useTitleBlock, type TitleBlock } from '../lib/titleBlock.ts'
@@ -71,7 +71,7 @@ export default function NotePrint({ note, project, people, tasks, onDone }: {
           </tr>
         </tbody>
       </table>
-      {note.body && <section><h2>Notes</h2><div className="np-body">{note.body}</div></section>}
+      {note.body && <section><h2>Notes</h2><NoteBody text={note.body} /></section>}
       {decisions.length > 0 && <section><h2>Decisions</h2><ol>{decisions.map((d, i) => <li key={i}>{d}</li>)}</ol></section>}
       {actions.length > 0 && (
         <section>
@@ -93,4 +93,23 @@ export default function NotePrint({ note, project, people, tasks, onDone }: {
     </div>,
     document.body,
   )
+}
+
+/**
+ * Notes as written in the editor: "# " lines are topics (headings), "• " / "- " lines are items discussed
+ * (bullets under the topic); anything else is an ordinary paragraph.
+ */
+export function NoteBody({ text }: { text: string }) {
+  const blocks: ReactNode[] = []
+  let items: string[] = []
+  const flush = () => { if (items.length) { blocks.push(<ul key={blocks.length} className="np-items">{items.map((x, i) => <li key={i}>{x}</li>)}</ul>); items = [] } }
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd()
+    if (/^\s*[•\-*]\s+/.test(line)) { items.push(line.replace(/^\s*[•\-*]\s+/, '')); continue }
+    flush()
+    if (line.startsWith('# ')) blocks.push(<h3 key={blocks.length} className="np-topic">{line.slice(2)}</h3>)
+    else if (line.trim()) blocks.push(<p key={blocks.length} className="np-para">{line}</p>)
+  }
+  flush()
+  return <div className="np-body">{blocks}</div>
 }
