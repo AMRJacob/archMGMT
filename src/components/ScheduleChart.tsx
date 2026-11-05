@@ -47,6 +47,13 @@ interface Drag { kind: 'phase' | 'task'; id: string; mode: DragMode; x0: number;
 const ZONE_GENERAL = '#c98a12'
 const ZONE_SHEETS = '#8e3b6e'
 
+/** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */
+function mixHex(a: string, b: string, t: number) {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) || 0)
+  const [x, y] = [p(a), p(b)]
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')
+}
+
 function clip(s: string, max: number) {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
@@ -560,10 +567,10 @@ export default function ScheduleChart({
           return (
             <g key={i} pointerEvents="none">
               <rect x={M} y={ry + 3} width={W - 2 * M} height={h - 6} rx={4} fill="none" stroke={zc} strokeOpacity={0.3} />
-              {/* The zone's title: a solid band across the whole chart with white lettering. */}
-              <path d={`M${M} ${ry + 7} a4 4 0 0 1 4 -4 H${W - M - 4} a4 4 0 0 1 4 4 V${ry + ROW_ZONE - 1} H${M} Z`} fill={zc} fillOpacity={0.85} />
-              <text x={M + 30} y={ry + 15} fontSize={9.5} fontWeight={700} letterSpacing={1.1} fill="#fff">{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
-              <text x={M + 30 + (r.zone === 'sheets' ? 54 : 100)} y={ry + 15} fontSize={9.5} fill="#fff" fillOpacity={0.8}>{r.rows}</text>
+              {/* The zone's title: a muted band across the whole chart, lettered in a deeper shade of the same colour. */}
+              <path d={`M${M} ${ry + 7} a4 4 0 0 1 4 -4 H${W - M - 4} a4 4 0 0 1 4 4 V${ry + ROW_ZONE - 1} H${M} Z`} fill={mixHex(zc, C.bg, 0.72)} />
+              <text x={M + 30} y={ry + 15} fontSize={9.5} fontWeight={700} letterSpacing={1.1} fill={mixHex(zc, C.ink, 0.45)}>{r.zone === 'sheets' ? 'SHEETS' : 'GENERAL TASKS'}</text>
+              <text x={M + 30 + (r.zone === 'sheets' ? 54 : 100)} y={ry + 15} fontSize={9.5} fill={mixHex(zc, C.ink, 0.45)} fillOpacity={0.7}>{r.rows}</text>
             </g>
           )
         }
