@@ -1264,13 +1264,14 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .tgroup-head .count { font-weight: 500; letter-spacing: 0; color: var(--faint); }
 .tgroup-head .icon-btn { margin-left: 2px; opacity: 0; font-size: 13px; padding: 0 4px; }
 .tgroup-head:hover .icon-btn, .tgroup-head .icon-btn:focus { opacity: 1; }
-/* Sheets and everything under them sit on a light tint so they read apart from general tasks. */
-.tlist .sheet-side { background: color-mix(in srgb, var(--info) 7%, var(--panel)); }
-.tlist .trow.sheet-side:hover, .tlist .irow.sheet-side:hover { background: color-mix(in srgb, var(--info) 12%, var(--panel)); }
-.tlist .trow.k-sheet.sheet-side { background: color-mix(in srgb, var(--info) 11%, var(--panel)); }
-.tlist .trow.k-sheet.sheet-side:hover { background: color-mix(in srgb, var(--info) 16%, var(--panel)); }
-.tlist .tgroup-head.sheet-side { background: color-mix(in srgb, var(--info) 7%, var(--panel)); }
-.tlist .trow.sheet-side.selected, .tlist .irow.sheet-side.selected { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+/* Sheets and everything under them keep a light background (so they never look done) and carry their own
+   left bar in a different colour from the current-phase edge; the bar sits just inside so that edge still shows. */
+.tlist .sheet-side { --sheet-bar: color-mix(in srgb, var(--info) 45%, var(--panel)); --row-bg: var(--panel);
+  background: linear-gradient(to right, transparent 0 4px, var(--sheet-bar) 4px 7px, var(--row-bg) 7px); }
+.tlist .trow.k-sheet.sheet-side { --sheet-bar: color-mix(in srgb, var(--info) 80%, var(--panel)); }
+.tlist .trow.sheet-side:hover, .tlist .irow.sheet-side:hover { --row-bg: var(--hover); }
+.tlist .trow.sheet-side.selected, .tlist .irow.sheet-side.selected { --row-bg: color-mix(in srgb, var(--accent) 7%, var(--panel)); box-shadow: none; }
+.tlist .tgroup-head.sheet-side { color: color-mix(in srgb, var(--info) 70%, var(--faint)); }
 .tgroup-head { cursor: pointer; user-select: none; }
 .tgroup-head:hover { color: var(--muted); }
 .tgroup-head .caret { display: inline-block; width: 10px; margin-left: -16px; font-size: 9px; transition: transform .15s; }
