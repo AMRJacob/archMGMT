@@ -11,21 +11,23 @@ import { textOn } from '../lib/colors.ts'
 const initialsOfPhase = (name: string) => name.split(/[\s/&-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase()
 
 /**
- * Task board. Columns by status (kanban), by phase, by week (a post-it pull-plan, cards coloured by
- * person) or by person (post-its; unassigned work on the left to hand out). Drag a card to another
+ * Task board. Columns by status (kanban), by phase, by week (a post-it pull-plan) or by person (post-its; unassigned work on the left to hand out). Drag a card to another
  * column to change its status, phase, week or who's on it.
  */
 
 export type BoardGroup = 'status' | 'phase' | 'week' | 'person'
 
-const NOTE_COLORS = ['#fdf1b8', '#d7ecf7', '#f9d9cf', '#dcefd8', '#e9dcf4', '#fbe3bd', '#d5e7e3', '#f3d6e4', '#e2e4e8']
+/** One paper colour for every post-it; the phase strip carries the colour. */
+const NOTE_PAPER = '#fdf3c4'
 const WEEK_COLS = 8
 
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
 
 export default function BoardView({
-  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar, sheetOf,
+  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar, sheetOf, onTeam,
 }: {
+  /** Update the project team: people who get or hand over work on the person board join it, so their column stays. */
+  onTeam?: (team: string[]) => void
   /** The sheet a card belongs to (itself, or the sheet it sits under); null for a general task. */
   sheetOf?: (t: Task) => Task | null
   /** The project team (person board columns); empty = everyone active on the Team list who has work here. */
@@ -51,10 +53,6 @@ export default function BoardView({
   const phaseIndex = new Map(sortedPhases.map((p, i) => [p.id, i]))
   const phaseColor = (i: number) => palette[i] ?? '#8b8f94'
   const staffOrder = [...people].sort((a, b) => a.name.localeCompare(b.name))
-  const personColor = (id: string | null) => {
-    const i = staffOrder.findIndex((p) => p.id === id)
-    return i < 0 ? '#f1f0ec' : NOTE_COLORS[i % NOTE_COLORS.length]
-  }
   const person = (id: string | null) => people.find((p) => p.id === id)
   const byDue = (a: Task, b: Task) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.title.localeCompare(b.title)
   const thisWeek = mondayOf(today())
@@ -72,8 +70,11 @@ export default function BoardView({
     ]
   } else if (group === 'person') {
     // Unassigned work first, to hand out; then each person (the project team, or everyone with work here).
-    const ids = team && team.length ? team
-      : staffOrder.filter((p) => p.active && tasks.some((t) => isAssigned(t, p.id))).map((p) => p.id)
+    // The team always shows (even with nothing assigned), plus anyone else who has work here.
+    const withWork = staffOrder.filter((p) => tasks.some((t) => isAssigned(t, p.id))).map((p) => p.id)
+    // In name order, so columns don't jump around when someone joins the team.
+    const all = new Set([...(team ?? []), ...withWork])
+    const ids = staffOrder.filter((p) => all.has(p.id)).map((p) => p.id)
     const open = (t: Task) => t.status !== 'done'
     columns = [
       { key: 'unassigned', title: 'Unassigned', sub: 'Drag to someone', droppable: true, tasks: tasks.filter((t) => !assigneesOf(t).length && open(t)).sort(byDue) },
@@ -107,6 +108,10 @@ export default function BoardView({
       const ids = assigneesOf(t)
       const fromId = dragFrom
       setDragFrom(null)
+      // Everyone involved joins the project team, so emptying someone's column never takes them off the board.
+      const keep = [fromId, col.key, ...ids].filter((x): x is string => Boolean(x) && x !== 'unassigned' && Boolean(person(x!)))
+      const cur = team ?? []
+      if (onTeam && keep.some((x) => !cur.includes(x))) onTeam([...cur, ...keep.filter((x, i) => !cur.includes(x) && keep.indexOf(x) === i)])
       if (col.key === 'unassigned') { if (ids.length) onPatch(t, assignPatch([])); return }
       if (ids.includes(col.key)) return
       // Moving from one person to another hands it over; from Unassigned it just gets this person.
@@ -149,11 +154,6 @@ export default function BoardView({
             <button className="btn" onClick={() => setFrom(addDays(thisWeek, -7))}>This week</button>
             <button className="btn" onClick={() => setFrom(addDays(from, 28))}>Later ›</button>
           </div>
-          <div className="note-legend">
-            {staffOrder.filter((p) => p.active && tasks.some((t) => isAssigned(t, p.id))).map((p) => (
-              <span key={p.id}><i style={{ background: personColor(p.id) }} />{p.name}</span>
-            ))}
-          </div>
         </div>
       )}
       <div className="board-cols">
@@ -185,7 +185,7 @@ export default function BoardView({
                     <div key={t.id} draggable
                       className={`card-task${t.status === 'done' ? ' done' : ''}${dragId === t.id ? ' dragging' : ''}${note ? ' note' : ''}`}
                       style={note
-                        ? { background: personColor(group === 'person' ? (col.key === 'unassigned' ? null : col.key) : t.assignee_id), transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
+                        ? { background: NOTE_PAPER, transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }
                         : { borderLeftColor: pi === undefined ? '#c9c6bf' : phaseColor(pi) }}
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; setDragId(t.id); setDragFrom(col.key) }}
                       onDragEnd={() => { setDragId(null); setOver(null) }}

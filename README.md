@@ -44,7 +44,7 @@ carrying about three medium tasks at once.
     phases and tasks marked "Show in presentation view". Export as PDF or PNG; *Preview…* shows the pages and sets paper (Letter / Tabloid / Arch B 18×12), fit (one page or
     full width) and background (white, brand tint or brand dark, from the project's colour).
   - *Calendar*: month grid; drag a task to another day.
-  - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan, notes coloured by person);
+  - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan; a strip on each note shows its phase);
     drag cards between columns.
   - **Show** All / General Tasks / Sheets on all three (General Tasks hides sheets and their views; milestones always show),
     and a **Detail** slider: Sheets / Views / Tasks.
@@ -58,7 +58,8 @@ carrying about three medium tasks at once.
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
 - **Editing tasks**: every part of a task row is clickable in place (status, size, dates, assignee, ⋯ for more);
   clicking a task in the timeline, calendar or board opens the same controls in a small panel.
-- **Board** (sidebar): by status, phase, week or **person** (post-its; Unassigned on the left to hand out). The
+- **Board** (sidebar): by status, phase, week or **person** (post-its; Unassigned on the left to hand out; team
+  members keep their column even with nothing assigned). The
   project **team** (Overview → Team, or above the person board) is what the assign list offers first.
 - **Meeting notes**: *+ Topic* and *+ Item discussed* build a topic / bullet outline that prints as headings and lists.
 - **Settings & Data**, in sections down the left: *General* (theme), *Branding & Printing* (brand

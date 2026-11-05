@@ -406,13 +406,14 @@ export default function Schedule() {
               {group === 'person'
                 ? 'Hand out work: drag a note from Unassigned (or from one person) onto someone.'
                 : group === 'week'
-                ? 'Pull-plan board: notes are coloured by person. Drag a note to another week to move its dates.'
+                ? 'Pull-plan board: drag a note to another week to move its dates.'
                 : `Drag a card to another column to change its ${group}. Click a card to edit it.`}
             </span>
             {levelControl}
           </div>
           <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
             team={project.team ?? []}
+            onTeam={(team) => void patchProject(project.id, { team })}
             sheetOf={(t) => { let cur: Task | undefined = real(t); for (let i = 0; cur && i < 12; i++) { if (cur.kind === 'sheet') return cur; cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined } return null }}
             teamBar={<><span className="team-label">Project team</span><ProjectTeam project={project} people={people.rows} compact onChange={(team) => void patchProject(project.id, { team })} /></>}
             onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
