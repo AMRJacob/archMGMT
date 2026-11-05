@@ -224,21 +224,21 @@ export function seedSheets(s: Store, tag: Tag) {
   sheet('A101', 'Architectural site plan', 'site', 'Sample Architect', 0, 28, 3)
   sheet('A102', 'Floor plan: reference', 'plan-ref', 'Sample Project Architect', 7, 35, 4)
   sheet('A104', 'Reflected ceiling plan', 'rcp', 'Sample Designer', 14, 28)
-  // A sheet with views, and tasks under a view, to show the full hierarchy.
+  // A sheet with tasks, and subtasks under a task, to show the full hierarchy (sheet → task → subtask).
   const a401 = sheet('A401', 'Enlarged plans & interior elevations', 'enlarged', 'Sample Designer', 21, 35)
-  const view = (title: string, off: number, len: number, tasks: [string, string][]) => {
+  const task = (title: string, off: number, len: number, subtasks: string[]) => {
     const v: Row = {
-      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: a401, kind: 'view', sheet_number: null, sheet_type: null,
+      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: a401, kind: 'task', sheet_number: null, sheet_type: null,
       title, assignee_id: who('Sample Designer'), start_date: addDays(cs, off), due_date: addDays(cs, off + len), estimated_hours: null,
       effort: 1, status: 'todo', is_milestone: false, client_visible: false, sort_order: 0, notes: null,
     }
     add([v])
-    tasks.forEach(([t, person], i) => add([{
-      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: v.id, kind: 'task', sheet_number: null, sheet_type: null,
-      title: t, assignee_id: who(person), start_date: addDays(cs, off + i * 4), due_date: addDays(cs, off + i * 4 + 6), estimated_hours: null,
-      effort: 1, status: 'todo', is_milestone: false, client_visible: false, sort_order: i, notes: null,
+    subtasks.forEach((t, i) => add([{
+      id: crypto.randomUUID(), project_id: lib.id, phase_id: cd.id, parent_id: v.id, kind: 'item', sheet_number: null, sheet_type: null,
+      title: t, assignee_id: null, start_date: null, due_date: null, estimated_hours: null,
+      effort: null, status: 'todo', is_milestone: false, client_visible: false, sort_order: i, notes: null,
     }]))
   }
-  view('Toilet rooms: enlarged plan and elevations', 21, 14, [['Draft enlarged plan', 'Sample Designer'], ['Interior elevations with mounting heights', 'Sample Intern']])
-  view('Check-in desk', 28, 14, [['Plan and elevations', 'Sample Designer'], ['Coordinate power and data', 'Sample Junior Designer']])
+  task('Toilet rooms: enlarged plan and elevations', 21, 14, ['Draft enlarged plan', 'Interior elevations with mounting heights'])
+  task('Check-in desk', 28, 14, ['Plan and elevations', 'Coordinate power and data'])
 }

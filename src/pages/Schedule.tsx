@@ -59,8 +59,9 @@ export default function Schedule() {
   const [group, setGroup] = useSaved<BoardGroup>('archmgmt.boardGroup', 'status')
   const [zoom, setZoom] = useSaved<Zoom>('archmgmt.timelineZoom', 'all')
   const [winStart, setWinStart] = useState(defaultWindowStart)
-  const [levelStr, setLevelStr] = useSaved<'0' | '1' | '2' | '3'>('archmgmt.detailLevel', '3')
-  const level = Number(levelStr) as DetailLevel
+  const [levelStr, setLevelStr] = useSaved<'0' | '1' | '2' | '3'>('archmgmt.detailLevel', '2')
+  // (A level saved before views were removed can be 3; that's now the top, 2.)
+  const level = Math.min(2, Number(levelStr)) as DetailLevel
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTaskId, setNewTaskId] = useState<string | null>(null)
   const [phaseEdit, setPhaseEdit] = useState<string | null>(null)
@@ -121,7 +122,7 @@ export default function Schedule() {
   }
   // Presentation view has its own Show rules, so the Detail slider and the General Tasks / Sheets filter don't apply.
   const chartRows: ShownTask[] = mode === 'presentation'
-    ? visibleAtLevel(tree, 3).map((v) => asShown(tree, v.task, 0))
+    ? visibleAtLevel(tree, 2).map((v) => asShown(tree, v.task, 0))
     : treeRows
   /** A drag on a shown copy: whole branches move together; plain tasks take the new dates. */
   const moveShown = (t: ShownTask, s: string | null, d: string | null) => {
@@ -160,7 +161,7 @@ export default function Schedule() {
       title={levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.' : undefined}>
     <div className="level-ctl" title={DETAIL_LEVELS.map((l) => `${l.label}: ${l.hint}`).join('\n')}>
       <span className="muted small">Detail</span>
-      <input type="range" min={0} max={3} step={1} value={level} aria-label="Detail level"
+      <input type="range" min={0} max={2} step={1} value={level} aria-label="Detail level"
         disabled={levelOff} onChange={(e) => setLevelStr(e.target.value as '0' | '1' | '2' | '3')} />
       <span className="level-name" title={DETAIL_LEVELS.find((l) => l.value === level)?.hint}>{DETAIL_LEVELS.find((l) => l.value === level)?.label}</span>
     </div>
@@ -176,11 +177,11 @@ export default function Schedule() {
     const ph = phases.rows.find((p) => p.id === t.phase_id)
     const inView = showing.some((r) => r.id === t.id) && (!presOff || (presented(t) && (!ph || ph.client_visible)))
     if (inView) return null
-    const kindWord = t.is_milestone ? 'milestone' : t.kind === 'sheet' ? 'sheet' : t.kind === 'section' ? 'spec section' : t.kind === 'view' ? 'view' : t.parent_id ? 'task' : 'task'
+    const kindWord = t.is_milestone ? 'milestone' : t.kind === 'sheet' ? 'sheet' : t.kind === 'section' ? 'spec section' : 'task'
     let why = '', fix: (() => void) | null = null, fixLabel = 'Show it'
     if (presOff) { why = 'the presentation view only shows what’s chosen for the client'; fix = () => setMode('working'); fixLabel = 'Switch to working view' }
     else if (!passesWork(tree, t, work)) { why = `the Show filter is set to ${work === 'tasks' ? 'General Tasks' : work === 'sheets' ? 'Sheets' : 'Project Manual'}`; fix = () => setWork('all') }
-    else if (level < 3) { why = `Detail is set to “${DETAIL_LEVELS.find((l) => l.value === level)?.label}”`; fix = () => setLevelStr('3') }
+    else if (level < 2) { why = `Detail is set to “${DETAIL_LEVELS.find((l) => l.value === level)?.label}”`; fix = () => setLevelStr('2') }
     else if (view !== 'timeline') { why = 'this view shows the lowest level of each branch'; fix = null }
     else return null
     return (
@@ -261,7 +262,7 @@ export default function Schedule() {
     const day = sp.date ? parseISO(sp.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null
     const where = sp.phase ? ` in ${sp.phase.name}` : ''
     const task = sp.task ? real(sp.task) : null
-    const holds = task && !task.is_milestone && KIND_RANK[task.kind ?? 'task'] < 3
+    const holds = task && !task.is_milestone && KIND_RANK[task.kind ?? 'task'] < 2
     return [
       { label: day ? `Add task on ${day}` : `Add task${where}`, run: () => void addHere(sp.phase, sp.date) },
       { label: day ? `Add milestone on ${day}` : `Add milestone${where}`, run: () => void addHere(sp.phase, sp.date, { milestone: true }) },
@@ -363,11 +364,13 @@ export default function Schedule() {
         </div>
         <div className="toolbar">
           {plan.canUndo && <button className="btn" onClick={plan.undo} title="Undo the last move (Ctrl+Z)">↶ Undo</button>}
-          <div className="segmented" role="tablist" aria-label="Schedule view">
-            <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
-            <button className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Calendar</button>
-            <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>Board</button>
-          </div>
+          {/* Board has its own place in the sidebar, so the switch here is just Timeline / Calendar. */}
+          {view !== 'board' && (
+            <div className="segmented" role="tablist" aria-label="Schedule view">
+              <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
+              <button className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Calendar</button>
+            </div>
+          )}
         </div>
       </header>
 

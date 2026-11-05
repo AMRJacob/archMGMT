@@ -143,7 +143,7 @@ export default function ScheduleChart({
   const sideOf = (t: Task): 'general' | 'sheets' | 'manual' => {
     let cur: Task | undefined = t
     for (let n = 0; cur && n < 12; n++) {
-      if (cur.kind === 'sheet' || cur.kind === 'view') return 'sheets'
+      if (cur.kind === 'sheet') return 'sheets'
       if (cur.kind === 'section') return 'manual'
       cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
     }

@@ -10,16 +10,14 @@ export type Change = { task: Task; next: Partial<Task> }
 /** Where to put something relative to a row: just before it, just after it, or inside it (last child). */
 export type Place = 'before' | 'after' | 'inside'
 
-const RANK_KIND: Record<number, TaskKind> = { 1: 'sheet', 2: 'view', 3: 'task', 4: 'item' }
+const RANK_KIND: Record<number, TaskKind> = { 1: 'sheet', 2: 'task', 3: 'item' }
 
 /** The kind a row should become under a new parent: kept when it still fits, otherwise the next level down. */
 export function kindUnder(parent: Task | null, kind: TaskKind): TaskKind {
-  if (!parent) return kind === 'view' || kind === 'item' ? 'task' : kind
-  // Spec sections hold tasks and checklist items directly (no views).
-  if (kindOf(parent) === 'section') return kind === 'item' ? 'item' : 'task'
+  if (!parent) return kind === 'item' ? 'task' : kind
   const pr = KIND_RANK[kindOf(parent)]
   if (KIND_RANK[kind] > pr && kind !== 'sheet' && kind !== 'section') return kind
-  return RANK_KIND[Math.min(4, pr + 1)]
+  return RANK_KIND[Math.min(3, pr + 1)]
 }
 
 /** Items can't hold anything; dropping "inside" one means after it. */

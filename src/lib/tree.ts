@@ -54,8 +54,8 @@ export function treeOrder(a: Task, b: Task): number {
   }
   // Sheets first (by number), then other scheduled work by date; checklist items last, in their order.
   if ((ra === 1) !== (rb === 1)) return ra === 1 ? -1 : 1
-  if (ra === 4 && rb === 4) return a.sort_order - b.sort_order
-  if (ra !== rb && (ra === 4 || rb === 4)) return ra - rb
+  if (ra === 3 && rb === 3) return a.sort_order - b.sort_order
+  if (ra !== rb && (ra === 3 || rb === 3)) return ra - rb
   return (a.start_date ?? a.due_date ?? '9999').localeCompare(b.start_date ?? b.due_date ?? '9999') || a.sort_order - b.sort_order
 }
 
@@ -66,14 +66,14 @@ export function isSheetWork(tree: Tree, t: Task): boolean {
   let cur: Task | undefined = t, d = 0
   while (cur && d < 12) {
     const k = kindOf(cur)
-    if (k === 'sheet' || k === 'view') return true
+    if (k === 'sheet') return true
     cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined
     d++
   }
   return false
 }
 
-/** The three kinds of work in a phase: general tasks, sheets (and their views), and Project Manual sections. */
+/** The three kinds of work in a phase: general tasks, sheets, and Project Manual spec sections. */
 export type WorkGroup = 'tasks' | 'sheets' | 'manual'
 export const WORK_GROUPS: { id: WorkGroup; label: string }[] = [
   { id: 'tasks', label: 'General Tasks' }, { id: 'sheets', label: 'Sheets' }, { id: 'manual', label: 'Project Manual' },
@@ -82,7 +82,7 @@ export function workGroupOf(tree: Tree, t: Task): WorkGroup {
   let cur: Task | undefined = t, d = 0
   while (cur && d < 12) {
     const k = kindOf(cur)
-    if (k === 'sheet' || k === 'view') return 'sheets'
+    if (k === 'sheet') return 'sheets'
     if (k === 'section') return 'manual'
     cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined
     d++
@@ -148,17 +148,16 @@ export function shiftTreeChanges(tree: Tree, t: Task, days: number): { task: Tas
 
 // ---------- detail level (the slider on schedule views) ----------
 
-export type DetailLevel = 0 | 1 | 2 | 3 // 0 phases (and milestones), 1 sheets, 2 views, 3 tasks (items are never scheduled)
+export type DetailLevel = 0 | 1 | 2 // 0 phases (and milestones), 1 top level, 2 tasks inside sheets and sections (subtasks are never scheduled)
 
 /**
- * The Detail slider, in the app's terms (General Tasks: task → subtask; Sheets: sheet → view → task → subtask;
+ * The Detail slider, in the app's terms (General Tasks: task → subtask; Sheets: sheet → task → subtask;
  * Project Manual: spec section → task → subtask). Subtasks are tick-box lines and never show on the schedule.
  */
 export const DETAIL_LEVELS: { value: DetailLevel; label: string; hint: string }[] = [
   { value: 0, label: 'Phases', hint: 'Phases and milestones only' },
   { value: 1, label: 'Tasks, Sheets & Sections', hint: 'Adds general tasks, sheets and spec sections' },
-  { value: 2, label: '+ Views', hint: 'Adds the views on each sheet' },
-  { value: 3, label: '+ Tasks Inside', hint: 'Adds the tasks inside sheets, views and spec sections' },
+  { value: 2, label: '+ Tasks Inside', hint: 'Adds the tasks inside sheets and spec sections' },
 ]
 
 /**

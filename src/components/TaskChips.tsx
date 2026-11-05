@@ -111,7 +111,7 @@ export function DateChip({ task, onPatch, locked = false }: { task: Task; onPatc
     : task.start_date && task.due_date ? `${shortDate(task.start_date)} – ${shortDate(task.due_date)}`
       : task.due_date ? `Due ${shortDate(task.due_date)}` : 'Set dates'
   if (locked) {
-    return <span className="chip-btn static" title="Dates come from the views and tasks under it"><span className="date-chip rolled">{text}</span></span>
+    return <span className="chip-btn static" title="Dates come from the tasks under it"><span className="date-chip rolled">{text}</span></span>
   }
   return (
     <Pop title="Dates" align="right" label={<span className={`date-chip${late ? ' late' : ''}${task.due_date ? '' : ' empty'}`}>{text}</span>}>

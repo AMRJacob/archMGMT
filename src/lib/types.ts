@@ -63,9 +63,9 @@ export interface Phase {
 }
 
 /** 'section' is a Project Manual spec section (e.g. 08 71 00 Door Hardware); it holds tasks and items like a sheet. */
-export type TaskKind = 'sheet' | 'view' | 'section' | 'task' | 'item'
+export type TaskKind = 'sheet' | 'section' | 'task' | 'item'
 
-export const KIND_RANK: Record<TaskKind, number> = { sheet: 1, view: 2, section: 1, task: 3, item: 4 }
+export const KIND_RANK: Record<TaskKind, number> = { sheet: 1, section: 1, task: 2, item: 3 }
 
 export type Effort = 1 | 2 | 3
 
@@ -96,7 +96,7 @@ export interface Task {
   effort?: Effort | null
   /** Hierarchy: the sheet, view or task this sits under (null = directly in the phase). */
   parent_id?: string | null
-  /** sheet → view → task → item. Items are checklist lines / info and are never scheduled. */
+  /** sheet / spec section → task → item ('subtask'). Subtasks are tick-box lines and are never scheduled. */
   kind?: TaskKind | null
   /** Sheets: number (A101) and type (key into SHEET_TYPES). */
   sheet_number?: string | null

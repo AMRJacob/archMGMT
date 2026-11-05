@@ -232,7 +232,6 @@ export default function BoardView({
                       <div className="ct-title">
                         {t.is_milestone && <MilestoneMark task={t} />}
                         {(t.kind === 'sheet' || t.kind === 'section') && t.sheet_number && <span className="mono ct-no">{t.sheet_number}</span>}
-                        {t.kind === 'view' && <span className="kind-tag">View</span>}
                         {t.title}
                       </div>
                       <div className="ct-meta">

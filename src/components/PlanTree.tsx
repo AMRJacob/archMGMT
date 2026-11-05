@@ -15,7 +15,7 @@ import { assigneesOf, assignPatch } from '../lib/assignees.ts'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
 const ghostName = (t: Task) =>
-  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', view: 'View name', section: 'Section name', task: 'Task name', item: 'Subtask' } as const)[kindOf(t)]
+  t.is_milestone ? 'Milestone name' : ({ sheet: 'Sheet name', section: 'Section name', task: 'Task name', item: 'Subtask' } as const)[kindOf(t)]
 
 /** The row being dragged, shared by every phase's tree so rows can move between phases. */
 let dragging: { id: string } | null = null
@@ -173,17 +173,17 @@ export default function PlanTree({
   async function addAt(target: Task | null, place: Place, kind: TaskKind, milestone = false) {
     const { sortOrders, parent, phaseId } = orderAt(target, place)
     const ph = phases.find((x) => x.id === phaseId) ?? phase
-    const k = (kind === 'sheet' || kind === 'section') && parent ? kindUnder(parent, kind === 'sheet' ? 'view' : 'task') : kindUnder(parent, kind)
+    const k = (kind === 'sheet' || kind === 'section') && parent ? kindUnder(parent, 'task') : kindUnder(parent, kind)
     const created = await onAdd({
       id: crypto.randomUUID(), project_id: projectId, phase_id: ph.id, parent_id: parent?.id ?? null, kind: k,
       title: '',
       sheet_number: null, sheet_type: k === 'sheet' ? 'other' : null,
       ...assignPatch(parent ? assigneesOf(parent) : []),
-      // Sheets span their phase; tasks, views and milestones start undated, to be placed on the timeline
+      // Sheets span their phase; tasks and milestones start undated, to be placed on the timeline
       // (or given dates with the date chip) where they belong, instead of landing somewhere arbitrary.
       start_date: k === 'sheet' || k === 'section' ? ph.start_date : null,
       due_date: k === 'sheet' || k === 'section' ? ph.end_date : null,
-      estimated_hours: null, effort: k === 'item' ? null : k === 'view' ? 1 : 2, status: 'todo',
+      estimated_hours: null, effort: k === 'item' ? null : 2, status: 'todo',
       is_milestone: milestone, client_visible: milestone, sort_order: sortOrders[0],
     })
     expand(parent?.id)
@@ -455,7 +455,7 @@ export default function PlanTree({
       <li key={t.id} {...rowProps(t, `trow k-${kind}${t.status === 'done' ? ' done' : ''}`, depth)}>
         {grip(t)}
         <button className={`twist${isOpen ? ' open' : ''}${kids.length ? '' : ' empty'}`} onClick={() => toggle(t.id)}
-          title={isOpen ? 'Collapse' : kids.length ? `Show ${kids.length} under it` : 'Add views, tasks or subtasks under it'}>
+          title={isOpen ? 'Collapse' : kids.length ? `Show ${kids.length} under it` : 'Add tasks or subtasks under it'}>
           <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <button className={`tick ${t.status}`} title={t.status === 'done' ? 'Mark not done' : 'Mark done'}
@@ -469,7 +469,6 @@ export default function PlanTree({
         {kind === 'section' && (
           <TextField value={t.sheet_number ?? null} placeholder="Section" className="sheet-no section-no mono" onSave={(v) => onPatch(t, { sheet_number: v }, false)} />
         )}
-        {kind === 'view' && <span className="kind-tag">View</span>}
         <div className="trow-title">{title(t, kind === 'sheet' || kind === 'section' ? 'sheet-title' : '')}</div>
         {t.notes && descFor !== t.id && <button className="has-desc" title={`${t.notes}\n\nClick to edit`} onClick={() => setDescFor(t.id)}>≡</button>}
         {kind === 'sheet' && (
@@ -523,7 +522,7 @@ export default function PlanTree({
           <button className="btn ghost" onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
             setMenu({ x: r.left, y: r.bottom + 2, target: t, only: 'add-inside' })
-          }}>+ Add under {kind === 'sheet' ? 'sheet' : kind === 'view' ? 'view' : kind === 'section' ? 'section' : 'task'}</button>
+          }}>+ Add under {kind === 'sheet' ? 'sheet' : kind === 'section' ? 'section' : 'task'}</button>
         </li>,
       ] : []),
     ]
@@ -625,7 +624,6 @@ export default function PlanTree({
       : k === 'item' || pk === 'task'
         ? [{ label: 'Subtask', run: () => addAt(t, place, 'item') }]
         : [
-            ...(pk === 'sheet' ? [{ label: 'View', run: () => addAt(t, place, 'view') }] : []),
             { label: 'Task', run: () => addAt(t, place, 'task') },
             { label: 'Subtask', run: () => addAt(t, place, 'item') },
           ]
@@ -639,8 +637,7 @@ export default function PlanTree({
   function insideItems(t: Task): MenuItem[] {
     const k = kindOf(t)
     return [
-      ...(k === 'sheet' ? [{ label: 'View', run: () => addAt(t, 'inside', 'view') }] : []),
-      ...(KIND_RANK[k] < 3 ? [{ label: 'Task', run: () => addAt(t, 'inside', 'task') }] : []),
+      ...(KIND_RANK[k] < 2 ? [{ label: 'Task', run: () => addAt(t, 'inside', 'task') }] : []),
       { label: 'Subtask', run: () => addAt(t, 'inside', 'item') },
       ...(readClip() ? ['sep' as const, { label: clip?.mode === 'cut' ? 'Move here' : 'Paste here', run: () => paste(t, 'inside') }] : []),
     ]
@@ -695,10 +692,9 @@ export default function PlanTree({
       ? [{ label: 'Add subtask below', run: () => addAt(t, 'after', 'item') }]
       : [
           ...(topLevel ? [{ label: 'Add sheet below', run: () => addAt(t, 'after', 'sheet') }, { label: 'Add spec section below', run: () => addAt(t, 'after', 'section') }] : []),
-          { label: `Add ${k === 'view' ? 'view' : 'task'} below`, run: () => addAt(t, 'after', k === 'view' ? 'view' : 'task') },
+          { label: 'Add task below', run: () => addAt(t, 'after', 'task') },
           ...(topLevel ? [{ label: 'Add milestone below', run: () => addAt(t, 'after', 'task', true) }] : []),
-          ...(k === 'sheet' ? [{ label: 'Add view inside', run: () => addAt(t, 'inside', 'view') }] : []),
-          ...(KIND_RANK[k] < 3 ? [{ label: 'Add task', run: () => addAt(t, 'inside', 'task') }] : []),
+          ...(KIND_RANK[k] < 2 ? [{ label: 'Add task', run: () => addAt(t, 'inside', 'task') }] : []),
           { label: 'Add subtask', run: () => addAt(t, 'inside', 'item') },
         ]
     return [
