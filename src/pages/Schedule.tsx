@@ -413,6 +413,7 @@ export default function Schedule() {
           </div>
           <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
             team={project.team ?? []}
+            sheetOf={(t) => { let cur: Task | undefined = real(t); for (let i = 0; cur && i < 12; i++) { if (cur.kind === 'sheet') return cur; cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined } return null }}
             teamBar={<><span className="team-label">Project team</span><ProjectTeam project={project} people={people.rows} compact onChange={(team) => void patchProject(project.id, { team })} /></>}
             onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
         </>

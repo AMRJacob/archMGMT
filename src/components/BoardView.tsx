@@ -24,8 +24,10 @@ const WEEK_COLS = 8
 interface Column { key: string; title: string; sub?: string; accent?: string; droppable: boolean; tasks: Task[]; current?: boolean }
 
 export default function BoardView({
-  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar,
+  group, phases, tasks, people, palette, onPatch, onOpenTask, onAdd, team, teamBar, sheetOf,
 }: {
+  /** The sheet a card belongs to (itself, or the sheet it sits under); null for a general task. */
+  sheetOf?: (t: Task) => Task | null
   /** The project team (person board columns); empty = everyone active on the Team list who has work here. */
   team?: string[]
   /** Shown above the person board: the project team with "+ Add team member". */
@@ -196,6 +198,13 @@ export default function BoardView({
                             {ph ? initialsOfPhase(ph.name) : '–'}
                           </span>
                         )
+                      })()}
+                      {note && sheetOf && (() => {
+                        // Which kind of work: a corner in the Overview's group colours (amber general, plum sheet).
+                        const sh = sheetOf(t)
+                        return <span className={`ct-kind ${sh ? 'sheet' : 'general'}`} title={sh ? `Sheet work${sh.sheet_number ? `: ${sh.sheet_number}` : ''} ${sh.title}` : 'General task'}>
+                          {sh && sh.id !== t.id ? (sh.sheet_number || 'Sheet') : ''}
+                        </span>
                       })()}
                       <div className="ct-title">
                         {t.is_milestone && <MilestoneMark task={t} />}
