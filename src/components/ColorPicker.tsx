@@ -3,16 +3,22 @@ import { decodeBrand, encodeBrand, projectAccent, projectPalette, ROOT_PRESETS, 
 import { useRows } from '../lib/data.ts'
 import type { BrandPalette } from '../lib/types.ts'
 
-/** Pick a project's root colour and scheme; previews the phase colours they build. */
-export default function ColorPicker({ value, scheme, phaseNames, onChange, onScheme }: {
+/**
+ * A project's colours, in two steps:
+ *  1. Base colour: any saved brand colour, a preset or a custom colour. Phase 1 uses it exactly.
+ *  2. Scheme: Balanced / Triad / Complementary build the other phases from the base, or "Brand colours" uses
+ *     brand colours you pick by hand, in order (from one palette or several).
+ * Both are saved together in one change (color + color_scheme).
+ */
+export default function ColorPicker({ value, scheme, phaseNames, onChange }: {
   value: string | null
   scheme: string | null
   phaseNames: string[]
-  onChange: (hex: string | null) => void
-  onScheme: (scheme: string) => void
+  onChange: (c: { color?: string | null; color_scheme?: string | null }) => void
 }) {
   const [open, setOpen] = useState(false)
   const brands = useRows<BrandPalette>('brand_palettes')
+  const palettes = [...brands.rows].sort((a, b) => a.name.localeCompare(b.name))
   const brand = decodeBrand(scheme)
   const box = useRef<HTMLDivElement>(null)
 
@@ -26,99 +32,119 @@ export default function ColorPicker({ value, scheme, phaseNames, onChange, onSch
   }, [open])
 
   const names = phaseNames.length ? phaseNames : ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5', 'Phase 6']
-  const current = scheme ?? 'balanced'
-  const accent = projectAccent(value).accent
-  // The brand colours this project uses, in order (empty when it uses a generated scheme).
-  const picked = brand?.colors ?? []
-  const applyColors = (colors: string[], name: string) => {
-    if (!colors.length) return
-    onChange(colors[0])
-    onScheme(encodeBrand(name, colors))
-  }
-  /** Name for a hand-picked set: the palette's name when every colour comes from one palette. */
-  const nameFor = (colors: string[], fallback: string) => {
-    const one = brands.rows.find((b) => colors.every((c) => b.colors.includes(c)))
-    return one?.name ?? (fallback || 'Brand colours')
-  }
-  const toggle = (c: string, from: string) => {
-    if (picked.includes(c)) {
-      const rest = picked.filter((x) => x !== c)
-      if (rest.length) applyColors(rest, nameFor(rest, brand?.name ?? from))
-      return
-    }
-    const next = brand ? [...picked, c] : [c]
-    applyColors(next, nameFor(next, 'Mixed brand colours'))
-  }
   const short = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()
+  const base = value ?? null
+  const accent = projectAccent(base ?? brand?.colors[0]).accent
+  const generated = brand ? null : (scheme ?? 'balanced')
+
+  /** The palette a colour belongs to (for naming a hand-picked set). */
+  const paletteWith = (cs: string[]) => palettes.find((p) => cs.every((c) => p.colors.includes(c)))
+  const brandScheme = (cs: string[]) => encodeBrand(paletteWith(cs)?.name ?? 'Brand colours', cs)
+
+  // ---- step 1: base ----
+  const setBase = (c: string | null) => {
+    // With brand colours as the scheme, the base leads the list (phase 1 is the base).
+    if (brand && c) {
+      const rest = brand.colors.filter((x) => x !== c)
+      onChange({ color: c, color_scheme: brandScheme([c, ...rest]) })
+    } else onChange({ color: c })
+  }
+
+  // ---- step 2: scheme ----
+  const pickGenerated = (id: string) => onChange({ color_scheme: id })
+  const pickBrand = () => {
+    if (brand) return
+    // Start from the base's palette, base first; otherwise just the base.
+    const from = base ? palettes.find((p) => p.colors.includes(base)) : palettes[0]
+    const list = from ? [...(base ? [base] : []), ...from.colors.filter((c) => c !== base)] : base ? [base] : []
+    if (list.length) onChange({ color: list[0], color_scheme: brandScheme(list) })
+  }
+  const toggleBrand = (c: string) => {
+    if (!brand) return
+    const list = brand.colors.includes(c) ? brand.colors.filter((x) => x !== c) : [...brand.colors, c]
+    if (!list.length) return
+    onChange({ color: list[0], color_scheme: brandScheme(list) })
+  }
+  const wholePalette = (p: BrandPalette) => onChange({ color: p.colors[0], color_scheme: encodeBrand(p.name, p.colors) })
+
+  const preview = (cs: string[]) => (
+    <span className="cp-preview">{cs.map((c, i) => <i key={i} style={{ background: c, color: textOn(c) }}>{short(names[i] ?? '')}</i>)}</span>
+  )
 
   return (
     <div className="color-pick" ref={box}>
       <button className="swatch-btn" title="Project colours" onClick={() => setOpen(!open)} style={{ background: accent }} aria-label="Project colours" />
       {open && (
-        <div className="color-pop">
-          {brands.rows.length > 0 && (
-            <>
-              <div className="cp-label">Brand palettes</div>
-              <div className="cp-brands">
-                {[...brands.rows].sort((a, b) => a.name.localeCompare(b.name)).map((b) => {
-                  const all = brand !== null && brand.colors.length === b.colors.length && b.colors.every((c, i) => brand.colors[i] === c)
-                  return (
-                    <div key={b.id} className={`cp-brand${all ? ' on' : ''}`} title={b.notes ?? b.name}>
-                      <button className="cp-brand-name" title={`Use all ${b.name} colours`} onClick={() => applyColors(b.colors, b.name)}>{b.name}</button>
-                      <span className="cp-brand-chips">
-                        {b.colors.map((c, i) => {
-                          const n = picked.indexOf(c)
-                          return (
-                            <button key={i} className={`cp-chip${n >= 0 ? ' on' : ''}`} style={{ background: c, color: textOn(c) }}
-                              title={n >= 0 ? `${c}: phase colour ${n + 1}. Click to leave it out.` : `${c}: click to add`}
-                              onClick={() => toggle(c, b.name)}>{n >= 0 ? n + 1 : ''}</button>
-                          )
-                        })}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-              {brand
-                ? <p className="cp-hint">Phases use {picked.length === 1 ? 'this colour' : `these ${picked.length} colours in the numbered order`}. Click palette names to use a whole palette, or single colours (from any palette) to pick your own set. Pick a scheme below to go back to generated colours.</p>
-                : <p className="cp-hint">Click a palette name to use all its colours, or click single colours, in the order you want them, to use just those.</p>}
-            </>
+        <div className="color-pop wide">
+          <div className="cp-step"><b>1</b> Base colour <span className="muted">phase 1 uses it exactly</span></div>
+          {palettes.length > 0 && (
+            <div className="cp-brands">
+              {palettes.map((p) => (
+                <div key={p.id} className="cp-brand-row">
+                  <span className="cp-brand-label" title={p.notes ?? p.name}>{p.name}</span>
+                  <span className="cp-brand-chips">
+                    {p.colors.map((c, i) => (
+                      <button key={i} className={`cp-chip${base?.toLowerCase() === c.toLowerCase() ? ' on' : ''}`} style={{ background: c }}
+                        title={`${c}: use as the base colour`} onClick={() => setBase(c)} />
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
-          <div className="cp-label">Root colour</div>
           <div className="cp-presets">
             {ROOT_PRESETS.map((c) => (
-              <button key={c.hex} title={c.name} className={value?.toLowerCase() === c.hex ? 'on' : ''}
-                style={{ background: c.hex }} onClick={() => onChange(c.hex)} />
+              <button key={c.hex} title={c.name} className={base?.toLowerCase() === c.hex ? 'on' : ''}
+                style={{ background: c.hex }} onClick={() => setBase(c.hex)} />
             ))}
           </div>
           <div className="cp-row">
             <label className="cp-custom">
-              <input type="color" value={value ?? '#6b8f71'} onChange={(e) => onChange(e.target.value)} />
+              <input type="color" value={base ?? '#6b8f71'} onChange={(e) => setBase(e.target.value)} />
               Custom…
             </label>
-            {value && <button className="btn ghost" onClick={() => onChange(null)}>Use default</button>}
+            {base && <span className="mono small muted">{base}</span>}
           </div>
 
-          {value && (
-            <>
-              <div className="cp-label">{brand ? 'Or a generated scheme' : 'Scheme'}</div>
-              <div className="cp-schemes">
-                {SCHEMES.map((s) => {
-                  const pal = projectPalette(value, names.length, s.id)
-                  return (
-                    <button key={s.id} className={`cp-scheme${current === s.id ? ' on' : ''}`} onClick={() => onScheme(s.id)} title={s.hint}>
-                      <span className="cp-scheme-name">{s.name}</span>
-                      <span className="cp-preview">
-                        {pal.map((c, i) => <i key={i} style={{ background: c, color: textOn(c) }}>{short(names[i])}</i>)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              {!brand && <p className="cp-hint">{SCHEMES.find((s) => s.id === current)?.hint} The first phase always uses the root colour.</p>}
-              {brands.rows.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Branding &amp; Printing to use them here.</p>}
-            </>
+          <div className="cp-step"><b>2</b> Colour scheme</div>
+          <div className="cp-schemes">
+            {SCHEMES.map((s) => (
+              <button key={s.id} className={`cp-scheme${generated === s.id ? ' on' : ''}`} onClick={() => pickGenerated(s.id)} title={s.hint} disabled={!base}>
+                <span className="cp-scheme-name">{s.name}</span>
+                {base && preview(projectPalette(base, names.length, s.id))}
+              </button>
+            ))}
+            {palettes.length > 0 && (
+              <button className={`cp-scheme${brand ? ' on' : ''}`} onClick={pickBrand}
+                title="Pick brand colours by hand, in the order the phases should use them">
+                <span className="cp-scheme-name">Brand colours{brand ? <span className="muted"> · {brand.name}</span> : ''}</span>
+                {brand ? preview(projectPalette(null, names.length, scheme)) : <span className="muted small">Choose which brand colours, in order</span>}
+              </button>
+            )}
+          </div>
+          {!base && !brand && <p className="cp-hint">Pick a base colour first.</p>}
+          {generated && base && <p className="cp-hint">{SCHEMES.find((s) => s.id === generated)?.hint}</p>}
+
+          {brand && (
+            <div className="cp-brand-pick">
+              <p className="cp-hint">Click brand colours in the order the phases should use them (numbers show the order; click a numbered one to take it out). Phase 1 is also the base colour.</p>
+              {palettes.map((p) => (
+                <div key={p.id} className="cp-brand-row">
+                  <button className="cp-brand-name" title={`Use all ${p.name} colours, in the palette's order`} onClick={() => wholePalette(p)}>{p.name}</button>
+                  <span className="cp-brand-chips">
+                    {p.colors.map((c, i) => {
+                      const n = brand.colors.indexOf(c)
+                      return (
+                        <button key={i} className={`cp-chip${n >= 0 ? ' on' : ''}`} style={{ background: c, color: textOn(c) }}
+                          title={n >= 0 ? `${c}: phase ${n + 1}. Click to take it out.` : `${c}: click to add`} onClick={() => toggleBrand(c)}>{n >= 0 ? n + 1 : ''}</button>
+                      )
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
+          {palettes.length === 0 && <p className="cp-hint">Save a client’s brand colours in Settings → Branding &amp; Printing to use them here.</p>}
         </div>
       )}
     </div>

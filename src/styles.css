@@ -1317,3 +1317,13 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .note-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .note-tools { display: inline-flex; gap: 4px; }
 .note-tools .btn { font-size: 12.5px; padding: 3px 9px; }
+
+/* Project colour picker: 1 base colour, 2 scheme. */
+.color-pop.wide { width: 360px; max-height: 78vh; overflow: auto; }
+.cp-step { font-size: 12px; font-weight: 600; display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+.cp-step b { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--panel); font-size: 11px; align-items: center; justify-content: center; }
+.cp-step .muted { font-weight: 400; font-size: 11.5px; }
+.cp-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.cp-brand-label { font-size: 12.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-brand-pick { border-top: 1px dashed var(--line); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.cp-scheme:disabled { opacity: .5; cursor: default; }

@@ -640,7 +640,7 @@ export default function ScheduleChart({
           </g>
         ))}
         <text x={W - 2 * M} y={1} textAnchor="end">
-          {pres ? 'Schedule is preliminary and subject to change.' : 'Working schedule. Initials show who is assigned.'}
+          {pres ? '' : 'Working schedule. Initials show who is assigned.'}
         </text>
       </g>
     </svg>

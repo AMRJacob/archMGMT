@@ -132,7 +132,7 @@ export function projectPalette(root: string | null | undefined, n: number, schem
   const C = clamp(base.c, 0.06, 0.1)
   return hueOffsets(id, count).map(({ dh, depth }, i) =>
     i === 0
-      ? oklchToHex({ l: clamp(base.l, 0.45, 0.72), c: clamp(base.c, 0.04, 0.13), h: base.h }) // the root itself
+      ? root.toLowerCase() // the base colour itself, exactly as chosen (a brand colour stays true)
       : oklchToHex({ l: L + (depth ? -0.07 : 0.02) + yellowLift(base.h + dh), c: C * (depth ? 0.95 : 1), h: base.h + dh }),
   )
 }

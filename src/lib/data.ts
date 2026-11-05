@@ -394,19 +394,32 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
     return () => { clearTimeout(wait.t); void supabase!.removeChannel(channel) }
   }, [table, key, reload])
 
+  // Saves to the same row go one after another: each starts from the version the last one produced, so two
+  // quick edits (e.g. a colour and its scheme) can't trip the "someone else changed this" check on each other.
+  const queue = useRef(new Map<string, Promise<void>>())
+  const savedAt = useRef(new Map<string, string>())
+
   /** Update one row on screen immediately, then save it (unless someone else changed it first). */
   const patch = useCallback(
-    async (id: string, changes: Partial<T>) => {
-      const seen = GUARDED.has(table) ? (rowsRef.current.find((r) => r.id === id) as { updated_at?: string } | undefined)?.updated_at : undefined
+    (id: string, changes: Partial<T>) => {
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...changes } : r)))
-      try {
-        const at = await update<T>(table, id, changes, seen)
-        if (at) setRows((rs) => rs.map((r) => (r.id === id ? { ...r, updated_at: at } : r)))
-      } catch (e) {
-        if (e instanceof StaleError) notify(`${nameOf(e.by)} changed this just before you, so your edit wasn't saved. You're now seeing their version.`, 'warn')
-        else setError(e instanceof Error ? e.message : String(e))
-        void reload()
-      }
+      const job = (queue.current.get(id) ?? Promise.resolve()).then(async () => {
+        // The newest version we know of: our own last save, or what's on screen (which may have been reloaded since).
+        const onScreen = (rowsRef.current.find((r) => r.id === id) as { updated_at?: string } | undefined)?.updated_at
+        const mine = savedAt.current.get(id)
+        const seen = GUARDED.has(table) ? ([mine, onScreen].filter(Boolean).sort().pop() as string | undefined) : undefined
+        try {
+          const at = await update<T>(table, id, changes, seen)
+          if (at) { savedAt.current.set(id, at); setRows((rs) => rs.map((r) => (r.id === id ? { ...r, updated_at: at } : r))) }
+        } catch (e) {
+          savedAt.current.delete(id)
+          if (e instanceof StaleError) notify(`${nameOf(e.by)} changed this just before you, so your edit wasn't saved. You're now seeing their version.`, 'warn')
+          else setError(e instanceof Error ? e.message : String(e))
+          void reload()
+        }
+      })
+      queue.current.set(id, job)
+      return job
     },
     [table, reload],
   )
