@@ -235,7 +235,6 @@ export default function BoardView({
                     </div>
                   )
                 }
-                  if (!sheetOf) return col.tasks.map(card)
                   // Cards gather in two zones on the column itself, general tasks then sheet work, and within a zone
                   // they clump by phase (a small phase label over each clump; not needed when columns are phases).
                   const byPhase = (list: Task[]) => {
@@ -259,8 +258,11 @@ export default function BoardView({
                       }
                       out.push(card(t, i))
                     })
+                    // Filtered to one kind (no sheetOf): no zone box, just the phase clumps.
+                    if (!sheetOf) return <div className="nz-cards plain">{out}</div>
                     return <div className={`note-zone ${kind}`}><span className="nz-label">{label}</span><div className="nz-cards">{out}</div></div>
                   }
+                  if (!sheetOf) return zone('general', '', col.tasks)
                   return (
                     <>
                       {zone('general', 'General', col.tasks.filter((t) => !sheetOf(t)))}

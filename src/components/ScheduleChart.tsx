@@ -66,8 +66,10 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
-  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase,
+  onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true,
 }: {
+  /** Working view: General Tasks / Sheets zones (off when the view is filtered to one of them). */
+  zones?: boolean
   /** Presentation setup (working view): grey out what the presentation won't show; a click adds or removes it. */
   setup?: boolean
   onTogglePresented?: (t: Task) => void
@@ -138,7 +140,7 @@ export default function ScheduleChart({
     const list = tasks
       .filter((t) => t.phase_id === phase.id && (!pres || presented(t)))
       .sort(keepOrder ? () => 0 : byStart)
-    if (pres) list.forEach((task) => rows.push({ kind: 'task', task, color }))
+    if (pres || !zones) list.forEach((task) => rows.push({ kind: 'task', task, color }))
     else {
       // Working view: like the Overview, general tasks first and sheet work after, each in its own zone. Branches stay
       // together (everything under a sheet is sheet work), and each keeps its order.

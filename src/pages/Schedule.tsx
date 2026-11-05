@@ -379,6 +379,7 @@ export default function Schedule() {
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask}
               setup={mode === 'working' && setup === 'on'}
+              zones={!workApplies || work === 'all'}
               onTogglePresented={(t) => togglePres(t as ShownTask)}
               onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}
               onReorder={(t, target, at) => { const c = moveTo(tree, real(t), real(target), at, target.phase_id); if (c.length) plan.patchMany(c) }}
@@ -425,7 +426,7 @@ export default function Schedule() {
           <BoardView group={group} phases={phases.rows} tasks={frontierRows} people={people.rows} palette={palette}
             team={project.team ?? []}
             onTeam={(team) => void patchProject(project.id, { team })}
-            sheetOf={(t) => { let cur: Task | undefined = real(t); for (let i = 0; cur && i < 12; i++) { if (cur.kind === 'sheet') return cur; cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined } return null }}
+            sheetOf={workApplies && work !== 'all' ? undefined : (t) => { let cur: Task | undefined = real(t); for (let i = 0; cur && i < 12; i++) { if (cur.kind === 'sheet') return cur; cur = cur.parent_id ? tree.byId.get(cur.parent_id) : undefined } return null }}
             teamBar={<><span className="team-label">Project team</span><ProjectTeam project={project} people={people.rows} compact onChange={(team) => void patchProject(project.id, { team })} /></>}
             onPatch={(t, c) => patchShown(t as ShownTask, c)} onOpenTask={openTask} onAdd={addTask} />
         </>
