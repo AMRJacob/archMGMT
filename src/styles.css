@@ -1279,3 +1279,9 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .wish-form > select.wish-pri { grid-column: 1; grid-row: 2; justify-self: start; }
 /* Every phase running today is marked current. */
 .phase-sec.now { box-shadow: inset 3px 0 0 var(--p-accent, var(--accent)); }
+/* Milestone type chip (in the size column for milestones). */
+.ms-chip { display: inline-flex; align-items: center; gap: 2px; padding-right: 9px; background: color-mix(in srgb, var(--mc) 12%, var(--panel)); color: color-mix(in srgb, var(--mc) 75%, var(--ink)); font-weight: 600; }
+.ms-chip .diamond { width: 8px; height: 8px; margin: 0 5px 0 3px; }
+.ms-chip.unset { background: none; border: 1px dashed var(--line-strong); color: var(--muted); font-weight: 500; }
+.qp-head .diamond { margin-left: 2px; }
+.ms-chip.compact { padding: 2px 6px 2px 2px; }

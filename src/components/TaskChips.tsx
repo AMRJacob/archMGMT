@@ -226,6 +226,30 @@ export function MilestoneMark({ task, onPatch }: { task: Task; onPatch?: (c: Par
   )
 }
 
+/** A milestone's type as a chip (diamond in the type's colour + its name); click to pick or change it. */
+export function MilestoneTypeChip({ task, onPatch, compact = false }: { task: Task; onPatch: (c: Partial<Task>) => void; compact?: boolean }) {
+  const mt = milestoneType(task.milestone_type)
+  return (
+    <Pop className="ms-pop" title={mt ? `${mt.label} milestone: change type` : 'Pick the milestone type'}
+      label={<span className={`chip ms-chip${mt ? '' : ' unset'}${compact ? ' compact' : ''}`} style={mt ? { '--mc': mt.color } as CSSProperties : undefined}>
+        <span className="diamond" style={{ background: mt ? mt.color : 'var(--faint)' }} />{compact ? (mt ? '' : '?') : mt ? mt.label : 'Type…'}
+      </span>}>
+      {(close) => (
+        <>
+          <div className="pm-label">Milestone type</div>
+          {MILESTONE_TYPES.map((m) => (
+            <button key={m.value} className={`pm-item${task.milestone_type === m.value ? ' on' : ''}`} onClick={() => { onPatch({ milestone_type: m.value }); close() }}>
+              <span className="diamond" style={{ background: m.color }} />
+              <span>{m.label}<span className="pm-hint">{m.hint}</span></span>
+            </button>
+          ))}
+          {mt && <><div className="pm-sep" /><button className="pm-item muted" onClick={() => { onPatch({ milestone_type: null }); close() }}>No type</button></>}
+        </>
+      )}
+    </Pop>
+  )
+}
+
 /** The full set of chips for one task, in reading order. `columnar` lays them out in the Overview's columns. */
 export function TaskControls({ task, people, phases, onPatch, onDelete, isParent = false, columnar = false }: {
   task: Task; people: Person[]; phases: Phase[]; onPatch: (c: Partial<Task>) => void; onDelete: () => void
@@ -236,7 +260,8 @@ export function TaskControls({ task, people, phases, onPatch, onDelete, isParent
   const layout = useRowLayout()
   const chip = (k: RowColumn) => {
     if (k === 'status') return <StatusChip task={task} onPatch={onPatch} />
-    if (k === 'size') return isParent ? <span className="chip-spacer" /> : <SizeChip task={task} onPatch={onPatch} />
+    // Milestones have no size; their slot holds the milestone type instead.
+    if (k === 'size') return task.is_milestone ? <MilestoneTypeChip task={task} onPatch={onPatch} compact={columnar} /> : isParent ? <span className="chip-spacer" /> : <SizeChip task={task} onPatch={onPatch} />
     if (k === 'dates') return <DateChip task={task} onPatch={onPatch} locked={isParent} />
     return <AssigneeChip task={task} people={people} onPatch={onPatch} />
   }

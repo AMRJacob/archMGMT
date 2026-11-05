@@ -1,7 +1,8 @@
 import { useLockedBy } from '../lib/live.ts'
 import { useEffect, useRef } from 'react'
 import { TextField } from './fields.tsx'
-import { TaskControls } from './TaskChips.tsx'
+import { MilestoneMark, TaskControls } from './TaskChips.tsx'
+import { milestoneType } from '../lib/milestones.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 
 /**
@@ -41,12 +42,12 @@ export default function TaskEditor({
     <div className={`quick-panel${lockedBy ? ' locked' : ''}`} ref={box} role="dialog" aria-label="Task" data-lock={lockedBy ? undefined : task.id} tabIndex={-1}>
       {lockedBy && <p className="lock-banner">{lockedBy} is editing this. It opens for editing when they're done.</p>}
       <div className="qp-head">
-        {task.is_milestone && <span className="diamond" title="Milestone" />}
+        {task.is_milestone && <MilestoneMark task={task} onPatch={onPatch} />}
         <TextField value={task.title} className="qp-title" autoFocus={isNew} onSave={(v) => v && onPatch({ title: v })}
           onEscape={isNew ? () => { onDelete(); onClose() } : undefined} />
         <button className="icon-btn close" title="Close (Esc)" onClick={onClose}>×</button>
       </div>
-      <div className="qp-sub muted small">{phase?.name ?? 'No phase'}{task.is_milestone ? ' · Milestone' : ''}</div>
+      <div className="qp-sub muted small">{phase?.name ?? 'No phase'}{task.is_milestone ? ` · ${milestoneType(task.milestone_type)?.label ?? 'Untyped'} milestone` : ''}</div>
       <TaskControls task={task} people={people} phases={phases} onPatch={onPatch} onDelete={() => { onDelete(); onClose() }} />
     </div>
   )
