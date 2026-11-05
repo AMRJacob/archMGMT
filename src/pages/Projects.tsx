@@ -132,13 +132,13 @@ export default function Projects() {
     const tree = buildTree(tasks.rows)
     return projects.projects.map((p) => {
       const ph = phases.rows.filter((x) => x.project_id === p.id)
-      const current = ph.find((x) => x.start_date <= today && today <= x.end_date)
+      const current = ph.filter((x) => x.start_date <= today && today <= x.end_date) // overlapping phases can both be current
       const ts = tasks.rows.filter((t) => t.project_id === p.id && !t.is_milestone && isWorkLeaf(tree, t))
       return {
         project: p,
         start: minDate(ph.map((x) => x.start_date)),
         end: maxDate(ph.map((x) => x.end_date)),
-        currentPhase: current?.name ?? null,
+        currentPhase: current.length ? current.map((x) => x.name).join(' + ') : null,
         pm: people.rows.find((x) => x.id === p.pm_id)?.name ?? null,
         open: ts.filter((t) => t.status !== 'done').length,
         total: ts.length,

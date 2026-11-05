@@ -49,7 +49,9 @@ export default function ProjectDetail() {
     [phases.rows],
   )
   const t = today()
-  const currentPhase = sortedPhases.find((p) => p.start_date <= t && t <= p.end_date)
+  // Phases can overlap (e.g. a grant process beside design): every phase running today is current.
+  const currentPhases = sortedPhases.filter((p) => p.start_date <= t && t <= p.end_date)
+  const currentIds = new Set(currentPhases.map((p) => p.id))
     ?? sortedPhases.find((p) => p.start_date > t) ?? sortedPhases[sortedPhases.length - 1]
 
   // ?find=<task id> (from search): open its phase, scroll to it, flash it.
@@ -57,7 +59,7 @@ export default function ProjectDetail() {
   // Which phases are expanded: the current one by default, reset when switching projects.
   if (openFor !== id) { setOpenFor(id); setOpenIds(null) }
   const findPhase = findId ? tasks.rows.find((x) => x.id === findId)?.phase_id : null
-  const open = new Set([...(openIds ?? (currentPhase ? [currentPhase.id] : [])), ...(findPhase ? [findPhase] : [])])
+  const open = new Set([...(openIds ?? currentPhases.map((p) => p.id)), ...(findPhase ? [findPhase] : [])])
   useEffect(() => {
     if (!findId) return
     const t = tasks.rows.find((x) => x.id === findId)
@@ -267,7 +269,7 @@ export default function ProjectDetail() {
               const left = (daysBetween(start!, p.start_date) / span) * 100
               const width = ((daysBetween(p.start_date, p.end_date) + 1) / span) * 100
               return (
-                <button key={p.id} className={`strip-seg${p.id === currentPhase?.id ? ' now' : ''}${p.end_date < t ? ' past' : ''}`}
+                <button key={p.id} className={`strip-seg${currentIds.has(p.id) ? ' now' : ''}${p.end_date < t ? ' past' : ''}`}
                   style={{ left: `calc(${left}% + 1px)`, width: `calc(${width}% - 2px)`, top: (stripLanes.lane.get(p.id) ?? 0) * 34, background: phaseColor(i), color: textOn(phaseColor(i)) }}
                   title={`${p.name}: ${shortDate(p.start_date)} – ${shortDate(p.end_date)}`}
                   onClick={() => { setOpenIds(new Set([...open, p.id])); document.getElementById(`phase-${p.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>
@@ -278,7 +280,7 @@ export default function ProjectDetail() {
             {t >= start! && end && t <= end && <i className="strip-today" title={`Today, ${formatDate(t)}`} style={{ left: `${((daysBetween(start!, t) + 0.5) / span) * 100}%` }} />}
           </div>
           <div className="strip-foot muted small">
-            <span>{currentPhase ? <>Now in <strong>{currentPhase.name}</strong>, through {formatDate(currentPhase.end_date)}</> : ''}</span>
+            <span>{currentPhases.length ? <>Now in {currentPhases.map((c, i) => <span key={c.id}>{i ? (i === currentPhases.length - 1 ? ' and ' : ', ') : ''}<strong>{c.name}</strong>{currentPhases.length > 1 ? ` (through ${shortDate(c.end_date)})` : `, through ${formatDate(c.end_date)}`}</span>)}</> : ''}</span>
             {nextMilestone && <span>Next milestone: <strong>{nextMilestone.title}</strong>, {formatDate(nextMilestone.due_date)}</span>}
           </div>
         </div>
@@ -292,10 +294,10 @@ export default function ProjectDetail() {
           const done = leaves.filter((x) => x.status === 'done').length
           const openCount = leaves.length - done
           const isOpen = open.has(p.id)
-          const isNow = p.id === currentPhase?.id && p.start_date <= t
+          const isNow = currentIds.has(p.id)
           return (
             <div key={p.id} id={`phase-${p.id}`}
-              className={`phase-sec${isOpen ? ' open' : ''}${p.end_date < t ? ' past' : ''}${dragPhase === p.id ? ' dragging' : ''}${dropPhase?.id === p.id ? ` drop-${dropPhase.side}` : ''}`}
+              className={`phase-sec${isOpen ? ' open' : ''}${isNow ? ' now' : ''}${p.end_date < t ? ' past' : ''}${dragPhase === p.id ? ' dragging' : ''}${dropPhase?.id === p.id ? ` drop-${dropPhase.side}` : ''}`}
               onDragOver={(e) => {
                 if (!dragPhase || dragPhase === p.id) return
                 e.preventDefault()

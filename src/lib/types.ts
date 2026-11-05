@@ -194,6 +194,14 @@ export const WISH_STATUSES: { value: WishStatus; label: string; closed: boolean 
   { value: 'duplicate', label: 'Duplicate – closed', closed: true },
 ]
 
+/** Wishlist priorities, green to red. */
+export const WISH_PRIORITIES: { value: number; label: string; color: string }[] = [
+  { value: 1, label: 'Low', color: '#3f9a5b' },
+  { value: 2, label: 'Normal', color: '#a3a838' },
+  { value: 3, label: 'High', color: '#df8a2c' },
+  { value: 4, label: 'Urgent', color: '#d2453b' },
+]
+
 /** A wish or error report from Settings → Wishlist & Errors. (Errors are stored with kind 'problem'.) */
 export interface WishItem {
   id: string
@@ -204,6 +212,8 @@ export interface WishItem {
   response: string | null
   submitted_by: string | null
   sort_order: number
+  /** 1 low · 2 normal · 3 high · 4 urgent (null: not set). */
+  priority?: number | null
   created_at?: string
   updated_at?: string
 }

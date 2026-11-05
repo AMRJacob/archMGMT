@@ -651,6 +651,23 @@ h1, h2, .brand .mgmt { font-family: var(--font-display); }
 .theme-tile[data-preview='blueprint'] strong { font-family: 'Architects Daughter', cursive; text-transform: uppercase; letter-spacing: 0.08em; }
 .theme-tile[data-preview='cyberpunk'] strong { font-family: 'Chakra Petch', sans-serif; text-transform: uppercase; letter-spacing: 0.12em; }
 
+/* Zen: low contrast and calm. Soft ink on stone paper, a sage accent, quiet lines, a little more room. */
+:root[data-theme='zen'] {
+  --ink: #3a3f42; --muted: #80868a; --line: #e8e6e0; --line-strong: #dad7cf; --paper: #f3f2ee; --panel: #fbfbf9; --hover: #eeede8;
+  --accent: #5f8a7d; --accent-strong: #4d7468; --accent-soft: #e3ece8; --on-accent: #fff; --sidebar: #3d4743;
+  --ok: #5f8a6a; --warn: #b08a4a; --info: #6d88a0; --danger: #b0645a;
+  --subtle: #f8f7f4; --line-soft: #f0efea; --chip: #ecebe6; --col: #efeee9; --col-soft: #f4f3ef; --faint: #bdbab3;
+  --ok-soft: #e6eee8; --info-soft: #e6ecf1; --warn-soft: #f2ece0; --danger-soft: #f5e8e5; --danger-line: #e8cdc8;
+  --heat-1: #e7eee9; --heat-2: #bcd3c6; --heat-3: #e6d3a6; --heat-4: #dcaea2; --heat-ink: rgba(58, 63, 66, 0.7);
+  --side-ink: #d6dcd8; --side-muted: #a9b4af; --side-faint: #8e9a95; --side-strong: #f4f6f4;
+  font-size: 14.5px; line-height: 1.55;
+}
+[data-theme='zen'] .card { border-color: var(--line-soft); border-radius: 12px; box-shadow: 0 1px 2px rgba(58, 63, 66, 0.04); }
+[data-theme='zen'] h1 { font-weight: 600; letter-spacing: -0.005em; }
+[data-theme='zen'] h2 { font-weight: 600; }
+[data-theme='zen'] .btn { border-radius: 8px; }
+[data-theme='zen'] .brand .mgmt { color: #a9c7bc; }
+
 /* Mid-century: cream stock, deep teal, tangerine and mustard, geometric type, flat offset shadows. */
 :root[data-theme='midcentury'] {
   --ink: #2b2520; --muted: #7a6c5d; --line: #e3d6bd; --line-strong: #cdbb9a; --paper: #f2e8d5; --panel: #fbf6ea; --hover: #efe4cd;
@@ -1256,3 +1273,9 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 .tgroup-head:hover { color: var(--muted); }
 .tgroup-head .caret { display: inline-block; width: 10px; margin-left: -16px; font-size: 9px; transition: transform .15s; }
 .tgroup-head.folded .caret { transform: rotate(-90deg); }
+.wish-pri { font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 2px 8px; width: auto; flex: none;
+  background: color-mix(in srgb, var(--pc, #999) 16%, var(--panel)); color: color-mix(in srgb, var(--pc, #999) 80%, var(--ink)); border: 1px solid color-mix(in srgb, var(--pc, #999) 35%, var(--panel)); }
+select.wish-pri.unset { background: var(--chip); color: var(--faint); border-color: var(--line); font-weight: 500; }
+.wish-form > select.wish-pri { grid-column: 1; grid-row: 2; justify-self: start; }
+/* Every phase running today is marked current. */
+.phase-sec.now { box-shadow: inset 3px 0 0 var(--p-accent, var(--accent)); }

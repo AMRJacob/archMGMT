@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { TextField } from './fields.tsx'
 import { useAuth } from '../auth/authContext.ts'
 import { useRows } from '../lib/data.ts'
 import { formatDate } from '../lib/dates.ts'
 import { supabase } from '../lib/supabase.ts'
-import { WISH_STATUSES, type WishItem, type WishStatus } from '../lib/types.ts'
+import { WISH_PRIORITIES, WISH_STATUSES, type WishItem, type WishStatus } from '../lib/types.ts'
 
 /**
  * Settings → Wishlist & Errors: anyone can ask for something or report an error; admins set the status and reply.
@@ -18,6 +18,7 @@ export default function Wishlist() {
   const [kind, setKind] = useState<WishItem['kind']>('wish')
   const [title, setTitle] = useState('')
   const [details, setDetails] = useState('')
+  const [priority, setPriority] = useState(2)
   const [showClosed, setShowClosed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replying, setReplying] = useState<string | null>(null) // item whose empty reply box is open
@@ -37,10 +38,10 @@ export default function Wishlist() {
     setError(null)
     try {
       await items.add({
-        kind, title: title.trim(), details: details.trim() || null, status: 'new', submitted_by: me,
+        kind, title: title.trim(), details: details.trim() || null, status: 'new', submitted_by: me, priority,
         sort_order: items.rows.reduce((m, x) => Math.max(m, x.sort_order), 0) + 1,
       })
-      setTitle(''); setDetails('')
+      setTitle(''); setDetails(''); setPriority(2)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
   }
   const patch = (x: WishItem, c: Partial<WishItem>) => void items.patch(x.id, { ...c, updated_at: new Date().toISOString() })
@@ -51,6 +52,7 @@ export default function Wishlist() {
       <li key={x.id} className={`wish ${x.status}`}>
         <div className="wish-head">
           <span className={`wish-kind ${x.kind}`}>{x.kind === 'problem' ? 'Error' : 'Wish'}</span>
+          <PriorityPick value={x.priority ?? null} disabled={!canEdit} onChange={(v) => patch(x, { priority: v })} />
           {canEdit
             ? <TextField value={x.title} className="wish-title" onSave={(v) => v && patch(x, { title: v })} />
             : <strong className="wish-title">{x.title}</strong>}
@@ -91,6 +93,7 @@ export default function Wishlist() {
           <button role="radio" aria-checked={kind === 'wish'} className={kind === 'wish' ? 'on' : ''} onClick={() => setKind('wish')}>Wish</button>
           <button role="radio" aria-checked={kind === 'problem'} className={kind === 'problem' ? 'on' : ''} onClick={() => setKind('problem')}>Error</button>
         </div>
+        <PriorityPick value={priority} onChange={(v) => setPriority(v ?? 2)} labelled />
         <input className="field boxed" placeholder={kind === 'wish' ? 'What would you like it to do?' : 'What went wrong?'} value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea className="field boxed" rows={2} placeholder={kind === 'wish' ? 'Details (optional)' : 'What you were doing and what happened (optional)'} value={details} onChange={(e) => setDetails(e.target.value)} />
         <button className="btn primary" disabled={!title.trim()} onClick={() => void submit()}>Add</button>
@@ -105,5 +108,21 @@ export default function Wishlist() {
         </>
       )}
     </div>
+  )
+}
+
+/** Priority as a coloured pill (green → red); a dropdown for whoever may edit the item. */
+function PriorityPick({ value, onChange, disabled = false, labelled = false }: {
+  value: number | null; onChange: (v: number | null) => void; disabled?: boolean; labelled?: boolean
+}) {
+  const p = WISH_PRIORITIES.find((x) => x.value === value)
+  const style = p ? { '--pc': p.color } as CSSProperties : undefined
+  if (disabled) return p ? <span className="wish-pri" style={style}>{p.label}</span> : null
+  return (
+    <select className={`field wish-pri${p ? '' : ' unset'}`} style={style} value={value ?? ''} title="Priority"
+      aria-label="Priority" onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+      {!labelled && <option value="">Priority…</option>}
+      {WISH_PRIORITIES.map((x) => <option key={x.value} value={x.value}>{labelled ? `${x.label} priority` : x.label}</option>)}
+    </select>
   )
 }

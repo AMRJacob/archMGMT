@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 /** Looks for the app. The choice is saved per browser; it never touches project data. */
-export type ThemeId = 'studio' | 'midcentury' | 'blueprint' | 'cyberpunk'
+export type ThemeId = 'studio' | 'zen' | 'midcentury' | 'blueprint' | 'cyberpunk'
 
 export interface ThemeInfo {
   id: ThemeId
@@ -13,6 +13,7 @@ export interface ThemeInfo {
 
 export const THEMES: ThemeInfo[] = [
   { id: 'studio', name: 'Studio', blurb: 'The original: warm paper, slate sidebar, terracotta accent.', swatch: ['#1f2a2e', '#f7f6f2', '#b5502d', '#2f6690', '#2f7d5b'] },
+  { id: 'zen', name: 'Zen', blurb: 'Soft and quiet: low contrast, sage and stone, roomy and easy on the eyes.', swatch: ['#3d4743', '#f3f2ee', '#5f8a7d', '#b9a68a', '#8fa3b5'] },
   { id: 'midcentury', name: 'Mid-century', blurb: 'Cream stock, teal, mustard and tangerine, geometric type.', swatch: ['#1e4a4f', '#f2e8d5', '#d9572b', '#e3a72f', '#3f8f88'] },
   { id: 'blueprint', name: 'Blueprint', blurb: 'Cyanotype blue with drafting-grid lines and hand lettering.', swatch: ['#0f2a4a', '#e9f0f7', '#1f6fd1', '#f2c14e', '#5aa9e6'] },
   { id: 'cyberpunk', name: 'Cyberpunk', blurb: 'Night mode in neon: magenta, cyan and acid yellow.', swatch: ['#06070d', '#0c0e1a', '#ff2e88', '#00e5ff', '#e8ff3a'] },
@@ -73,6 +74,10 @@ export const STUDIO_CHART: ChartColors = {
 
 const CHART: Record<ThemeId, ChartColors> = {
   studio: STUDIO_CHART,
+  zen: {
+    bg: '#fbfbf9', band: '#f3f2ee', ink: '#3a3f42', muted: '#80868a', line: '#e8e6e0',
+    lineStrong: '#dad7cf', lineFaint: '#f1f0eb', faint: '#bdbab3', accent: '#5f8a7d', onAccent: '#ffffff', font: BASE_FONT,
+  },
   midcentury: {
     bg: '#fbf6ea', band: '#f2e8d5', ink: '#2b2520', muted: '#7a6c5d', line: '#e6dac3',
     lineStrong: '#d4c4a6', lineFaint: '#eee4d0', faint: '#bfae92', accent: '#d9572b', onAccent: '#ffffff', font: "Jost, 'Futura', " + BASE_FONT,
