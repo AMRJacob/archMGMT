@@ -1354,7 +1354,7 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 .phase-sec.open { background: var(--col-soft); border-color: color-mix(in srgb, var(--pc, var(--line)) 45%, var(--line)); }
 .phase-sec.open .phase-body { border-top: none; }
 .phase-sec.open .tlist { padding: 0 0 10px; }
-.tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 6px; border-radius: 8px 0 0 8px;
+.tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 14px; /* bottom gap = the 14px left gap */ border-radius: 8px 0 0 8px;
   background: color-mix(in srgb, var(--zc) 8%, var(--panel)); box-shadow: -1px 1px 3px rgba(0, 0, 0, 0.05); }
 .tgroup-list { list-style: none; margin: 0; padding: 0; }
 .tgroup.g-tasks { --zc: var(--kind-general); }
