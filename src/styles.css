@@ -1273,8 +1273,6 @@ body.resizing-page { cursor: col-resize; user-select: none; }
 select.wish-pri.unset { background: var(--chip); color: var(--faint); border-color: var(--line); font-weight: 500; }
 .wish-form > select.wish-pri { grid-column: 1; grid-row: 2; justify-self: start; }
 /* Every phase running today is marked current. */
-.phase-sec { border-left: 3px solid var(--line-strong); }
-.phase-sec.now { border-left-color: var(--p-accent, var(--accent)); }
 /* Milestone type chip (in the size column for milestones). */
 .ms-chip { display: inline-flex; align-items: center; gap: 2px; padding-right: 9px; background: color-mix(in srgb, var(--mc) 12%, var(--panel)); color: color-mix(in srgb, var(--mc) 75%, var(--ink)); font-weight: 600; }
 .ms-chip .diamond { width: 8px; height: 8px; margin: 0 5px 0 3px; }
@@ -1352,7 +1350,10 @@ select.wish-pri.unset { background: var(--chip); color: var(--faint); border-col
 /* Overview as stacked paper: the phase is the base sheet (a faint wash of its own colour); General Tasks and
    Sheets each sit on a sheet set a little to the right (faint amber / plum); the rows sit on plain sheets nudged
    right again; and anything under a row steps in further, showing a sliver of the level behind it. */
-.phase-sec.open { background: var(--col-soft); }
+.phase-sec { border-left: none; background: color-mix(in srgb, var(--pc, var(--line)) 6%, var(--panel)); }
+.phase-sec.past:not(.open) { background: color-mix(in srgb, var(--pc, var(--line)) 4%, var(--subtle)); }
+/* An open phase: a very light wash of its own colour over the theme's soft background. */
+.phase-sec.open { background: color-mix(in srgb, var(--pc, var(--line)) 8%, var(--col-soft)); }
 .phase-sec.open .phase-body { border-top: none; }
 .phase-sec.open .tlist { padding: 0 0 10px; }
 .tgroup { list-style: none; position: relative; margin: 4px 0 8px 14px; padding: 2px 0 6px; border-radius: 8px 0 0 8px;
