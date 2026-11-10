@@ -130,7 +130,10 @@ export default function PhoneTimeline({ phases, rows, people, colorOf, onOpen }:
     return (
       <>
         {milestone ? <i className="ptl-dia" style={{ left: l }} /> : <i className={`ptl-bar ${cls}${a < D0 ? ' cut-l' : ''}`} style={{ left: l, width: r - l }} />}
-        <span className="ptl-when" style={{ left: r + (milestone ? 10 : 6) }}>{range(s, e)}</span>
+        {/* Near the far edge the dates go before the bar, so nothing runs past the end. */}
+        {r + 84 > W
+          ? <span className="ptl-when" style={{ right: W - l + (milestone ? 10 : 6) }}>{range(s, e)}</span>
+          : <span className="ptl-when" style={{ left: r + (milestone ? 10 : 6) }}>{range(s, e)}</span>}
       </>
     )
   }
