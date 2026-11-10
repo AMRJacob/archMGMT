@@ -368,11 +368,21 @@ export default function ScheduleChart({
   const dragging = (kind: Drag['kind'], id: string) => drag?.moved && drag.kind === kind && drag.id === id
 
   // ---- axis ----
+  // Tick detail follows the zoom: days at about 3 months, weeks at about 6, months beyond.
+  const scale: 'month' | 'week' | 'day' = ticks ?? (view ? (days <= 100 ? 'day' : days <= 200 ? 'week' : 'month') : 'month')
+  // When the grid is drawn only on Mondays (week ticks, or day ticks without day marks), a month's line goes on the
+  // first Monday of that month, so it sits on a week line and each week sits under the month it starts in.
+  const weekGrid = scale === 'week' || (scale === 'day' && !dayMarks)
+  const monthEdge = (iso: string) => weekGrid ? addDays(iso, (8 - parseISO(iso).getUTCDay()) % 7) : iso
   const months: { x1: number; x2: number; label: string; year: number; month: number }[] = []
-  for (let d = parseISO(start.slice(0, 8) + '01'); toISO(d) <= end; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
+  // (Start a month early: on a week grid the days before this month's first Monday still belong to the last one.)
+  const m0 = parseISO(start.slice(0, 8) + '01')
+  for (let d = new Date(Date.UTC(m0.getUTCFullYear(), m0.getUTCMonth() - 1, 1)); toISO(d) <= end; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
     const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+    const a = monthEdge(toISO(d)), b = monthEdge(toISO(next))
+    if (a > end || b <= start) continue
     months.push({
-      x1: Math.max(x0, x(toISO(d))), x2: next > parseISO(end) ? x0 + cw : x(toISO(next)),
+      x1: Math.max(x0, x(a)), x2: b > end ? x0 + cw : x(b),
       label: d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
       year: d.getUTCFullYear(), month: d.getUTCMonth(),
     })
@@ -385,8 +395,6 @@ export default function ScheduleChart({
     return acc
   }, [])
 
-  // Tick detail follows the zoom: days at about 3 months, weeks at about 6, months beyond.
-  const scale: 'month' | 'week' | 'day' = ticks ?? (view ? (days <= 100 ? 'day' : days <= 200 ? 'week' : 'month') : 'month')
   const dayList: string[] = []
   if (scale !== 'month') for (let d = start; d <= end; d = addDays(d, 1)) dayList.push(d)
   const dow = (iso: string) => parseISO(iso).getUTCDay()
