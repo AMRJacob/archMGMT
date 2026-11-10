@@ -18,6 +18,8 @@ import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
 import MyTodo from './pages/MyTodo.tsx'
+import { MobileTabs, MobileTop } from './components/MobileNav.tsx'
+import { usePhone } from './lib/phone.ts'
 
 export default function App() {
   return (
@@ -62,12 +64,14 @@ function useNoteActivity(email: string | undefined) {
 function Shell() {
   const { session, signOut } = useAuth()
   const pageW = usePageWidth()
+  const phone = usePhone()
   useNoteActivity(session?.user.email)
   return (
     <ProjectProvider>
       <PresenceProvider>
-      <div className="shell">
-        <aside className="sidebar no-print">
+      <div className={`shell${phone ? ' phone' : ''}`}>
+        {phone && <MobileTop />}
+        {!phone && <aside className="sidebar no-print">
           <div className="brand" aria-label="archMGMT"><span className="arch">arch</span><span className="mgmt">MGMT</span></div>
           <GlobalSearch />
           {/* The project you're in, with its pages, as one group. */}
@@ -106,8 +110,8 @@ function Shell() {
               </div>
             )}
           </div>
-        </aside>
-        <main className="content" style={pageW === 'full' ? undefined : { maxWidth: pageW === 'fit' ? FIT_WIDTH : pageW }}>
+        </aside>}
+        <main className="content" style={pageW === 'full' || phone ? undefined : { maxWidth: pageW === 'fit' ? FIT_WIDTH : pageW }}>
           <PageEdge />
           <Routes>
             <Route path="/" element={<Projects />} />
@@ -125,6 +129,7 @@ function Shell() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
+        {phone && <MobileTabs />}
         <Notices />
       </div>
       </PresenceProvider>

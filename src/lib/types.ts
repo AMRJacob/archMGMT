@@ -101,6 +101,8 @@ export interface Task {
   /** Sheets: number (A101) and type (key into SHEET_TYPES). */
   sheet_number?: string | null
   sheet_type?: string | null
+  /** Sheets carried through phases: rows sharing this id are the same drawing in different phases. */
+  sheet_link?: string | null
   /** Extra info for anything in the tree. */
   notes?: string | null
   status: TaskStatus

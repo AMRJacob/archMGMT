@@ -336,6 +336,25 @@ export async function remove(table: TableName, id: string): Promise<void> {
   writeStore(s)
 }
 
+/** Delete several rows at once (children go with them where the database cascades). */
+export async function removeMany(table: TableName, ids: string[]): Promise<void> {
+  if (!ids.length) return
+  if (supabase) {
+    for (const id of ids) markMine(id)
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from(table).delete().in('id', ids.slice(i, i + 200))
+      if (error) throw error
+    }
+    return
+  }
+  const s = readStore()
+  for (const id of ids) deleteLocal(s, table, id)
+  writeStore(s)
+}
+
+/** Fields a sheet shares with its copies in other phases (see sheet_link). */
+const LINKED_FIELDS = ['sheet_number', 'title', 'sheet_type'] as const
+
 /** Load rows for a screen, with helpers to keep the on-screen copy in step with edits. */
 export function useRows<T extends { id: string }>(table: TableName, match: Match = {}) {
   const key = JSON.stringify(match)
@@ -400,7 +419,7 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
   const savedAt = useRef(new Map<string, string>())
 
   /** Update one row on screen immediately, then save it (unless someone else changed it first). */
-  const patch = useCallback(
+  const patchOne = useCallback(
     (id: string, changes: Partial<T>) => {
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...changes } : r)))
       const job = (queue.current.get(id) ?? Promise.resolve()).then(async () => {
@@ -427,6 +446,24 @@ export function useRows<T extends { id: string }>(table: TableName, match: Match
       return job
     },
     [table, reload],
+  )
+
+  const patch = useCallback(
+    (id: string, changes: Partial<T>): Promise<void> => {
+      // A sheet carried through phases: renaming, renumbering or retyping one copy changes them all.
+      if (table === 'tasks') {
+        const row = rowsRef.current.find((r) => r.id === id) as { sheet_link?: string | null } | undefined
+        const shared = Object.fromEntries(Object.entries(changes).filter(([k]) => (LINKED_FIELDS as readonly string[]).includes(k)))
+        if (row?.sheet_link && Object.keys(shared).length && !('sheet_link' in changes)) {
+          for (const other of rowsRef.current) {
+            const o = other as unknown as { id: string; sheet_link?: string | null }
+            if (o.id !== id && o.sheet_link === row.sheet_link) void patchOne(o.id, shared as Partial<T>)
+          }
+        }
+      }
+      return patchOne(id, changes)
+    },
+    [table, patchOne],
   )
 
   const add = useCallback(

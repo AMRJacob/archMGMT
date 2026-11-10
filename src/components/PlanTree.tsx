@@ -12,6 +12,8 @@ import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { childrenOf, descendants, isItem, isSheetWork, kindOf, progressOf, rolledDates, scheduledChildren, workGroupOf, type Tree, type WorkGroup } from '../lib/tree.ts'
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
+import { carryRows, phaseOrder, phaseShort, phasesOfSheet, sheetsBefore, typeHint } from '../lib/sheetLinks.ts'
+import Modal from './Modal.tsx'
 import { KIND_RANK, type Person, type Phase, type Task, type TaskKind } from '../lib/types.ts'
 
 const ghostName = (t: Task) =>
@@ -111,6 +113,33 @@ export default function PlanTree({
   const [newId, setNewId] = useState<string | null>(null)
   const [addingSheet, setAddingSheet] = useState(false)
   const [planning, setPlanning] = useState(false)
+  // Sheets from earlier phases: carry some into this phase ('add'), or make a sheet the same as one ('link').
+  const [carryPick, setCarryPick] = useState<{ mode: 'add' } | { mode: 'link'; sheet: Task } | null>(null)
+  const allRows = [...tree.byId.values()]
+
+  /** Carry sheets into a phase as linked copies (the sources get a link id if they had none). */
+  async function carryInto(sources: Task[], ph: Phase) {
+    const topHere = childrenOf(tree, null).filter((t) => t.phase_id === ph.id)
+    let order = topHere.reduce((m, t) => Math.max(m, t.sort_order), topHere.length - 1) + 1
+    const rows: Partial<Task>[] = []
+    for (const src of sources) {
+      const c = carryRows(src, ph, { sortOrder: order++ })
+      if (c.linkSource) onPatch(src, { sheet_link: c.linkSource }, false)
+      rows.push(c.sheet, ...c.items)
+    }
+    if (rows.length) await onAddMany(rows)
+  }
+  /** Make `sheet` the same drawing as `source` (an earlier phase's sheet): shared link, number, name and type. */
+  function linkTo(sheet: Task, source: Task) {
+    const link = source.sheet_link ?? crypto.randomUUID()
+    if (!source.sheet_link) onPatch(source, { sheet_link: link }, false)
+    onPatch(sheet, { sheet_link: link, sheet_number: source.sheet_number ?? null, title: source.title || sheet.title, sheet_type: source.sheet_type ?? sheet.sheet_type })
+  }
+  const nextPhaseOf = (t: Task) => {
+    const order = phaseOrder(phases)
+    const i = order.findIndex((p) => p.id === t.phase_id)
+    return i >= 0 ? order[i + 1] ?? null : null
+  }
   const selection = useSel()
   const setSelected = (id: string) => selectOne(id)
   const isSel = (id: string) => selection.ids.has(id)
@@ -376,7 +405,7 @@ export default function PlanTree({
   const rowProps = (t: Task, className: string, depth: number) => ({
     'data-locked-by': lockedBy(t.id),
     className: `${className}${isSheetWork(tree, t) ? ' sheet-side' : ''}${lockedBy(t.id) ? ' locked' : ''}${isSel(t.id) ? ' selected' : ''}${cutIds.has(t.id) ? ' cutting' : ''}${hint?.id === t.id ? ` drop-${hint.place}` : ''}`,
-    style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px` } as CSSProperties,
+    style: { paddingLeft: 40 + depth * 24, '--indent': `${40 + depth * 24}px`, '--d': depth } as CSSProperties,
     tabIndex: -1,
     'data-row': t.id,
     'data-depth': depth,
@@ -470,6 +499,16 @@ export default function PlanTree({
           <TextField value={t.sheet_number ?? null} placeholder="Section" className="sheet-no section-no mono" onSave={(v) => onPatch(t, { sheet_number: v }, false)} />
         )}
         <div className="trow-title">{title(t, kind === 'sheet' || kind === 'section' ? 'sheet-title' : '')}</div>
+        {kind === 'sheet' && t.sheet_link && (() => {
+          const in_ = phasesOfSheet(allRows, phases, t)
+          if (in_.length < 2) return null
+          return (
+            <span className="link-chip" title={`Same sheet in ${in_.map((p) => p.name).join(', ')}. Number, name and type stay in step.`}>
+              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M5 7l2-2 M4.2 5.6L3 6.8a1.7 1.7 0 0 0 2.4 2.4l1.2-1.2 M7.8 6.4L9 5.2a1.7 1.7 0 0 0-2.4-2.4L5.4 4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+              {in_.map((p) => <b key={p.id} className={p.id === t.phase_id ? 'on' : ''}>{phaseShort(p)}</b>)}
+            </span>
+          )
+        })()}
         {t.notes && descFor !== t.id && <button className="has-desc" title={`${t.notes}\n\nClick to edit`} onClick={() => setDescFor(t.id)}>≡</button>}
         {kind === 'sheet' && (
           <Pop className="type-pop" title="Sheet type" label={<span className="type-chip">{type?.name ?? 'Type'}</span>}>
@@ -530,6 +569,17 @@ export default function PlanTree({
 
   return (
     <>
+      {carryPick && (
+        <CarryPicker phase={phase} phases={phases}
+          sheets={sheetsBefore(allRows, phases, phase).filter((x) => carryPick.mode === 'add' || !carryPick.sheet.sheet_link || x.sheet_link !== carryPick.sheet.sheet_link)}
+          single={carryPick.mode === 'link'}
+          onCancel={() => setCarryPick(null)}
+          onPick={async (picked) => {
+            if (carryPick.mode === 'link') { if (picked[0]) linkTo(carryPick.sheet, picked[0]) }
+            else { await carryInto(picked, phase); if (folded.sheets) fold('sheets') }
+            setCarryPick(null)
+          }} />
+      )}
       {planning && (
         <SheetPlanner
           onCancel={() => setPlanning(false)}
@@ -589,8 +639,11 @@ export default function PlanTree({
         )}
         {addingSheet && (
           <AddSheetRow
+            earlier={sheetsBefore(allRows, phases, phase)}
+            phases={phases}
             onCancel={() => setAddingSheet(false)}
-            onAdd={async (number, name, typeId) => {
+            onAdd={async (number, name, typeId, same) => {
+              if (same) { await carryInto([same], phase); return }
               const { sheet, items } = sheetRows({
                 projectId, phaseId: phase.id, number, name, typeId,
                 start: phase.start_date, due: phase.end_date, assigneeId: null, sortOrder: top.reduce((m, t) => Math.max(m, t.sort_order), top.length - 1) + 1,
@@ -643,6 +696,20 @@ export default function PlanTree({
     ]
   }
 
+  /** Carrying a sheet through phases: into the next phase, or linking it to an earlier phase's sheet. */
+  function sheetLinkItems(t: Task): MenuItem[] {
+    const next = nextPhaseOf(t)
+    const inNext = next ? phasesOfSheet(allRows, phases, t).some((p) => p.id === next.id) : false
+    const ph = phases.find((p) => p.id === t.phase_id)
+    const earlier = ph ? sheetsBefore(allRows, phases, ph).filter((x) => !t.sheet_link || x.sheet_link !== t.sheet_link) : []
+    return [
+      'sep',
+      ...(next ? [{ label: inNext ? `Already in ${next.name}` : `Carry into ${next.name}`, disabled: inNext, run: () => void carryInto([t], next) }] : []),
+      ...(earlier.length ? [{ label: 'Same sheet as…', run: () => setCarryPick({ mode: 'link', sheet: t }) }] : []),
+      ...(t.sheet_link && phasesOfSheet(allRows, phases, t).length > 1 ? [{ label: 'Unlink from other phases', run: () => onPatch(t, { sheet_link: null }) }] : []),
+    ]
+  }
+
   function menuItems(t: Task | null, first: WorkGroup = 'tasks'): MenuItem[] {
     const hasClip = Boolean(clip)
     const pasteLabel = clip?.mode === 'cut' ? 'Move here' : 'Paste'
@@ -658,6 +725,7 @@ export default function PlanTree({
           { label: 'Add sheet', run: () => addAt(null, 'inside', 'sheet') },
           { label: 'Add sheets by type…', run: () => setPlanning(true) },
           { label: 'Quick-add sheets by number…', run: () => setAddingSheet(true) },
+          ...(sheetsBefore(allRows, phases, phase).length ? [{ label: 'Carry sheets from earlier phases…', run: () => setCarryPick({ mode: 'add' }) }] : []),
         ],
         manual: [
           { label: 'Add spec section', run: () => addAt(null, 'inside', 'section') },
@@ -708,6 +776,7 @@ export default function PlanTree({
       { label: `${pasteLabel} below`, keys: 'Ctrl+V', disabled: !hasClip, run: () => paste(t, 'after') },
       ...(holds ? [{ label: `${pasteLabel} inside`, disabled: !hasClip, run: () => paste(t, 'inside') }] : []),
       { label: 'Duplicate', keys: 'Ctrl+D', run: () => duplicate(t) },
+      ...(k === 'sheet' && topLevel ? sheetLinkItems(t) : []),
       'sep',
       { label: descFor === t.id ? 'Close description' : t.notes ? 'Edit description…' : 'Add description…', run: () => setDescFor(descFor === t.id ? null : t.id) },
       ...(onAddNote && k !== 'item' ? [
@@ -725,8 +794,17 @@ export default function PlanTree({
 }
 
 /** Quick row for adding sheets one after another: number, name, type (guessed as you type). */
-function AddSheetRow({ onAdd, onCancel }: { onAdd: (number: string, name: string, typeId: string) => Promise<void>; onCancel: () => void }) {
+function AddSheetRow({ onAdd, onCancel, earlier, phases }: {
+  onAdd: (number: string, name: string, typeId: string, sameAs: Task | null) => Promise<void>
+  onCancel: () => void
+  /** Sheets earlier phases have: a matching number offers to carry that sheet instead of making a new one. */
+  earlier: Task[]
+  phases: Phase[]
+}) {
   const [number, setNumber] = useState('')
+  const [useSame, setUseSame] = useState(true)
+  const match = number.trim() ? earlier.find((t) => (t.sheet_number ?? '').toUpperCase() === number.trim().toUpperCase()) ?? null : null
+  const matchPhase = match ? phases.find((p) => p.id === match.phase_id) : null
   const [name, setName] = useState('')
   const [typeId, setTypeId] = useState<string | null>(null) // null = follow the guess
   const [busy, setBusy] = useState(false)
@@ -737,7 +815,7 @@ function AddSheetRow({ onAdd, onCancel }: { onAdd: (number: string, name: string
   async function submit() {
     if (!number.trim() && !name.trim()) return
     setBusy(true)
-    await onAdd(number.trim(), name.trim(), type)
+    await onAdd(number.trim(), name.trim(), type, match && useSame ? match : null)
     setBusy(false)
     setNumber(''); setName(''); setTypeId(null)
     document.getElementById('new-sheet-no')?.focus()
@@ -756,6 +834,12 @@ function AddSheetRow({ onAdd, onCancel }: { onAdd: (number: string, name: string
       </select>
       <button className="btn primary" disabled={busy || (!number.trim() && !name.trim())} onClick={submit}>Add sheet</button>
       <button className="btn ghost" onClick={onCancel}>Done</button>
+      {match && (
+        <label className="inline-check small add-sheet-same">
+          <input type="checkbox" checked={useSame} onChange={(e) => setUseSame(e.target.checked)} />
+          Same sheet as {match.sheet_number} {match.title}{matchPhase ? ` in ${matchPhase.name}` : ''}
+        </label>
+      )}
       <span className="muted small add-sheet-hint">
         {st && st.checklist.length ? `Adds ${st.checklist.length} standard subtasks${st.source === 'suggested' ? ' (suggested list)' : ' (from your Asana projects)'}. ` : ''}
         Enter adds and starts the next; Esc closes.
@@ -816,5 +900,49 @@ function SheetPlanner({ onCreate, onCancel }: {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Pick sheets from earlier phases: several to carry into this phase, or one to link a sheet to. */
+function CarryPicker({ phase, phases, sheets, single, onPick, onCancel }: {
+  phase: Phase
+  phases: Phase[]
+  sheets: Task[]
+  single: boolean
+  onPick: (picked: Task[]) => Promise<void>
+  onCancel: () => void
+}) {
+  const [picked, setPicked] = useState<Set<string>>(() => (single ? new Set() : new Set(sheets.map((t) => t.id))))
+  const [busy, setBusy] = useState(false)
+  const short = (id: string | null | undefined) => { const p = phases.find((x) => x.id === id); return p ? phaseShort(p) : '' }
+  const chosen = sheets.filter((t) => picked.has(t.id))
+  return (
+    <Modal title={single ? 'Same sheet as…' : `Carry sheets into ${phase.name}`} onClose={onCancel}
+      footer={
+        <>
+          <span className="muted small grow">{single ? 'Takes that sheet’s number, name and type; they stay in step from now on.' : 'Each keeps its number and name; add this phase’s work under it.'}</span>
+          <button className="btn ghost" onClick={onCancel}>Cancel</button>
+          <button className="btn primary" disabled={!chosen.length || busy} onClick={async () => { setBusy(true); try { await onPick(chosen) } finally { setBusy(false) } }}>
+            {single ? 'Link' : `Carry ${chosen.length} sheet${chosen.length === 1 ? '' : 's'}`}
+          </button>
+        </>
+      }>
+      <ul className="pick-list carry">
+        {sheets.map((t) => (
+          <li key={t.id}>
+            <label className={picked.has(t.id) ? '' : 'off'}>
+              <input type={single ? 'radio' : 'checkbox'} name="carry-pick" checked={picked.has(t.id)} onChange={(e) => {
+                if (single) { setPicked(new Set([t.id])); return }
+                const next = new Set(picked)
+                if (e.target.checked) next.add(t.id); else next.delete(t.id)
+                setPicked(next)
+              }} />
+              <span className="mono carry-no">{t.sheet_number || '—'}</span>
+              <span>{t.title}<span className="pick-hint">{typeHint(t)}from {short(t.phase_id)}</span></span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </Modal>
   )
 }

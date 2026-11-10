@@ -7,6 +7,8 @@ import { milestoneType } from '../lib/milestones.ts'
 import { PHASE_TEMPLATES, templateFor, type TemplateTask } from '../lib/phaseTemplates.ts'
 import { nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { DEFAULT_PHASES, type Phase, type Project, type Task } from '../lib/types.ts'
+import { carryRows, phaseShort, sheetsBefore, typeHint } from '../lib/sheetLinks.ts'
+import { describeContents, phaseContents, type PhaseContents } from '../lib/phaseWork.ts'
 
 // ---------- new project ----------
 
@@ -159,18 +161,41 @@ function datesIn(phase: Phase, at: [number, number], milestone: boolean) {
  * Fill a phase in one go: tick the usual tasks, milestones and sheets for it (suggestions follow the
  * AIA phase scopes), adjust counts, add your own. Everything can be changed or removed afterwards.
  */
-export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, onCreate, onClose }: {
+export function PhaseSetupDialog({ phase, phases, rows: allRows, projectId, takenNumbers, startOrder, onCreate, onClose }: {
   phase: Phase
+  /** Every phase in the project, and every row: to find sheets earlier phases already have. */
+  phases: Phase[]
+  rows: Task[]
   projectId: string
   takenNumbers: Set<string>
   startOrder: number
-  onCreate: (rows: Partial<Task>[]) => Promise<void>
+  /** New rows, rows to delete first (a fresh setup), and earlier sheets that need their new link id saved. */
+  onCreate: (rows: Partial<Task>[], extra: { clearIds: string[]; links: { id: string; link: string }[] }) => Promise<void>
   onClose: () => void
 }) {
   const [templateKey, setTemplateKey] = useState(() => templateFor(phase.name)?.key ?? '')
   const tpl = PHASE_TEMPLATES.find((t) => t.key === templateKey) ?? null
   const [tasks, setTasks] = useState<TaskPick[]>(() => (tpl?.tasks ?? []).map((t, i) => ({ ...t, key: `t${i}` })))
-  const [sheets, setSheets] = useState<SheetPick[]>(() => sheetPicks(tpl?.sheets ?? []))
+  // Sheets earlier phases already have: carried into this phase (same sheet, linked) rather than made again.
+  const [earlier] = useState(() => sheetsBefore(allRows, phases, phase))
+  // Ticked by default when this phase usually works on sheets (SD → DD → CD); not for Bidding or CA.
+  const [carry, setCarry] = useState<Set<string>>(() => {
+    const t = templateFor(phase.name)
+    return new Set(!t || t.sheets.length ? earlier.map((x) => x.id) : [])
+  })
+  const [carrySubtasks, setCarrySubtasks] = useState(false)
+  const carriedTypes = (picked: Set<string>) => new Set(earlier.filter((t) => picked.has(t.id)).map((t) => t.sheet_type ?? 'other'))
+  // A sheet type the phase usually needs starts unticked when earlier sheets of that type are carried.
+  const startSheets = (from: { type: string; count: number; on: boolean }[]) => {
+    const have = carriedTypes(carry)
+    return sheetPicks(from).map((p) => (have.has(p.type) ? { ...p, on: false } : p))
+  }
+  const [sheets, setSheets] = useState<SheetPick[]>(() => startSheets(tpl?.sheets ?? []))
+  // A fresh setup: clear what's already in the phase first.
+  const [here] = useState<PhaseContents>(() => phaseContents(allRows, phase.id))
+  const [clearSheets, setClearSheets] = useState(false)
+  const [clearTasks, setClearTasks] = useState(false)
+  const phaseName = (id: string | null | undefined) => { const p = phases.find((x) => x.id === id); return p ? phaseShort(p) : '' }
   const [moreSheets, setMoreSheets] = useState(false)
   const [own, setOwn] = useState('')
   const [autoNumber, setAutoNumber] = useState(true)
@@ -181,13 +206,16 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
     const t = PHASE_TEMPLATES.find((x) => x.key === key) ?? null
     setTemplateKey(key)
     setTasks((t?.tasks ?? []).map((x, i) => ({ ...x, key: `t${i}` })))
-    setSheets(sheetPicks(t?.sheets ?? []))
+    setSheets(startSheets(t?.sheets ?? []))
   }
 
   const pickedTasks = tasks.filter((t) => t.on)
   const pickedSheets = sheets.filter((s) => s.on && s.count > 0)
   const sheetCount = pickedSheets.reduce((n, s) => n + s.count, 0)
   const shownSheets = moreSheets ? sheets : sheets.filter((s) => s.on || (tpl?.sheets ?? []).some((x) => x.type === s.type))
+  const carried = earlier.filter((t) => carry.has(t.id))
+  const clearIds = [...(clearSheets ? here.sheets : []), ...(clearTasks ? [...here.tasks, ...here.milestones] : [])].map((t) => t.id)
+  const hasWork = here.sheets.length + here.tasks.length + here.milestones.length > 0
 
   function addOwn() {
     const title = own.trim()
@@ -216,6 +244,12 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
           assignee_id: null, assignee_ids: [],
         }))
       }
+      const links: { id: string; link: string }[] = []
+      for (const src of carried) {
+        const c = carryRows(src, phase, { sortOrder: order++, withSubtasks: carrySubtasks })
+        rows.push(c.sheet, ...c.items)
+        if (c.linkSource) links.push({ id: src.id, link: c.linkSource })
+      }
       const taken = new Set(takenNumbers)
       for (const s of pickedSheets) {
         const st = sheetTypeById(s.type)
@@ -230,22 +264,32 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
         }
       }
       setError(null)
-      if (rows.length) await onCreate(rows)
+      if (rows.length || clearIds.length) await onCreate(rows, { clearIds, links })
       onClose()
     } catch (e) {
       setError(`Couldn’t add them: ${e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e)}`)
     } finally { setBusy(false) }
   }
 
-  const total = pickedTasks.length + sheetCount
+  const total = pickedTasks.length + sheetCount + carried.length
+  const adds = [
+    pickedTasks.length && `${pickedTasks.length} task${pickedTasks.length === 1 ? '' : 's'}`,
+    sheetCount && `${sheetCount} ${carried.length ? 'new ' : ''}sheet${sheetCount === 1 ? '' : 's'}`,
+  ].filter(Boolean) as string[]
+  const steps = [
+    carried.length && `carry ${carried.length} sheet${carried.length === 1 ? '' : 's'}`,
+    adds.length && `add ${adds.join(' and ')}`,
+  ].filter(Boolean) as string[]
+  const action = (clearIds.length ? ['clear', ...steps] : steps).join(steps.length > 1 || clearIds.length ? ', ' : '')
+  const label = action ? action[0].toUpperCase() + action.slice(1) : 'Add'
   return (
     <Modal title={`Set Up ${phase.name}`} onClose={onClose} size="wide"
       footer={
         <>
           {error ? <span className="error small grow">{error}</span> : <span className="muted small grow">Everything can be changed, moved or removed later.</span>}
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={!total || busy} onClick={create}>
-            {total ? `Add ${[pickedTasks.length && `${pickedTasks.length} task${pickedTasks.length === 1 ? '' : 's'}`, sheetCount && `${sheetCount} sheet${sheetCount === 1 ? '' : 's'}`].filter(Boolean).join(' and ')}` : 'Add'}
+          <button className={`btn ${clearIds.length && !total ? 'danger' : 'primary'}`} disabled={(!total && !clearIds.length) || busy} onClick={create}>
+            {clearIds.length && !total ? 'Clear phase' : label}
           </button>
         </>
       }>
@@ -257,6 +301,21 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
             {PHASE_TEMPLATES.map((t) => <option key={t.key} value={t.key}>Suggestions for {labelOf(t.key)}</option>)}
           </select>
         </div>
+
+        {hasWork && (
+          <div className="setup-clear">
+            <strong>Start fresh?</strong>
+            <span className="muted small">Clear what’s already in {phase.name} before adding:</span>
+            {here.sheets.length > 0 && (
+              <label className="inline-check small"><input type="checkbox" checked={clearSheets} onChange={(e) => setClearSheets(e.target.checked)} />
+                {here.sheets.length} sheet{here.sheets.length === 1 ? '' : 's'}, with their tasks and subtasks</label>
+            )}
+            {here.tasks.length + here.milestones.length > 0 && (
+              <label className="inline-check small"><input type="checkbox" checked={clearTasks} onChange={(e) => setClearTasks(e.target.checked)} />
+                {describeContents({ sheets: [], sections: [], tasks: here.tasks, milestones: here.milestones })}</label>
+            )}
+          </div>
+        )}
 
         <div className="setup-cols">
           <section>
@@ -288,7 +347,39 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
           </section>
 
           <section>
-            <div className="setup-head"><strong>Sheets in this set</strong><span className="muted small">{sheetCount} sheet{sheetCount === 1 ? '' : 's'}</span></div>
+            {earlier.length > 0 && (
+              <>
+                <div className="setup-head"><strong>Carry sheets forward</strong><span className="muted small">{carried.length} of {earlier.length}</span></div>
+                <p className="muted small setup-note">Same sheets as earlier phases: they keep their numbers and names, and {phase.name}’s work is added to them here.</p>
+                <ul className="pick-list carry">
+                  {earlier.map((t) => (
+                    <li key={t.id}>
+                      <label className={carry.has(t.id) ? '' : 'off'}>
+                        <input type="checkbox" checked={carry.has(t.id)} onChange={(e) => {
+                          const next = new Set(carry)
+                          if (e.target.checked) next.add(t.id); else next.delete(t.id)
+                          setCarry(next)
+                        }} />
+                        <span className="mono carry-no">{t.sheet_number || '—'}</span>
+                        <span>{t.title}<span className="pick-hint">{typeHint(t)}from {phaseName(t.phase_id)}</span></span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="pick-foot">
+                  <button className="linkbtn" onClick={() => setCarry(carry.size === earlier.length ? new Set() : new Set(earlier.map((t) => t.id)))}>
+                    {carry.size === earlier.length ? 'Untick all' : 'Tick all'}
+                  </button>
+                  {carried.length > 0 && (
+                    <label className="inline-check small">
+                      <input type="checkbox" checked={carrySubtasks} onChange={(e) => setCarrySubtasks(e.target.checked)} />
+                      Add each type’s standard subtasks
+                    </label>
+                  )}
+                </div>
+              </>
+            )}
+            <div className="setup-head"><strong>{earlier.length ? 'New sheets' : 'Sheets in this set'}</strong><span className="muted small">{sheetCount} sheet{sheetCount === 1 ? '' : 's'}</span></div>
             {shownSheets.length === 0 && <p className="muted small">This phase usually has no new sheets. Show all types to add some anyway.</p>}
             <ul className="pick-list sheets">
               {shownSheets.map((s) => {
@@ -333,10 +424,51 @@ export function PhaseSetupDialog({ phase, projectId, takenNumbers, startOrder, o
 const LABELS: Record<string, string> = { predesign: 'Predesign', sd: 'Schematic Design', dd: 'Design Development', cd: 'Construction Documents', ffe: 'FF&E', bidding: 'Bidding', ca: 'Construction Administration' }
 const labelOf = (k: string) => LABELS[k] ?? k
 
+
 /** Every sheet type, with the template's picks ticked and counted. */
 function sheetPicks(from: { type: string; count: number; on: boolean }[]): SheetPick[] {
   return SHEET_TYPES.filter((t) => t.id !== 'other').map((t) => {
     const f = from.find((x) => x.type === t.id)
     return { type: t.id, count: f ? f.count : 1, on: f ? f.on : false }
   })
+}
+
+// ---------- clear a phase ----------
+
+/** Wipe a phase's sheets and/or its general tasks and milestones, for a fresh setup. */
+export function PhaseClearDialog({ phase, rows, onClear, onClose }: {
+  phase: Phase
+  rows: Task[]
+  onClear: (ids: string[]) => Promise<void>
+  onClose: () => void
+}) {
+  const here = phaseContents(rows, phase.id)
+  const [sheets, setSheets] = useState(here.sheets.length > 0)
+  const [tasks, setTasks] = useState(here.tasks.length + here.milestones.length > 0)
+  const [busy, setBusy] = useState(false)
+  const ids = [...(sheets ? here.sheets : []), ...(tasks ? [...here.tasks, ...here.milestones] : [])].map((t) => t.id)
+  const nTasks = here.tasks.length + here.milestones.length
+  return (
+    <Modal title={`Clear ${phase.name}`} onClose={onClose}
+      footer={
+        <>
+          <span className="muted small grow">This can’t be undone. Copies of carried sheets in other phases stay.</span>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn danger" disabled={!ids.length || busy} onClick={async () => { setBusy(true); try { await onClear(ids); onClose() } finally { setBusy(false) } }}>
+            Clear {ids.length ? `${ids.length} item${ids.length === 1 ? '' : 's'}` : ''}
+          </button>
+        </>
+      }>
+      <div className="form-checks clear-checks">
+        <label className={`inline-check${here.sheets.length ? '' : ' off'}`}>
+          <input type="checkbox" checked={sheets} disabled={!here.sheets.length} onChange={(e) => setSheets(e.target.checked)} />
+          <span><strong>Sheets</strong> <span className="muted small">{here.sheets.length ? `${here.sheets.length}, with their tasks and subtasks` : 'none'}</span></span>
+        </label>
+        <label className={`inline-check${nTasks ? '' : ' off'}`}>
+          <input type="checkbox" checked={tasks} disabled={!nTasks} onChange={(e) => setTasks(e.target.checked)} />
+          <span><strong>General tasks and milestones</strong> <span className="muted small">{nTasks ? describeContents({ sheets: [], sections: [], tasks: here.tasks, milestones: here.milestones }) : 'none'}</span></span>
+        </label>
+      </div>
+    </Modal>
+  )
 }

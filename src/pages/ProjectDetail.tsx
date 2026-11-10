@@ -9,8 +9,10 @@ import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
 import { useRowLayout } from '../lib/rowColumns.ts'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
-import { PhaseSetupDialog } from '../components/SetupDialogs.tsx'
-import { insertMany } from '../lib/data.ts'
+import { usePhone } from '../lib/phone.ts'
+import { PhaseClearDialog, PhaseSetupDialog } from '../components/SetupDialogs.tsx'
+import { insertMany, removeMany } from '../lib/data.ts'
+import { deletePhaseQuestion, phaseContents } from '../lib/phaseWork.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import { addDays, daysBetween, formatDate, maxDate, minDate, nextMonday, shortDate, today } from '../lib/dates.ts'
 import ColorPicker from '../components/ColorPicker.tsx'
@@ -54,6 +56,9 @@ export default function ProjectDetail() {
   const [dragPhase, setDragPhase] = useState<string | null>(null)
   const [dropPhase, setDropPhase] = useState<{ id: string; side: 'before' | 'after' } | null>(null)
   const [setupLocal, setSetupLocal] = useState<string | null>(null)
+  const [clearing, setClearing] = useState<string | null>(null)
+  const phone = usePhone()
+  const [showInfo, setShowInfo] = useState(false)
   // ?setup=<phase id> (from the New project dialog) opens that phase's setup.
   const setupId = setupLocal ?? params.get('setup')
   const closeSetup = () => { setSetupLocal(null); if (params.get('setup')) { params.delete('setup'); setParams(params, { replace: true }) } }
@@ -147,9 +152,10 @@ export default function ProjectDetail() {
     navigate('/')
   }
 
-  async function deletePhase(p: Phase) {
-    const n = tasksFor(p.id).length
-    if (!window.confirm(`Delete the ${p.name} phase?${n ? ` Its ${n} task(s) will move to "No phase".` : ''}`)) return
+  async function deletePhase(p: Phase, ask = true) {
+    if (ask && !window.confirm(deletePhaseQuestion(p.name, tasks.rows, p.id))) return
+    const c = phaseContents(tasks.rows, p.id)
+    await removeMany('tasks', [...c.sheets, ...c.sections, ...c.tasks, ...c.milestones].map((t) => t.id))
     await phases.drop(p.id)
     void tasks.reload()
   }
@@ -183,6 +189,7 @@ export default function ProjectDetail() {
       { label: 'Add spec section', run: ask('section') },
       'sep',
       { label: filled ? `Add suggested work to ${p.name}…` : `Set up ${p.name}…`, run: () => setSetupLocal(p.id) },
+      ...(filled ? [{ label: `Clear ${p.name}…`, run: () => setClearing(p.id) }] : []),
       { label: 'Rename', run: () => { setOpenIds(new Set(open)); setRenaming(p.id) } },
       { label: 'Change dates…', run: () => setEditingPhase(p.id) },
       { label: p.client_visible ? 'Hide from presentation view' : 'Show in presentation view', run: () => void phases.patch(p.id, { client_visible: !p.client_visible }) },
@@ -252,7 +259,7 @@ export default function ProjectDetail() {
           <button className="btn danger" onClick={deleteProject}>Delete permanently</button>
         </div>
       )}
-      <header className="project-head card">
+      <header className={`project-head card${phone && !showInfo ? ' folded' : ''}`}>
         <div className="project-title">
           <ColorPicker value={project.color} scheme={project.color_scheme ?? null} phases={sortedPhases}
             onChange={(c) => projects.patch(id, c)} />
@@ -261,6 +268,11 @@ export default function ProjectDetail() {
           <TextField value={project.name} className="title" autoFocus={isNew}
             onSave={(v) => v && projects.patch(id, { name: v })} />
         </div>
+        {phone && (
+          <button className="linkbtn info-toggle" onClick={() => setShowInfo(!showInfo)} aria-expanded={showInfo}>
+            {showInfo ? 'Hide project details' : `Project details${project.client ? ` · ${project.client}` : ''}`}
+          </button>
+        )}
         <div className="meta-grid">
           <label>Owner<TextField value={project.client} placeholder="Owner" onSave={(v) => projects.patch(id, { client: v })} /></label>
           <label>Building type<BuildingTypeField value={project.building_type ?? null} onSave={(v) => projects.patch(id, { building_type: v })} /></label>
@@ -439,8 +451,15 @@ export default function ProjectDetail() {
       {editingPhase && (() => {
         const ph = phases.rows.find((x) => x.id === editingPhase)
         return ph ? (
-          <PhaseEditor phase={ph} taskCount={tasksFor(ph.id).length} onPatch={(c) => void phases.patch(ph.id, c)}
-            onDelete={() => { void phases.drop(ph.id).then(() => tasks.reload()) }} onClose={() => setEditingPhase(null)} />
+          <PhaseEditor phase={ph} deleteQuestion={deletePhaseQuestion(ph.name, tasks.rows, ph.id)} onPatch={(c) => void phases.patch(ph.id, c)}
+            onDelete={() => void deletePhase(ph, false)} onClose={() => setEditingPhase(null)} />
+        ) : null
+      })()}
+      {clearing && (() => {
+        const ph = phases.rows.find((x) => x.id === clearing)
+        return ph ? (
+          <PhaseClearDialog phase={ph} rows={tasks.rows} onClose={() => setClearing(null)}
+            onClear={async (ids) => { await removeMany('tasks', ids); await tasks.reload() }} />
         ) : null
       })()}
       {setupId && (() => {
@@ -449,9 +468,14 @@ export default function ProjectDetail() {
         const taken = new Set(tasks.rows.filter((x) => x.kind === 'sheet' && x.sheet_number).map((x) => x.sheet_number!.toUpperCase()))
         const top = tasks.rows.filter((x) => x.phase_id === ph.id && !x.parent_id)
         return (
-          <PhaseSetupDialog phase={ph} projectId={id} takenNumbers={taken}
+          <PhaseSetupDialog phase={ph} phases={phases.rows} rows={tasks.rows} projectId={id} takenNumbers={taken}
             startOrder={top.reduce((m, x) => Math.max(m, x.sort_order), top.length - 1) + 1}
-            onCreate={async (rows) => { await insertMany<Task>('tasks', rows); await tasks.reload(); setOpenIds(new Set([...open, ph.id])) }}
+            onCreate={async (rows, { clearIds, links }) => {
+              await removeMany('tasks', clearIds)
+              await Promise.all(links.map((l) => tasks.patch(l.id, { sheet_link: l.link })))
+              if (rows.length) await insertMany<Task>('tasks', rows)
+              await tasks.reload(); setOpenIds(new Set([...open, ph.id]))
+            }}
             onClose={closeSetup} />
         )
       })()}

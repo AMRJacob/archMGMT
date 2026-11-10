@@ -320,7 +320,7 @@ export default function Projects() {
       {error && <p className="error">{error}</p>}
 
       <div className="card table-scroll">
-        <table className={`table clickable${tableText === 'crop' ? ' crop' : ''}`}>
+        <table className={`table clickable projects-table${tableText === 'crop' ? ' crop' : ''}`}>
           <colgroup>
             {['name', ...shownCols.map((c) => c.key)].map((k) => {
               const w = widths[k] ?? (tableText === 'crop' ? CROP_WIDTHS[k] : undefined)
@@ -343,7 +343,7 @@ export default function Projects() {
                 </td>
                 {shownCols.map((c) => {
                   const v = c.key === 'schedule' ? `${formatDate(r.start)} – ${formatDate(r.end)}` : c.value(r)
-                  return <td key={c.key} className={c.num ? 'num' : ''} title={tableText === 'crop' && v != null && typeof v === 'string' ? v : undefined}>{c.cell(r)}</td>
+                  return <td key={c.key} data-label={c.label} className={c.num ? 'num' : ''} title={tableText === 'crop' && v != null && typeof v === 'string' ? v : undefined}>{c.cell(r)}</td>
                 })}
               </tr>
             ))}
@@ -355,7 +355,7 @@ export default function Projects() {
             <tfoot>
               <tr>
                 <td className="muted small">Total of {rows.length}</td>
-                {shownCols.map((c) => <td key={c.key} className={c.num ? 'num strong' : ''}>{totals[c.key] ?? ''}</td>)}
+                {shownCols.map((c) => <td key={c.key} data-label={c.label} className={c.num ? 'num strong' : ''}>{totals[c.key] ?? ''}</td>)}
               </tr>
             </tfoot>
           )}

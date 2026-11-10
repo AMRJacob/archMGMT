@@ -11,9 +11,11 @@ import '@fontsource/chakra-petch/600.css'
 import './styles.css'
 import { applyTheme } from './lib/theme.ts'
 import { applyPrefs } from './lib/prefs.ts'
+import { installLongPress } from './lib/phone.ts'
 
 applyTheme() // before the first paint, so the saved look doesn't flash
 applyPrefs()
+installLongPress() // touch: press and hold = right-click
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

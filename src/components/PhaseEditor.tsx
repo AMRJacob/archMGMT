@@ -2,9 +2,10 @@ import Modal from './Modal.tsx'
 import { DateField, TextField } from './fields.tsx'
 import type { Phase } from '../lib/types.ts'
 
-export default function PhaseEditor({ phase, taskCount, onPatch, onDelete, onClose }: {
+export default function PhaseEditor({ phase, deleteQuestion, onPatch, onDelete, onClose }: {
   phase: Phase
-  taskCount: number
+  /** Asked before deleting: says what goes with the phase. */
+  deleteQuestion: string
   onPatch: (changes: Partial<Phase>) => void
   onDelete: () => void
   onClose: () => void
@@ -16,7 +17,7 @@ export default function PhaseEditor({ phase, taskCount, onPatch, onDelete, onClo
       footer={
         <>
           <button className="btn danger" onClick={() => {
-            if (window.confirm(`Delete the ${phase.name} phase?${taskCount ? ` Its ${taskCount} task(s) will move to "No phase".` : ''}`)) { onDelete(); onClose() }
+            if (window.confirm(deleteQuestion)) { onDelete(); onClose() }
           }}>Delete phase</button>
           <button className="btn primary" onClick={onClose}>Done</button>
         </>

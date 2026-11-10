@@ -19,12 +19,15 @@ import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
 import { BRAND_ROLES, KIND_RANK, type BrandPalette, type BrandRoles, type Phase, type Task } from '../lib/types.ts'
-import { useRows } from '../lib/data.ts'
+import { removeMany, useRows } from '../lib/data.ts'
+import { usePhone } from '../lib/phone.ts'
+import AgendaList from '../components/AgendaList.tsx'
+import { deletePhaseQuestion, phaseContents } from '../lib/phaseWork.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
 import { asShown, buildTree, DETAIL_LEVELS, movedBy, passesWork, workGroupOf, visibleAtLevel, type DetailLevel, type ShownTask, type WorkFilter } from '../lib/tree.ts'
 
-type View = 'timeline' | 'calendar' | 'board'
+type View = 'list' | 'timeline' | 'calendar' | 'board'
 type Zoom = 'all' | '12' | '6' | '3'
 
 /** The same day n months later (or earlier). */
@@ -51,8 +54,13 @@ export default function Schedule() {
   const plan = useProjectPlan(project?.id ?? '')
   const { phases, tasks, people } = plan
   const nh = useNotes(project?.id ?? '', tasks.rows, phases.rows, people.rows, () => void tasks.reload())
-  const [savedView, setSavedView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
-  // The Board has its own place in the sidebar (/board); Schedule shows the timeline or calendar.
+  const phone = usePhone()
+  const [deskView, setDeskView] = useSaved<View>('archmgmt.scheduleView', 'timeline')
+  // Phones open on the list (a timeline is hard to read that narrow); their choice is kept separately.
+  const [phoneView, setPhoneView] = useSaved<View>('archmgmt.scheduleViewPhone', 'list')
+  const savedView = phone ? phoneView : deskView === 'list' ? 'timeline' : deskView
+  const setSavedView = phone ? setPhoneView : setDeskView
+  // The Board has its own place in the sidebar (/board); Schedule shows the list, timeline or calendar.
   const view: View = onBoardPage ? 'board' : savedView === 'board' ? 'timeline' : savedView
   const setView = (v: View) => { if (v === 'board') navigate('/board'); else { setSavedView(v); if (onBoardPage) navigate('/schedule') } }
   const [mode, setMode] = useSaved<ChartMode>('archmgmt.chartMode', 'working')
@@ -402,6 +410,7 @@ export default function Schedule() {
           {/* Board has its own place in the sidebar, so the switch here is just Timeline / Calendar. */}
           {view !== 'board' && (
             <div className="segmented" role="tablist" aria-label="Schedule view">
+              {phone && <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>List</button>}
               <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
               <button className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Calendar</button>
             </div>
@@ -477,7 +486,8 @@ export default function Schedule() {
           </div>
           {hiddenNote}
           </div>
-          <div className="card chart-card no-print" ref={chartBox}>
+          <div className={`card chart-card no-print${phone ? ' phone-scroll' : ''}`} ref={phone ? undefined : chartBox}>
+            <div ref={phone ? chartBox : undefined} style={phone ? { width: 980 } : undefined}>
             <ScheduleChart project={pres ? xProject : project} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
               firmName={FIRM_NAME} editable window={chartWindow} dayMarks={dayMarks === 'on'} width={chartW} colors={pres ? xColors : chartColors(theme)} showHeader={false} keepOrder
               onPan={months ? (d) => setWinStart((w) => addDays(w, d)) : undefined}
@@ -485,7 +495,7 @@ export default function Schedule() {
               onMoveTask={(t, s, d) => moveShown(t as ShownTask, s, d)}
               onOpenTask={openTask}
               setup={mode === 'working' && setup === 'on'}
-              stickyTop={`${stickyH}px`}
+              stickyTop={phone ? undefined : `${stickyH}px`}
               zones={level > 0 && (!workApplies || work === 'all')}
               onTogglePresented={(t) => togglePres(t as ShownTask)}
               onTogglePhase={(p) => void phases.patch(p.id, { client_visible: !p.client_visible })}
@@ -493,6 +503,7 @@ export default function Schedule() {
               onAddAt={(ph, d) => void addHere(ph, d)}
               onSeam={(sm) => setSeam(sm)}
               onContextAt={(sp) => setSpot(sp)} />
+            </div>
           </div>
           <p className="muted small no-print">
             “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Exports use {pageOf(xPage).name.split(' (')[0].toLowerCase()} paper,
@@ -502,6 +513,13 @@ export default function Schedule() {
       )}
 
       {view !== 'timeline' && hiddenNote}
+      {view === 'list' && (
+        <>
+          <div className="subbar no-print"><span className="grow" />{levelControl}</div>
+          <AgendaList tasks={frontierRows.map(real)} tree={tree} phases={phases.rows} people={people.rows} palette={palette}
+            onToggle={(t) => plan.patchTask(t, { status: t.status === 'done' ? 'todo' : 'done' })} onOpen={openTask} />
+        </>
+      )}
       {view === 'calendar' && (
         <div className="subbar no-print"><span className="grow" />{levelControl}</div>
       )}
@@ -555,8 +573,12 @@ export default function Schedule() {
       {phaseEdit && (() => {
         const ph = phases.rows.find((x) => x.id === phaseEdit)
         return ph ? (
-          <PhaseEditor phase={ph} taskCount={tasks.rows.filter((x) => x.phase_id === ph.id).length}
-            onPatch={(c) => void phases.patch(ph.id, c)} onDelete={() => { void phases.drop(ph.id).then(() => tasks.reload()) }}
+          <PhaseEditor phase={ph} deleteQuestion={deletePhaseQuestion(ph.name, tasks.rows, ph.id)}
+            onPatch={(c) => void phases.patch(ph.id, c)} onDelete={() => {
+              const c = phaseContents(tasks.rows, ph.id)
+              void removeMany('tasks', [...c.sheets, ...c.sections, ...c.tasks, ...c.milestones].map((t) => t.id))
+                .then(() => phases.drop(ph.id)).then(() => tasks.reload())
+            }}
             onClose={() => setPhaseEdit(null)} />
         ) : null
       })()}
