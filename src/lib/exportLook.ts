@@ -6,6 +6,11 @@ import type { BrandPalette, BrandRoles, Project } from './types.ts'
 export type ExportBg = 'white' | 'tint' | 'dark' | 'brand' | 'custom'
 export type ExportPage = 'letter' | 'tabloid' | 'arch-b'
 export type ExportFit = 'fit' | 'width'
+/**
+ * What a schedule export covers: the whole schedule on one page, just the stretch of time on screen, or the whole
+ * schedule at the screen's zoom, split into pages that each cover the zoom's span (12, 6 or 3 months).
+ */
+export type ExportRange = 'all' | 'view' | 'pages'
 
 export const EXPORT_BGS: { id: ExportBg; name: string; hint: string }[] = [
   { id: 'white', name: 'White', hint: 'Plain white page.' },

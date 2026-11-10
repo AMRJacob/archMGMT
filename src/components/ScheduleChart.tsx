@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react'
+import { useId, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { addDays, formatDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { phaseColors } from '../lib/colors.ts'
 import type { Person, Phase, Project, Task } from '../lib/types.ts'
@@ -16,9 +16,12 @@ import { MILESTONE_TYPES, milestoneColor, milestoneType } from '../lib/milestone
 export type ChartMode = 'working' | 'presentation'
 
 /** Drawing width for exports; on screen the chart takes the width it's given so text stays its normal size. */
-const EXPORT_W = 1400
+export const EXPORT_W = 1400
 const M = 40 // outer margin
 const LABEL = 340 // label column width
+/** Where the timeline starts across the drawing (outer margin + names column), and the right margin, in chart units. */
+export const CHART_X0 = M + LABEL
+export const CHART_RIGHT = M
 const HEADER_FULL = 128
 const HEADER_BARE = 12
 const AXIS = 48
@@ -88,7 +91,12 @@ function dragDates(start: string, end: string, mode: DragMode, d: number): [stri
 export default function ScheduleChart({
   project, phases, tasks, people, mode, firmName, svgRef, editable = false,
   onMovePhase, onMoveTask, onOpenTask, onPan, window: view, showHeader = true, keepOrder = false, colors: C = STUDIO_CHART, onAddAt, onQuickAdd, onSeam, onContextAt, presented = (t: Task) => t.client_visible, width, dayMarks = true, onReorder, setup = false, onTogglePresented, onTogglePhase, zones = true, stickyTop,
+  ticks, pageLabel,
 }: {
+  /** Tick detail to use instead of the one worked out from the window's length (exports split into pages). */
+  ticks?: 'month' | 'week' | 'day'
+  /** Exports split into pages: "Page 2 of 5", before the schedule's dates on the right. */
+  pageLabel?: string
   /** On screen: keep the date header in view while scrolling, this far from the top of the window (CSS length). */
   stickyTop?: string
   /** Working view: General Tasks / Sheets zones (off when the view is filtered to one of them). */
@@ -121,7 +129,8 @@ export default function ScheduleChart({
   people: Person[]
   mode: ChartMode
   firmName: string
-  svgRef?: RefObject<SVGSVGElement | null>
+  /** Called with the drawing's element (exports read it to make the PDF preview and PNG). */
+  svgRef?: (el: SVGSVGElement | null) => void
   editable?: boolean
   onMovePhase?: (phase: Phase, start: string, end: string, withTasks: boolean) => void
   onMoveTask?: (task: Task, start: string | null, due: string | null) => void
@@ -137,6 +146,8 @@ export default function ScheduleChart({
   const HEADER = showHeader ? HEADER_FULL : HEADER_BARE
   const W = width ? Math.max(900, Math.round(width)) : EXPORT_W
   const inner = useRef<SVGSVGElement | null>(null)
+  // Each chart's clip area needs its own id: several charts (screen, export pages) share one document.
+  const clipId = 'chart-area-' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<{ id: string; y0: number; moved: boolean; target: string | null; place: 'before' | 'after' } | null>(null)
   const pan = useRef<{ x0: number; applied: number } | null>(null)
@@ -375,7 +386,7 @@ export default function ScheduleChart({
   }, [])
 
   // Tick detail follows the zoom: days at about 3 months, weeks at about 6, months beyond.
-  const scale: 'month' | 'week' | 'day' = view ? (days <= 100 ? 'day' : days <= 200 ? 'week' : 'month') : 'month'
+  const scale: 'month' | 'week' | 'day' = ticks ?? (view ? (days <= 100 ? 'day' : days <= 200 ? 'week' : 'month') : 'month')
   const dayList: string[] = []
   if (scale !== 'month') for (let d = start; d <= end; d = addDays(d, 1)) dayList.push(d)
   const dow = (iso: string) => parseISO(iso).getUTCDay()
@@ -525,7 +536,7 @@ export default function ScheduleChart({
     <>
     {stickyAxis}
     <svg
-      ref={(el) => { inner.current = el; if (svgRef) svgRef.current = el }}
+      ref={(el) => { inner.current = el; svgRef?.(el) }}
       xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width="100%"
       style={{ display: 'block', height: 'auto', userSelect: editable ? 'none' : undefined, touchAction: editable ? 'pan-y' : undefined }}
       fontFamily={C.font} role="img" aria-label={`${project.name} schedule`}
@@ -559,10 +570,10 @@ export default function ScheduleChart({
         {pres ? 'PROJECT SCHEDULE' : 'WORKING SCHEDULE'}
       </text>
       <text x={W - M} y={80} fontSize={14} fill={C.ink} textAnchor="end">Prepared {formatDate(t)}</text>
-      {has && <text x={W - M} y={106} fontSize={14} fill={C.muted} textAnchor="end">{range(first, last)}</text>}
+      {(has || pageLabel) && <text x={W - M} y={106} fontSize={14} fill={C.muted} textAnchor="end">{[pageLabel, has ? range(first, last) : null].filter(Boolean).join('  ·  ')}</text>}
       <line x1={M} x2={W - M} y1={HEADER - 8} y2={HEADER - 8} stroke={C.ink} strokeWidth={1.2} />
       </>}
-      <defs><clipPath id="chart-area"><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
+      <defs><clipPath id={clipId}><rect x={x0} y={0} width={cw} height={100000} /></clipPath></defs>
 
       {axisEl}
 
@@ -660,7 +671,7 @@ export default function ScheduleChart({
         <rect x={x0} y={axisTop} width={cw} height={rowsBottom - axisTop} fill="transparent"
           style={{ cursor: panning ? 'grabbing' : 'grab' }} data-pan="1" onPointerDown={startPan} />
       )}
-      <g clipPath={view ? 'url(#chart-area)' : undefined}>
+      <g clipPath={view ? `url(#${clipId})` : undefined}>
       {rows.map((r, i) => {
         const ry = rowY[i]
         if (r.kind === 'phase') {

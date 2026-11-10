@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import BoardView, { type BoardGroup } from '../components/BoardView.tsx'
 import CalendarView from '../components/CalendarView.tsx'
-import ScheduleChart, { type ChartMode, type ChartSeam, type ChartSpot } from '../components/ScheduleChart.tsx'
+import ScheduleChart, { CHART_RIGHT, CHART_X0, EXPORT_W, type ChartMode, type ChartSeam, type ChartSpot } from '../components/ScheduleChart.tsx'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
 import { kindUnder, moveTo } from '../lib/treeEdit.ts'
 import { isPresented, ruleMatch, rulesOf, togglePresented, type PresentationRules } from '../lib/presentation.ts'
@@ -13,8 +13,8 @@ import { useNotes } from '../lib/useNotes.tsx'
 import PhaseEditor from '../components/PhaseEditor.tsx'
 import ProjectTeam from '../components/ProjectTeam.tsx'
 import { FIRM_NAME } from '../lib/brand.ts'
-import ExportPreview, { renderPng, type ExportSettings } from '../components/ExportPreview.tsx'
-import { brandOnlyProject, EXPORT_BGS, exportColors, paletteOf, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage } from '../lib/exportLook.ts'
+import ExportPreview, { renderPng, type ExportPages, type ExportSettings } from '../components/ExportPreview.tsx'
+import { brandOnlyProject, EXPORT_BGS, exportColors, paletteOf, PAGE_MARGIN, pageOf, type ExportBg, type ExportFit, type ExportPage, type ExportRange } from '../lib/exportLook.ts'
 import { phaseColors } from '../lib/colors.ts'
 import { addDays, daysBetween, maxDate, minDate, parseISO, shortDate, toISO, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
@@ -76,7 +76,11 @@ export default function Schedule() {
   const [phaseEdit, setPhaseEdit] = useState<string | null>(null)
   const [seam, setSeam] = useState<ChartSeam | null>(null)
   const [spot, setSpot] = useState<(Omit<ChartSpot, 'phase'> & { phase: Phase | null }) | null>(null)
-  const exportSvg = useRef<SVGSVGElement | null>(null)
+  // The hidden export drawings: one per printed page (one, unless split into pages at the zoom), plus the long strip
+  // the split-into-pages preview and PNG are made from.
+  const exportSvgs = useRef<(SVGSVGElement | null)[]>([])
+  const stripSvg = useRef<SVGSVGElement | null>(null)
+  // What the preview shows: the long strip when split into pages, otherwise the one export chart.
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const brandPalettes = useRows<BrandPalette>('brand_palettes')
@@ -88,8 +92,11 @@ export default function Schedule() {
   const [xBg, setXBg] = useSaved<ExportBg>('archmgmt.exportBg', 'white')
   const [xPage, setXPage] = useSaved<ExportPage>('archmgmt.exportPage', 'letter')
   const [xFit, setXFit] = useSaved<ExportFit>('archmgmt.exportFit', 'fit')
-  const xSettings: ExportSettings = { bg: xBg, page: xPage, fit: xFit }
-  const setXSettings = (s: ExportSettings) => { setXBg(s.bg); setXPage(s.page); setXFit(s.fit) }
+  const [xRange, setXRange] = useSaved<ExportRange>('archmgmt.exportRange', 'all')
+  const stripping = xRange === 'pages' && zoom !== 'all'
+  const previewDrawing = useCallback(() => (stripping ? stripSvg.current : exportSvgs.current[0] ?? null), [stripping])
+  const xSettings: ExportSettings = { bg: xBg, page: xPage, fit: xFit, range: xRange }
+  const setXSettings = (s: ExportSettings) => { setXBg(s.bg); setXPage(s.page); setXFit(s.fit); setXRange(s.range) }
   // The on-screen timeline draws at the card's real width, so text stays normal size on wide screens.
   const [chartW, setChartW] = useState<number | undefined>(undefined)
   const [stickyH, setStickyH] = useState(0)
@@ -333,11 +340,12 @@ export default function Schedule() {
   }
 
   async function downloadPng() {
-    const el = exportSvg.current
+    const el = xRangeOn === 'pages' ? stripSvg.current : exportSvgs.current[0]
     if (!el) return
     setSaving(true)
     try {
-      const blob = await renderPng(el, xSettings, xColors.bg)
+      // Split into pages, the PNG is the whole schedule at the zoom as one long image.
+      const blob = await renderPng(el, xRangeOn === 'pages' ? { page: xPage, fit: 'width' } : xSettings, xColors.bg)
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
       a.download = `${fileBase}.png`
@@ -369,6 +377,49 @@ export default function Schedule() {
   const spanStart = minDate(allDates), spanEnd = maxDate(allDates)
   const winDays = chartWindow ? daysBetween(chartWindow[0], chartWindow[1]) : 0
   const scrollMax = spanStart && spanEnd ? Math.max(0, daysBetween(spanStart, spanEnd) - winDays + 14) : 0
+
+  // ---- What the export covers ----
+  // "On screen" and "per page" only mean something when zoomed in; at Whole project it's the whole schedule.
+  const xRangeOn: ExportRange = months ? xRange : 'all'
+  const zoomLabel = months ? `${months} months` : ''
+  const ticks: 'month' | 'week' | 'day' = months === 3 ? 'day' : months === 6 ? 'week' : 'month'
+  // Split into pages: from the first of the month the schedule starts in, one zoom's span per page, until the end.
+  const shownDates = (() => {
+    const out: string[] = []
+    const pres0 = mode === 'presentation'
+    const visible = new Set(phases.rows.filter((p) => !pres0 || p.client_visible).map((p) => p.id))
+    for (const p of phases.rows) if (visible.has(p.id)) out.push(p.start_date, p.end_date)
+    for (const t of chartRows) {
+      if (t.phase_id ? !visible.has(t.phase_id) : false) continue
+      if (pres0 && !presented(t)) continue
+      for (const d of [t.start_date, t.due_date]) if (d) out.push(d)
+    }
+    return out.sort()
+  })()
+  const pageWins: [string, string][] = []
+  if (months && shownDates.length) {
+    const last = shownDates[shownDates.length - 1]
+    for (let s0 = shownDates[0].slice(0, 8) + '01'; s0 <= last && pageWins.length < 40; s0 = addMonths(s0, months)) {
+      pageWins.push([s0, addDays(addMonths(s0, months), -1)])
+    }
+  }
+  const stripWin: [string, string] | undefined = pageWins.length ? [pageWins[0][0], pageWins[pageWins.length - 1][1]] : undefined
+  // The strip is as wide as the pages' timelines laid end to end, so it has the same scale as a page.
+  const stripW = CHART_X0 + pageWins.length * (EXPORT_W - CHART_X0 - CHART_RIGHT) + CHART_RIGHT
+  const xPages: ExportPages | null = stripWin ? {
+    count: pageWins.length, span: zoomLabel,
+    breaks: pageWins.slice(1).map(([b]) => {
+      const total = daysBetween(stripWin[0], stripWin[1]) + 1
+      return CHART_X0 + (daysBetween(stripWin[0], b) / total) * (stripW - CHART_X0 - CHART_RIGHT)
+    }),
+  } : null
+  // What the PDF prints: one chart, or one per page across.
+  const printWins: ([string, string] | undefined)[] = xRangeOn === 'pages' && pageWins.length ? pageWins
+    : [xRangeOn === 'view' ? chartWindow : undefined]
+  const year = (d: string) => d.slice(0, 4)
+  const viewDates = chartWindow
+    ? `${shortDate(chartWindow[0])}${year(chartWindow[0]) !== year(chartWindow[1]) ? `, ${year(chartWindow[0])}` : ''} – ${shortDate(chartWindow[1])}, ${year(chartWindow[1])}`
+    : ''
 
   // One colour per phase, in phase order (each phase keeps its own colour when phases are reordered).
   const colorOf = phaseColors(project, phases.rows)
@@ -457,9 +508,8 @@ export default function Schedule() {
               </select>
             )}
             {mode === 'presentation' && xBg === 'custom' && customControls}
-            <button className="btn" onClick={() => setPreviewing(true)} title="See the PDF / PNG pages and choose paper, background and fit">Preview…</button>
-            <button className="btn" onClick={downloadPng} disabled={saving}>Download PNG</button>
-            <button className="btn primary" onClick={printPdf}>Save as PDF</button>
+            <button className="btn primary" onClick={() => setPreviewing(true)}
+              title="PDF or PNG: the whole schedule, what’s on screen, or pages at this zoom; paper, background, preview">Export…</button>
           </div>
           <div className="zoombar no-print">
             <span className="muted small">Zoom</span>
@@ -512,10 +562,6 @@ export default function Schedule() {
               onContextAt={(sp) => setSpot(sp)} />
             </div>
           </div>
-          <p className="muted small no-print">
-            “Save as PDF” opens the print dialog: choose <strong>Save as PDF</strong> as the printer. Exports use {pageOf(xPage).name.split(' (')[0].toLowerCase()} paper,
-            {xFit === 'fit' ? ' fitted to one page' : ' fitted to width'}{xBg === 'white' ? '' : `, ${xBg === 'tint' ? 'brand tint' : xBg === 'dark' ? 'brand dark' : xBg === 'custom' ? 'custom' : 'brand palette'} background`}; change these in Preview.
-          </p>
         </>
       )}
 
@@ -567,13 +613,29 @@ export default function Schedule() {
       )}
 
       {/* What PDF and PNG exports use: the timeline, not editable, in the chosen view. */}
+      {/* One printed page per chart (several when split into pages at the zoom); each repeats the title and names. */}
       <div className={`print-area export-only sched-export${xFit === 'fit' ? ' fit' : ''}`} aria-hidden="true"
         style={{ '--pbg': xColors.bg, '--ph': `${pageOf(xPage).h}in`, '--pm': `${PAGE_MARGIN}in` } as CSSProperties}>
-        <ScheduleChart project={xProject} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
-          firmName={FIRM_NAME} svgRef={exportSvg} keepOrder colors={xColors} />
+        {printWins.map((win, i) => (
+          <div key={win ? win[0] : 'all'} className="xp-print-page">
+            <ScheduleChart project={xProject} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
+              firmName={FIRM_NAME} svgRef={(el) => { exportSvgs.current[i] = el }} keepOrder colors={xColors}
+              window={win} dayMarks={dayMarks === 'on'} ticks={xRangeOn === 'pages' ? ticks : undefined}
+              pageLabel={printWins.length > 1 ? `Page ${i + 1} of ${printWins.length}` : undefined} />
+          </div>
+        ))}
       </div>
+      {/* The whole schedule at the zoom as one long drawing: the split-into-pages preview and PNG. Never printed. */}
+      {xRangeOn === 'pages' && stripWin && (
+        <div className="export-strip" aria-hidden="true">
+          <ScheduleChart project={xProject} phases={phases.rows} tasks={chartRows} people={people.rows} mode={mode} presented={presented}
+            firmName={FIRM_NAME} svgRef={(el) => { stripSvg.current = el }} keepOrder colors={xColors} window={stripWin} width={stripW}
+            dayMarks={dayMarks === 'on'} ticks={ticks} />
+        </div>
+      )}
       {previewing && (
-        <ExportPreview svg={exportSvg} settings={xSettings} customControls={xBg === 'custom' ? customControls : undefined} onSettings={setXSettings} bgColor={xColors.bg} saving={saving}
+        <ExportPreview drawing={previewDrawing} settings={xSettings} zoom={months ? { label: zoomLabel, dates: viewDates } : null} pages={xPages}
+          customControls={xBg === 'custom' ? customControls : undefined} onSettings={setXSettings} bgColor={xColors.bg} saving={saving}
           onClose={() => setPreviewing(false)} onPng={() => void downloadPng()} onPdf={() => { setPreviewing(false); setTimeout(printPdf, 50) }} />
       )}
 

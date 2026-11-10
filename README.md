@@ -41,8 +41,11 @@ carrying about three medium tasks at once.
   - *Timeline*: drag bars to move them, drag ends to change length; moving a phase moves its tasks.
     Zoom to 12 months (month ticks), 6 months (week ticks) or 3 months (day ticks) for fine moves;
     click and hold empty space to pan. *Working view* shows everything; *Presentation view* shows only
-    phases and tasks marked "Show in presentation view". Export as PDF or PNG; *Preview…* shows the pages and sets paper (Letter / Tabloid / Arch B 18×12), fit (one page or
-    full width) and background (white, brand tint or brand dark, from the project's colour).
+    phases and tasks marked "Show in presentation view". *Export…* opens one dialog for PDF and PNG with a preview.
+    *Show*: the whole schedule, just what's on screen (when zoomed), or the whole schedule split into pages at the
+    screen's zoom (12, 6 or 3 months to a page; each page repeats the title and names, and the preview shows the
+    schedule as one strip with dashed page breaks; the PNG is one long image). Also paper (Letter / Tabloid /
+    Arch B 18×12), tall schedules (shrink to the page or continue on the next) and background.
   - *Calendar*: month grid; drag a task to another day.
   - *Board*: columns by status (kanban), by phase, or by week (post-it pull plan; a strip on each note shows its phase);
     drag cards between columns.
