@@ -2,9 +2,9 @@ import { useSyncExternalStore } from 'react'
 
 /**
  * Phone layout: narrow screens get their own navigation (top bar and bottom tabs) and simpler screens.
- * Same breakpoint as the CSS (@media (max-width: 720px)).
+ * Narrow screens, and phones turned sideways (short and touch). Same breakpoint as the CSS media queries.
  */
-export const PHONE_QUERY = '(max-width: 720px)'
+export const PHONE_QUERY = '(max-width: 720px), (pointer: coarse) and (max-height: 520px)'
 const mq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(PHONE_QUERY) : null
 const subscribe = (cb: () => void) => { mq?.addEventListener('change', cb); return () => mq?.removeEventListener('change', cb) }
 export const isPhone = () => Boolean(mq?.matches)

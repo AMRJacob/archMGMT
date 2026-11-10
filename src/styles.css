@@ -1546,7 +1546,7 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
    of the screens adapt here.
    ====================================================================== */
 .mtop, .mtabs { display: none; }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   :root { font-size: 15px; }
   .shell.phone { display: block; min-height: 100dvh; overflow-x: clip; }
   .shell.phone .content { overflow-x: clip; }
@@ -1643,7 +1643,7 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 
 /* ---------- phone: Overview ---------- */
 .info-toggle { display: none; }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .project-head { padding: 14px; gap: 12px; }
   .project-title { flex-wrap: wrap; gap: 4px 8px; }
   .project-title .title { font-size: 19px; flex-basis: 100%; order: 3; margin-left: -7px; }
@@ -1714,7 +1714,7 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 .agenda-when { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .agenda-group.late .agenda-when { color: var(--danger); }
 
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .schedule-page .page-head { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
   .sched-sticky { position: static !important; }
   .subbar { flex-wrap: wrap; gap: 8px; }
@@ -1729,7 +1729,7 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
 }
 
 /* ---------- phone: My To Do, Team, Projects, Settings, Notes ---------- */
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .todo-filters { gap: 8px; }
   .todo-filters .todo-search { flex: 1 1 100%; width: auto; }
   .todo-filters .small-select { flex: 1 1 40%; }
@@ -1757,7 +1757,7 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
   .notes-toolbar, .notes-filters { flex-wrap: wrap; }
   .note-grid { grid-template-columns: 1fr !important; }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   /* All Projects: each row is a card; the chosen columns become label / value lines. */
   .card.table-scroll:has(.projects-table) { background: none; border: none; box-shadow: none; overflow: visible; }
   .projects-table, .projects-table tbody, .projects-table tfoot { display: block; }
@@ -1770,14 +1770,60 @@ section.todo-page .todo-filters select.field.boxed { width: auto !important; max
   .projects-table tfoot tr { background: var(--subtle); }
   .projects-table td.empty { grid-column: 1 / -1; }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .quick-panel { left: 8px; right: 8px; width: auto; bottom: calc(72px + env(safe-area-inset-bottom)); max-height: 70dvh; overflow-y: auto; border-radius: 14px; }
   .pop-menu { max-width: calc(100vw - 16px); }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .schedule-page .card.pad { padding: 10px 8px; }
   .board-cols, .board { -webkit-overflow-scrolling: touch; }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
   .card > .table:not(.projects-table):not(.heat) { min-width: 600px; }
 }
+
+/* Phones turned sideways: little height, so the top bar scrolls away and the tabs slim down. */
+@media (pointer: coarse) and (max-height: 520px) {
+  .mtop { position: static; }
+  .mtabs a, .mtabs button { flex-direction: row; justify-content: center; gap: 6px; padding: 5px 0; font-size: 12px; }
+  .mtabs svg { width: 18px; height: 18px; }
+  .shell.phone .content { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  .ptl-axis { top: 0 !important; }
+}
+
+/* ---------- phone timeline: name line, then a full-width bar line ---------- */
+.ptl { display: flex; flex-direction: column; gap: 8px; }
+.ptl-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ptl-nav { display: inline-flex; gap: 4px; margin-left: auto; }
+.ptl-empty { padding: 30px 0; text-align: center; }
+.ptl-axis { position: sticky; top: calc(54px + env(safe-area-inset-top)); z-index: 5; background: var(--paper); padding: 4px 12px 2px; border-bottom: 1px solid var(--line); }
+.ptl-axis-in { position: relative; height: 32px; }
+.ptl-axis-in span { position: absolute; top: 16px; font-size: 10.5px; color: var(--muted); padding-left: 3px; border-left: 1px solid var(--line-strong); line-height: 14px; white-space: nowrap; }
+.ptl-axis-in span.yr { color: var(--ink); font-weight: 600; }
+.ptl-axis-in em { position: absolute; top: 1px; transform: translateX(-50%); font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--on-accent); background: var(--accent); border-radius: 6px; padding: 1px 5px; z-index: 1; }
+.ptl-range { text-align: right; font-size: 10.5px; }
+.ptl-body { position: relative; display: flex; flex-direction: column; gap: 10px; }
+.ptl-today { position: absolute; top: 0; bottom: 0; left: calc(12px + (100% - 24px) * var(--at)); width: 0; border-left: 1.5px dashed var(--accent); opacity: .55; z-index: 2; pointer-events: none; }
+.ptl-phase { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: inset 3px 0 0 var(--pc); }
+.ptl-phase ul { list-style: none; margin: 0; padding: 0 0 4px; }
+.ptl-phead { padding: 10px 12px 8px; background: color-mix(in srgb, var(--pc) 9%, var(--panel)); }
+.ptl-phead strong { font-size: 14.5px; }
+.ptl-row { padding: 7px 12px 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ptl-row + .ptl-row { border-top: 1px solid var(--line-soft); }
+.ptl-row:active { background: var(--hover); }
+.ptl-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-left: calc(var(--d, 0) * 12px); }
+.ptl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.ptl-row.k-sheet .ptl-name, .ptl-row.k-section .ptl-name { font-weight: 600; }
+.ptl-row.done .ptl-name { color: var(--muted); text-decoration: line-through; }
+.ptl-meta { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; display: inline-flex; gap: 6px; }
+.ptl-meta b { font-weight: 600; color: var(--ink); opacity: .7; }
+.ptl-track { position: relative; height: 10px; margin-top: 4px; background: var(--line-soft); border-radius: 5px; }
+.ptl-bar { position: absolute; top: 1px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--pc) 70%, var(--panel)); }
+.ptl-bar.phase { top: 0; height: 10px; background: var(--pc); }
+.ptl-row.done .ptl-bar { opacity: .4; }
+.ptl-bar.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ptl-bar.cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ptl-dia { position: absolute; top: 0; width: 10px; height: 10px; margin-left: -5px; background: var(--ink); transform: rotate(45deg); border-radius: 1px; }
+.ptl-dia-sm { display: inline-block; width: 7px; height: 7px; background: var(--ink); transform: rotate(45deg); margin: 0 6px 1px 1px; }
+.ptl-off { position: absolute; top: -2px; font-size: 10px; color: var(--faint); }
+.ptl-off.right { right: 0; } .ptl-off.left { left: 0; }

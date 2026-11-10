@@ -22,6 +22,7 @@ import { BRAND_ROLES, KIND_RANK, type BrandPalette, type BrandRoles, type Phase,
 import { removeMany, useRows } from '../lib/data.ts'
 import { usePhone } from '../lib/phone.ts'
 import AgendaList from '../components/AgendaList.tsx'
+import PhoneTimeline from '../components/PhoneTimeline.tsx'
 import { deletePhaseQuestion, phaseContents } from '../lib/phaseWork.ts'
 import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { mondayOf } from '../lib/workload.ts'
@@ -151,7 +152,7 @@ export default function Schedule() {
   //  - Presentation view (timeline) has its own Show rules, so neither the Detail slider nor the work filter applies.
   //  - The General Tasks / Sheets filter does nothing at Detail "Phases" (only phases and milestones show) or
   //    when the project has no sheets.
-  const levelOff = view === 'timeline' && mode === 'presentation'
+  const levelOff = view === 'timeline' && mode === 'presentation' && !phone
   const workOff = levelOff || level === 0 || kindsHere.size < 2
   const workWhy = levelOff ? 'Presentation view uses its own Show rules (on the left); switch to Working view to use this.'
     : level === 0 ? 'Only phases and milestones show at this detail level, so there are no tasks or sheets to filter.'
@@ -418,7 +419,13 @@ export default function Schedule() {
         </div>
       </header>
 
-      {view === 'timeline' && (
+      {view === 'timeline' && phone && (
+        <>
+          <div className="subbar no-print"><span className="grow" />{levelControl}</div>
+          <PhoneTimeline phases={phases.rows} rows={treeRows} people={people.rows} colorOf={colorOf} onOpen={(t) => openTask(real(t))} />
+        </>
+      )}
+      {view === 'timeline' && !phone && (
         <>
           {/* The controls and zoom stay at the top of the window while scrolling the chart (the date header sticks just under them). */}
           <div className="sched-sticky no-print" ref={stickyBox}>
