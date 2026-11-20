@@ -585,6 +585,10 @@ h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
 .irow.done .field { color: var(--muted); text-decoration: line-through; }
 .irow .icon-btn { opacity: 0; }
 .irow:hover .icon-btn { opacity: 0.6; }
+/* Who's on a subtask: always shown once someone is; the + appears on hover. */
+.irow-who { flex: none; display: inline-flex; margin-right: 35px; }
+.irow-who:has(.avatar.empty) { opacity: 0; }
+.irow:hover .irow-who, .irow.selected .irow-who, .irow-who:focus-within { opacity: 1; }
 .tree-add { display: flex; gap: 2px; padding-top: 2px; padding-bottom: 4px; }
 .tree-add .btn.ghost { font-size: 12.5px; padding: 3px 7px; }
 .phase-actions-left { display: flex; gap: 4px; padding: 6px 10px 2px 32px; }

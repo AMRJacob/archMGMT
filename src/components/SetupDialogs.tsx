@@ -183,7 +183,7 @@ export function PhaseSetupDialog({ phase, phases, rows: allRows, projectId, take
     const t = templateFor(phase.name)
     return new Set(!t || t.sheets.length ? earlier.map((x) => x.id) : [])
   })
-  const [carrySubtasks, setCarrySubtasks] = useState(false)
+  const [carrySubtasks, setCarrySubtasks] = useState(true)
   const carriedTypes = (picked: Set<string>) => new Set(earlier.filter((t) => picked.has(t.id)).map((t) => t.sheet_type ?? 'other'))
   // A sheet type the phase usually needs starts unticked when earlier sheets of that type are carried.
   const startSheets = (from: { type: string; count: number; on: boolean }[]) => {

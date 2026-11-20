@@ -8,7 +8,7 @@ import {
   branchOf, canDemote, canHold, canPromote, clearClip, CLIP_EVENT, cloneRows, demote, isWithin, kindUnder, moveTo,
   placeAmong, promote, readClip, saveClip, slotFor, type Change, type Clip, type Place,
 } from '../lib/treeEdit.ts'
-import { MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
+import { AssigneeChip, MilestoneMark, Pop, TaskControls } from './TaskChips.tsx'
 import { guessSheetType, nextSheetNumbers, SHEET_TYPES, sheetRows, sheetTypeById } from '../lib/sheetTypes.ts'
 import { childrenOf, descendants, isItem, isSheetWork, kindOf, progressOf, rolledDates, scheduledChildren, workGroupOf, type Tree, type WorkGroup } from '../lib/tree.ts'
 import { assigneesOf, assignPatch } from '../lib/assignees.ts'
@@ -123,7 +123,7 @@ export default function PlanTree({
     let order = topHere.reduce((m, t) => Math.max(m, t.sort_order), topHere.length - 1) + 1
     const rows: Partial<Task>[] = []
     for (const src of sources) {
-      const c = carryRows(src, ph, { sortOrder: order++ })
+      const c = carryRows(src, ph, { sortOrder: order++, withSubtasks: true })
       if (c.linkSource) onPatch(src, { sheet_link: c.linkSource }, false)
       rows.push(c.sheet, ...c.items)
     }
@@ -467,6 +467,7 @@ export default function PlanTree({
           <input type="checkbox" checked={t.status === 'done'} title="Done"
             onChange={(e) => onPatch(t, { status: e.target.checked ? 'done' : 'todo' }, false)} />
           <div className="trow-title">{title(t)}</div>
+          <span className="irow-who"><AssigneeChip task={t} people={people} onPatch={(c) => onPatch(t, c)} /></span>
           <button className="icon-btn" title="Remove subtask" onClick={() => onDrop(t.id)}>×</button>
           {firstOf(t) && seam([{ task: t, depth }], 'before')}
           {seam([{ task: t, depth }, ...enders], 'after')}

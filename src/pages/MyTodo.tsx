@@ -8,7 +8,7 @@ import { phaseColors, projectDot } from '../lib/colors.ts'
 import { useRows } from '../lib/data.ts'
 import { addDays, formatDate, today } from '../lib/dates.ts'
 import { useProject } from '../lib/projectContext.ts'
-import { buildTree, headOf, isWorkLeaf, WORK_GROUPS, workGroupOf, type WorkGroup } from '../lib/tree.ts'
+import { buildTree, headOf, isWorkLeaf, rolledDates, WORK_GROUPS, workGroupOf, type WorkGroup } from '../lib/tree.ts'
 import type { Person, Phase, Task } from '../lib/types.ts'
 import { mondayOf } from '../lib/workload.ts'
 
@@ -57,9 +57,18 @@ export default function MyTodo() {
   const live = projects.filter((p) => !p.archived_at)
   const liveIds = new Set(live.map((p) => p.id))
   const tree = buildTree(tasks.rows)
-  const mine = me ? tasks.rows.filter((t) => liveIds.has(t.project_id) && t.kind !== 'item' && isAssigned(t, me.id)
-    && (t.is_milestone || isWorkLeaf(tree, t))) : []
-  const dueOf = (t: Task) => t.due_date ?? t.start_date
+  /** The task or sheet a subtask sits under. */
+  const aboveOf = (t: Task) => (t.parent_id ? tree.byId.get(t.parent_id) ?? null : null)
+  // Subtasks show when they're yours and the task above them isn't (that one is already in the list).
+  const mine = me ? tasks.rows.filter((t) => liveIds.has(t.project_id) && isAssigned(t, me.id) && (t.kind === 'item'
+    ? !(aboveOf(t) && isAssigned(aboveOf(t)!, me.id))
+    : t.is_milestone || isWorkLeaf(tree, t))) : []
+  /** Subtasks have no dates of their own: they go by the task or sheet above them. */
+  const dueOf = (t: Task): string | null => {
+    if (t.kind !== 'item') return t.due_date ?? t.start_date
+    const up = aboveOf(t)
+    return up ? rolledDates(tree, up).due ?? up.due_date ?? up.start_date : null
+  }
   const shown = mine.filter((t) => {
     if (!showDone && t.status === 'done') return false
     if (projectId && t.project_id !== projectId) return false
@@ -148,13 +157,15 @@ export default function MyTodo() {
               {group === 'due' && pr && <span><i className="pdot" style={{ background: projectDot(pr) }} />{pr.name}</span>}
               {ph && <span><i className="phase-sq" style={{ background: c }} />{ph.name}</span>}
               {sh && sh.id !== t.id && <span className="todo-sheet">{sh.sheet_number ? `${sh.sheet_number} ` : ''}{sh.title}</span>}
+              {t.kind === 'item' && aboveOf(t) && aboveOf(t)!.id !== sh?.id && <span>{aboveOf(t)!.title}</span>}
+              {t.kind === 'item' && <span>Subtask</span>}
               {d && d < t0 && t.status !== 'done' && <span className="late">Overdue since {formatDate(d)}</span>}
             </div>
           </div>
           <span className="todo-chips">
-            <StatusChip task={t} onPatch={(x) => patch(t, x)} />
-            {!t.is_milestone && <SizeChip task={t} onPatch={(x) => patch(t, x)} />}
-            <DateChip task={t} onPatch={(x) => patch(t, x)} />
+            {t.kind !== 'item' && <StatusChip task={t} onPatch={(x) => patch(t, x)} />}
+            {!t.is_milestone && t.kind !== 'item' && <SizeChip task={t} onPatch={(x) => patch(t, x)} />}
+            {t.kind !== 'item' && <DateChip task={t} onPatch={(x) => patch(t, x)} />}
             <button className="icon-btn todo-go" title={`Open in ${pr?.name ?? 'the project'}'s Overview`} onClick={() => open(t)}>↗</button>
           </span>
         </div>
