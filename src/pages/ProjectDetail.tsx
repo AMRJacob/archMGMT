@@ -5,6 +5,7 @@ import PersonOptions from '../components/PersonOptions.tsx'
 import { MilestoneMark, TaskControls } from '../components/TaskChips.tsx'
 import PlanTree, { type PhaseAdd } from '../components/PlanTree.tsx'
 import ProjectTeam from '../components/ProjectTeam.tsx'
+import { BuildingTypeField } from '../components/ProjectDetailsDialog.tsx'
 import RowColumnsHeader from '../components/RowColumnsHeader.tsx'
 import { useRowLayout } from '../lib/rowColumns.ts'
 import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
@@ -23,7 +24,7 @@ import { useProjectPlan } from '../lib/useProjectPlan.ts'
 import { useAuth } from '../auth/authContext.ts'
 import { isAssigned } from '../lib/assignees.ts'
 import { useNotes } from '../lib/useNotes.tsx'
-import { area, BUILDING_TYPES, money } from '../lib/amount.ts'
+import { area, money } from '../lib/amount.ts'
 import { isPresented, rulesOf, togglePresented } from '../lib/presentation.ts'
 
 export default function ProjectDetail() {
@@ -480,24 +481,5 @@ export default function ProjectDetail() {
         )
       })()}
     </section>
-  )
-}
-
-/** Building type: the usual list, or type your own under Other. */
-function BuildingTypeField({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
-  const known = !value || BUILDING_TYPES.includes(value)
-  const [other, setOther] = useState(!known)
-  if (other) {
-    return <TextField value={value} placeholder="Building type" autoFocus={known} onSave={(v) => { onSave(v); if (!v) setOther(false) }} onEscape={() => setOther(false)} />
-  }
-  return (
-    <select className="field" value={value ?? ''} onChange={(e) => {
-      if (e.target.value === '__other') { setOther(true); return }
-      onSave(e.target.value || null)
-    }}>
-      <option value="">Not set</option>
-      {BUILDING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-      <option value="__other">Other…</option>
-    </select>
   )
 }

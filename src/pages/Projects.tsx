@@ -6,6 +6,8 @@ import { useProject } from '../lib/projectContext.ts'
 import { projectDot } from '../lib/colors.ts'
 import { buildTree, isWorkLeaf } from '../lib/tree.ts'
 import NewProjectFlow from '../components/NewProjectFlow.tsx'
+import ContextMenu, { type MenuItem } from '../components/ContextMenu.tsx'
+import ProjectDetailsDialog from '../components/ProjectDetailsDialog.tsx'
 import { Pop } from '../components/TaskChips.tsx'
 import { area, money, parseAmount } from '../lib/amount.ts'
 import { formatDate, maxDate, minDate, today as todayISO } from '../lib/dates.ts'
@@ -88,6 +90,9 @@ export default function Projects() {
   const [cols, setColsState] = useState<ColKey[]>(savedCols)
   const [sort, setSort] = useState<{ key: ColKey | 'name'; dir: 1 | -1 }>({ key: 'number', dir: -1 })
   const [creating, setCreating] = useState(false)
+  // Right-click on a project row, and the project whose details are open.
+  const [menu, setMenu] = useState<{ x: number; y: number; project: Project } | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [widths, setWidthsState] = useState<Record<string, number>>(savedWidths)
   const [dragCol, setDragCol] = useState<ColKey | null>(null)
   const [dropAt, setDropAt] = useState<{ key: ColKey; side: 'l' | 'r' } | null>(null)
@@ -236,6 +241,27 @@ export default function Projects() {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
 
+  const open = (p: Project) => { projects.select(p.id); navigate('/overview') }
+  const setArchived = (p: Project, on: boolean) => void projects.patch(p.id, { archived_at: on ? new Date().toISOString() : null })
+  async function deleteProject(p: Project) {
+    const nPhases = phases.rows.filter((x) => x.project_id === p.id).length
+    const nTasks = tasks.rows.filter((x) => x.project_id === p.id).length
+    const what = [nPhases && `${nPhases} phase${nPhases === 1 ? '' : 's'}`, nTasks && `${nTasks} task${nTasks === 1 ? '' : 's'}, sheets and milestones`].filter(Boolean).join(' and ')
+    if (!window.confirm(`Permanently delete "${[p.number, p.name].filter(Boolean).join(' ')}"${what ? ` with its ${what}` : ''}? This can't be undone. (Settings has a backup download.)`)) return
+    await projects.drop(p.id)
+    void phases.reload(); void tasks.reload()
+  }
+  const menuItems = (p: Project): MenuItem[] => [
+    { label: 'Open', run: () => open(p) },
+    { label: 'Edit details…', run: () => setEditingId(p.id) },
+    'sep',
+    p.archived_at
+      ? { label: 'Restore from archive', run: () => setArchived(p, false) }
+      : { label: 'Archive', run: () => setArchived(p, true) },
+    { label: 'Delete permanently…', danger: true, run: () => void deleteProject(p) },
+  ]
+  const editing = projects.projects.find((p) => p.id === editingId) ?? null
+
   const error = projects.error ?? phases.error ?? tasks.error ?? people.error
   const multi = (label: string, choices: string[], picked: string[], set: (v: string[]) => void, empty: string) => (
     <Pop className="filter-pop" title={`Filter by ${label.toLowerCase()}`}
@@ -260,7 +286,7 @@ export default function Projects() {
       <header className="page-head">
         <div>
           <h1>All Projects</h1>
-          <p className="muted">Every project at a glance. Filter, sort by any column, and pick the columns you want.</p>
+          <p className="muted">Every project at a glance. Filter, sort by any column, and pick the columns you want. Right-click a project to edit its details, archive or delete it.</p>
         </div>
         <button className="btn primary" onClick={() => setCreating(true)}>+ New project</button>
       </header>
@@ -336,7 +362,8 @@ export default function Projects() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.project.id} className={r.project.id === projects.current?.id ? 'current' : ''}
-                onClick={() => { projects.select(r.project.id); navigate('/overview') }}>
+                onClick={() => open(r.project)}
+                onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, project: r.project }) }}>
                 <td title={tableText === 'crop' ? [r.project.name, r.project.client].filter(Boolean).join(' · ') : undefined}>
                   <div className="strong"><span className="pdot" style={{ background: projectDot(r.project) }} />{r.project.name}</div>
                   {!cols.includes('owner') && r.project.client && <div className="muted small">{r.project.client}</div>}
@@ -362,6 +389,8 @@ export default function Projects() {
         </table>
       </div>
       {creating && <NewProjectFlow onClose={() => setCreating(false)} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.project)} onClose={() => setMenu(null)} />}
+      {editing && <ProjectDetailsDialog project={editing} people={people.rows} onPatch={(c) => void projects.patch(editing.id, c)} onClose={() => setEditingId(null)} />}
     </section>
   )
 }

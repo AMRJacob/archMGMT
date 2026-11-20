@@ -65,7 +65,8 @@ carrying about three medium tasks at once.
   filterable by project, kind (general / sheets), due date and search, grouped by project or due date; completed
   optional. Click a task for its details (description included); drag tasks into your own order (saved in your
   browser). Tick tasks off or change status, size and dates in place; ↗ opens the task's project.
-- **All projects**: every project with PM, current phase, schedule span and open tasks.
+- **All projects**: every project with PM, current phase, schedule span and open tasks. Right-click a project to open it,
+  edit its details (number, name, owner, type, PM, status, budget, area, team, notes), archive or restore it, or delete it.
 - **Team & workload**: 12-week heat map per staff member (Light / Steady / Busy / Overloaded), ◆ for due dates,
   hover for the week's tasks; click a person for their per-project breakdown, open tasks, time off, availability.
 - **Editing tasks**: every part of a task row is clickable in place (status, size, dates, assignee, ⋯ for more);
