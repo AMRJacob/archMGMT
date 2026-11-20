@@ -45,6 +45,8 @@ export interface Project {
   archived_at?: string | null
   /** The people on this project (Overview → Team). Assigning tasks offers these first. */
   team?: string[] | null
+  /** Revit models that belong to this project (each model's Project Information UniqueId), set by the Revit add-in. */
+  revit_models?: string[] | null
   /** Custom presentation colours (Schedule → Presentation view → Custom). */
   export_colors?: BrandRoles | null
   created_at?: string
@@ -103,6 +105,8 @@ export interface Task {
   sheet_type?: string | null
   /** Sheets carried through phases: rows sharing this id are the same drawing in different phases. */
   sheet_link?: string | null
+  /** Revit add-in: the UniqueId of the Revit sheet (on sheets) or view (on a task that stands for a view). */
+  revit_id?: string | null
   /** Extra info for anything in the tree. */
   notes?: string | null
   status: TaskStatus

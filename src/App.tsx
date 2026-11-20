@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AuthProvider, CreatePassword, SignIn } from './auth/Auth.tsx'
 import { useAuth } from './auth/authContext.ts'
-import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import PageEdge from './components/PageEdge.tsx'
 import GlobalSearch from './components/GlobalSearch.tsx'
 import { Notices, PresenceProvider, WhosHere } from './components/Presence.tsx'
@@ -18,6 +18,7 @@ import Schedule from './pages/Schedule.tsx'
 import Team from './pages/Team.tsx'
 import Settings from './pages/Settings.tsx'
 import MyTodo from './pages/MyTodo.tsx'
+import RevitPanel from './pages/RevitPanel.tsx'
 import { MobileTabs, MobileTop } from './components/MobileNav.tsx'
 import { usePhone } from './lib/phone.ts'
 
@@ -32,11 +33,19 @@ export default function App() {
 /** Shared database: sign in first. Browser-only mode: straight in. */
 function Gate() {
   const { session, loading, needsPassword } = useAuth()
+  const loc = useLocation()
+  const revit = loc.pathname === '/revit'
   if (!usingSampleData) {
+    // The floating checklist in Revit is too small for the sign-in form: that happens in the pane.
+    if (revit && loc.search.includes('mode=overlay') && (loading || !session)) {
+      return <div className="rv rv-overlay"><div className="rv-ov-head"><span className="rv-ov-title"><span className="muted">{loading ? 'archMGMT' : 'Sign in from the archMGMT pane'}</span></span></div></div>
+    }
     if (loading) return <div className="signin"><p className="muted">Loading…</p></div>
     if (!session) return <SignIn />
     if (needsPassword) return <CreatePassword />
   }
+  // The Revit add-in's panel: the same sign-in and data, without the app's sidebar and pages.
+  if (revit) return <ProjectProvider><RevitPanel /><Notices /></ProjectProvider>
   return <Shell />
 }
 

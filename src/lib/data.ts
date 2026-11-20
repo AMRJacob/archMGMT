@@ -353,7 +353,7 @@ export async function removeMany(table: TableName, ids: string[]): Promise<void>
 }
 
 /** Fields a sheet shares with its copies in other phases (see sheet_link). */
-const LINKED_FIELDS = ['sheet_number', 'title', 'sheet_type'] as const
+const LINKED_FIELDS = ['sheet_number', 'title', 'sheet_type', 'revit_id'] as const
 
 /** Load rows for a screen, with helpers to keep the on-screen copy in step with edits. */
 export function useRows<T extends { id: string }>(table: TableName, match: Match = {}) {

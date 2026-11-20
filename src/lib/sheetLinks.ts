@@ -67,6 +67,7 @@ export function carryRows(source: Task, phase: Phase, opts: { sortOrder: number;
   const sheet: Partial<Task> = {
     id, project_id: source.project_id, phase_id: phase.id, parent_id: null, kind: 'sheet',
     sheet_number: source.sheet_number ?? null, sheet_type: source.sheet_type ?? 'other', sheet_link: link, title: source.title,
+    revit_id: source.revit_id ?? null,
     assignee_id: source.assignee_id ?? null, assignee_ids: source.assignee_ids ?? (source.assignee_id ? [source.assignee_id] : []),
     start_date: phase.start_date, due_date: phase.end_date, estimated_hours: null, effort: source.effort ?? type?.effort ?? 2,
     status: 'todo', is_milestone: false, client_visible: source.client_visible, sort_order: opts.sortOrder, notes: null,

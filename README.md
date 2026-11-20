@@ -1,5 +1,10 @@
 # archMGMT
 
+**Live app:** https://amrjacob.github.io/archMGMT/
+
+**Revit add-in:** [Download archMGMT-Revit-Setup.exe](https://github.com/AMRJacob/archMGMT/releases/latest/download/archMGMT-Revit-Setup.exe)
+(Revit 2026 · no admin rights · updates itself · [details](revit-plugin/README.md))
+
 Simple project management for a small architecture firm: tasks, schedules and workloads in one place,
 with Gantt charts that export ready to hand to a client.
 
@@ -74,6 +79,18 @@ carrying about three medium tasks at once.
   and error reports with a green-to-red priority, newest first; admins set status and reply), *Access* (your account, who can sign in), and *Data* (storage, backup / restore,
   sample data).
 
+## Revit add-in
+
+`revit-plugin/` is a small Revit 2026 add-in (AMR tab › archMGMT, beside Contours to Revit). It shows this app's
+`#/revit` page (`src/pages/RevitPanel.tsx`) in a pane docked at the right and, optionally, as a small checklist
+floating on the sheet. The page follows the sheet or view open in Revit and shows that sheet's tasks and subtasks for
+the phase being worked on: tick them off, see which are yours, add tasks, assign people and set dates. Revit sheets are
+linked to archMGMT sheets by Revit UniqueId (`tasks.revit_id`; the model's project in `projects.revit_models`), so
+nothing is written into the .rvt and the link is the same for everyone in the model. Right-click a sheet in the Project
+Browser › **archMGMT** to show its tasks, add or link sheets, or add a task. Because the pane is the web app, changes
+to it reach everyone with the next site deploy; only changes under `revit-plugin/src` need a new installer
+(bump `revit-plugin/version.txt`). Try the page without Revit: `…/archMGMT/?host=mock#/revit`.
+
 ## Keeping data safe while iterating
 
 - Browser data lives under one fixed storage key that never changes.
@@ -110,7 +127,8 @@ supabase/migrations/    Database schema (run once in Supabase SQL Editor)
 7. Sheets ✓ (hierarchy, types with checklists from Asana). Next: editable templates, sheet list import from a pasted
    sheet index / Revit schedule CSV / PDF set. Original note: per-project sheet list (number, name, discipline, assignee, status), import from a pasted
    sheet index / Revit schedule CSV / PDF set, counted in workload
-8. Revit add-in: push sheets and views from the model, pull assignments back into a sheet parameter
+8. Revit add-in ✓ (`revit-plugin/`): a docked pane and a floating checklist that follow the open sheet or view; link, add,
+   assign and tick off from Revit. Next: write assignments back into a sheet parameter
 9. Later: consultant logins with access limited to their projects
 
 ## Sample data
