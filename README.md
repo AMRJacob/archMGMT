@@ -83,8 +83,8 @@ carrying about three medium tasks at once.
 
 `revit-plugin/` is a small Revit 2026 add-in (AMR tab › archMGMT, beside Contours to Revit). It shows this app's
 `#/revit` page (`src/pages/RevitPanel.tsx`) in a pane docked at the right and, optionally, as a small checklist
-floating on the sheet. The page follows the sheet or view open in Revit and shows that sheet's tasks and subtasks for
-the phase being worked on: tick them off, see which are yours, add tasks, assign people and set dates. Revit sheets are
+floating on the sheet. The page follows the sheet or view open in Revit and shows every task and subtask on that
+sheet, whichever phase it's in, with filters (mine, open, phase): tick them off, add tasks, assign people and set dates. Revit sheets are
 linked to archMGMT sheets by Revit UniqueId (`tasks.revit_id`; the model's project in `projects.revit_models`), so
 nothing is written into the .rvt and the link is the same for everyone in the model. Right-click a sheet in the Project
 Browser › **archMGMT** to show its tasks, add or link sheets, or add a task. Because the pane is the web app, changes

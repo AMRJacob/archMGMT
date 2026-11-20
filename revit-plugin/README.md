@@ -3,18 +3,18 @@
 Adds **AMR › archMGMT** to Revit 2026 (the same AMR tab as Contours to Revit):
 
 - **Sheet Tasks** shows or hides the archMGMT pane, docked at the right. It follows whatever is open: on a sheet it
-  shows that sheet's tasks and subtasks for the phase you're working in; on a view it shows the view's task and the
-  sheet it's placed on. Tick things off, see which are yours (accent bar, or *Only mine*), add tasks and subtasks,
-  assign people and set dates. Everything is live with the archMGMT site and with everyone else's Revit.
+  shows every task and subtask on that sheet, from any phase (grouped by phase when there's more than one); on a view
+  it shows the view's task and the sheet it's placed on. Filters: *Only mine*, *Open only*, and one phase or all.
+  Tick things off, see which are yours (accent bar), add tasks and subtasks, assign people and set dates. Everything is live with the archMGMT site and with everyone else's Revit.
 - **Checklist on Sheet** shows or hides a small floating checklist in the top-right corner of the open sheet or view
-  (also *Show on sheet* in the pane). It folds down to one line.
+  (also *Show on sheet* in the pane), with the same filters (Mine · Open · phase). It folds down to one line.
 - **Right-click** a sheet or view in the Project Browser or the drawing › **archMGMT**: *Show tasks*, *Add or link
   sheets* (several at once), *Add a task…*.
 
 The first time a model is opened, the pane asks which archMGMT project it belongs to (it suggests the one whose number
 matches Revit's Project Number). After that everyone who opens the model gets the same project. Sheets are linked one
 by one or all together (*All sheets › Add all*): a Revit sheet whose number matches an archMGMT sheet is linked to it;
-the rest are added to the phase with their type's standard subtasks.
+the rest are added, with their type's standard subtasks, to the phase picked in the filter (or the one today falls in).
 
 Nothing is written into the .rvt. Links are kept in archMGMT's database by Revit UniqueId (`tasks.revit_id`,
 `projects.revit_models`), which is the same for everyone working in a shared model.

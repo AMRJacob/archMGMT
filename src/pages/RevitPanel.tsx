@@ -30,12 +30,17 @@ interface Ctx {
   plan: Plan
   tree: Tree
   project: Project
+  /** Where new sheets and carried copies go: the phase filtered to, else the one today falls in. */
   phase: Phase
+  /** Only this phase's work is shown (null: every phase). */
+  phaseFilter: Phase | null
   phases: Phase[]
   people: Person[]
   me: Person | null
   model: RevitModel
   onlyMine: boolean
+  /** Hide what's already done. */
+  openOnly: boolean
   compact: boolean
   say: (text: string) => void
 }
@@ -51,6 +56,28 @@ function crewOf(tree: Tree, t: Task): string[] {
 const isMine = (c: Ctx, t: Task) => Boolean(c.me && crewOf(c.tree, t).includes(c.me.id))
 const nextOrder = (rows: Task[]) => rows.reduce((m, t) => Math.max(m, t.sort_order), rows.length - 1) + 1
 
+/** Filters shared by the pane and the floating checklist (two windows of the same page), remembered between sessions. */
+interface Filters { mine: boolean; open: boolean; phase: Record<string, string> }
+const FILTER_KEY = 'archmgmt.revit.filters'
+function readFilters(): Filters {
+  try { return { mine: false, open: true, phase: {}, ...(JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>) } }
+  catch { return { mine: false, open: true, phase: {} } }
+}
+function useFilters() {
+  const [f, setF] = useState<Filters>(readFilters)
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === FILTER_KEY) setF(readFilters()) }
+    window.addEventListener('storage', on)
+    return () => window.removeEventListener('storage', on)
+  }, [])
+  const set = (next: Partial<Filters>) => {
+    const merged = { ...readFilters(), ...next }
+    setF(merged)
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(merged)) } catch { /* private mode */ }
+  }
+  return [f, set] as const
+}
+
 export default function RevitPanel() {
   const [params] = useSearchParams()
   const compact = params.get('mode') === 'overlay'
@@ -65,27 +92,22 @@ export default function RevitPanel() {
   const tree = useMemo(() => buildTree(plan.tasks.rows), [plan.tasks.rows])
   const phases = useMemo(() => phaseOrder(plan.phases.rows), [plan.phases.rows])
 
-  // The phase being worked on: the one picked last time for this project, else the one today falls in.
-  const [picked, setPicked] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem('archmgmt.revit.phase') ?? '{}') as Record<string, string> } catch { return {} }
-  })
+  // Every phase's work on a sheet shows unless one phase is picked as a filter. New sheets go into the phase
+  // filtered to, else the one today falls in.
+  const [filters, setFilters] = useFilters()
   const t0 = today()
-  const phase = phases.find((p) => p.id === (project ? picked[project.id] : ''))
-    ?? phases.find((p) => p.start_date <= t0 && t0 <= p.end_date) ?? phases.find((p) => p.start_date > t0) ?? phases[phases.length - 1] ?? null
-  const pickPhase = (id: string) => {
-    if (!project) return
-    const next = { ...picked, [project.id]: id }
-    setPicked(next)
-    try { localStorage.setItem('archmgmt.revit.phase', JSON.stringify(next)) } catch { /* private mode */ }
-  }
+  const phaseFilter = phases.find((p) => p.id === (project ? filters.phase[project.id] : '')) ?? null
+  const phase = phaseFilter ?? phases.find((p) => p.start_date <= t0 && t0 <= p.end_date) ?? phases.find((p) => p.start_date > t0) ?? phases[phases.length - 1] ?? null
+  const pickPhase = (id: string) => { if (project) setFilters({ phase: { ...filters.phase, [project.id]: id } }) }
 
   const email = session?.user.email?.toLowerCase() ?? null
   const me = (email ? plan.people.rows.find((p) => (p.email ?? '').toLowerCase() === email) : null)
     ?? (usingSampleData ? plan.people.rows.find((p) => p.kind === 'staff') ?? null : null)
 
   const [tab, setTab] = useState<'sheet' | 'all'>('sheet')
-  const [onlyMine, setOnlyMine] = useState(() => { try { return localStorage.getItem('archmgmt.revit.mine') === '1' } catch { return false } })
-  const toggleMine = () => { const v = !onlyMine; setOnlyMine(v); try { localStorage.setItem('archmgmt.revit.mine', v ? '1' : '0') } catch { /* ignore */ } }
+  const onlyMine = filters.mine, openOnly = filters.open
+  const toggleMine = () => setFilters({ mine: !onlyMine })
+  const toggleOpen = () => setFilters({ open: !openOnly })
   const [folded, setFolded] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const say = (text: string) => { setNote(text); window.setTimeout(() => setNote((n) => (n === text ? null : n)), 6000) }
@@ -109,7 +131,7 @@ export default function RevitPanel() {
     setTab('sheet')
     if (cmd.name === 'add') {
       const sheets = model.sheets.filter((s) => cmd.ids.includes(s.id))
-      if (sheets.length) void addSheets({ plan, tree, project, phase, model }, sheets).then((r) => { if (r) setNote(r) })
+      if (sheets.length) void addSheets({ plan, tree, project, phase, phases, model }, sheets).then((r) => { if (r) setNote(r) })
       else setNote('Pick one or more sheets to add (views are added as tasks from their sheet).')
     }
     if (first) setPin({ id: first, over: activeId, addTask: cmd.name === 'task' })
@@ -140,14 +162,14 @@ export default function RevitPanel() {
     )
   }
 
-  const ctx: Ctx | null = project && phase && model ? { plan, tree, project, phase, phases, people: plan.people.rows, me, model, onlyMine, compact, say } : null
+  const ctx: Ctx | null = project && phase && model ? { plan, tree, project, phase, phaseFilter, phases, people: plan.people.rows, me, model, onlyMine, openOnly, compact, say } : null
   const target = ctx ? targetOf(ctx.model, pinned?.id ?? null) : null
 
   if (compact) {
     return (
       <div className="rv rv-overlay" ref={root}>
         {!ctx ? <div className="rv-ov-head"><span className="rv-ov-title muted">{model?.open ? 'Link this model in the archMGMT pane' : 'archMGMT'}</span></div>
-          : <Overlay c={ctx} target={target} folded={folded} onFold={() => setFolded(!folded)} onMine={toggleMine} />}
+          : <Overlay c={ctx} target={target} folded={folded} onFold={() => setFolded(!folded)} onMine={toggleMine} onOpen={toggleOpen} onPhase={pickPhase} />}
       </div>
     )
   }
@@ -189,7 +211,8 @@ export default function RevitPanel() {
         : (
           <>
             <div className="rv-bar">
-              <select className="field boxed rv-phase" value={ctx.phase.id} onChange={(e) => pickPhase(e.target.value)} aria-label="Phase" title="The phase you're working in">
+              <select className="field boxed rv-phase" value={phaseFilter?.id ?? ''} onChange={(e) => pickPhase(e.target.value)} aria-label="Phase" title="Show every phase's work on a sheet, or just one phase's">
+                <option value="">All phases</option>
                 {phases.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <div className="segmented small-seg">
@@ -200,6 +223,9 @@ export default function RevitPanel() {
             <div className="rv-bar rv-sub">
               <label className="inline-check small" title={me ? `Only what's assigned to ${me.name}` : 'Your sign-in isn’t linked to a name on the Team list yet'}>
                 <input type="checkbox" checked={onlyMine} onChange={toggleMine} disabled={!me} /> Only mine
+              </label>
+              <label className="inline-check small" title="Hide what's already done">
+                <input type="checkbox" checked={openOnly} onChange={toggleOpen} /> Open only
               </label>
               <label className="inline-check small" title="A small checklist floating on the sheet in Revit">
                 <input type="checkbox" checked={Boolean(info?.overlay)} onChange={(e) => void ask<boolean>('setOverlay', { on: e.target.checked }).then((on) => revit.setInfo((i) => (i ? { ...i, overlay: on } : i)))} /> Show on sheet
@@ -237,11 +263,23 @@ function targetOf(model: RevitModel, pinnedId: string | null): Target {
   return { sheets: [], view: null, none: true }
 }
 
-/** The app's rows for a Revit sheet (one per phase it's in), and the one for this phase. */
-function rowsFor(c: Pick<Ctx, 'plan' | 'phase'>, revitId: string) {
+/** The app's rows for a Revit sheet (one per phase it's in, in phase order), and the ones the phase filter lets through. */
+function rowsFor(c: Pick<Ctx, 'plan' | 'phases' | 'phaseFilter'>, revitId: string) {
+  const rank = new Map(c.phases.map((p, i) => [p.id, i]))
   const all = c.plan.tasks.rows.filter((t) => t.kind === 'sheet' && t.revit_id === revitId)
-  return { all, here: all.find((t) => t.phase_id === c.phase.id) ?? null }
+    .sort((a, b) => (rank.get(a.phase_id ?? '') ?? 99) - (rank.get(b.phase_id ?? '') ?? 99))
+  return { all, shown: c.phaseFilter ? all.filter((t) => t.phase_id === c.phaseFilter!.id) : all }
 }
+
+/** What the filters let through: a row itself, or anything under it. */
+function passes(c: Ctx, t: Task): boolean {
+  const self = (!c.onlyMine || isMine(c, t)) && (!c.openOnly || t.status !== 'done')
+  const kids = childrenOf(c.tree, t.id)
+  // A task with subtasks shows while any of them do; ticking the last one off lets it go.
+  if (kids.length && !isItem(t)) return kids.some((k) => passes(c, k)) || (self && !c.openOnly)
+  return self
+}
+const filterWords = (c: Ctx) => [c.onlyMine && 'yours', c.openOnly && 'open'].filter(Boolean).join(' and ')
 
 function ThisSheet({ c, target, addTask }: { c: Ctx; target: Target | null; addTask: boolean }) {
   if (!target || target.none) {
@@ -260,8 +298,10 @@ function ThisSheet({ c, target, addTask }: { c: Ctx; target: Target | null; addT
 /** Tasks that stand for the view on screen (a task under a sheet, linked to the Revit view). */
 function ViewTasks({ c, view, sheets }: { c: Ctx; view: RevitActive; sheets: RevitSheet[] }) {
   const linked = c.plan.tasks.rows.filter((t) => t.kind === 'task' && t.revit_id === view.id)
-  const here = linked.filter((t) => t.phase_id === c.phase.id)
-  const host = sheets.map((s) => rowsFor(c, s.id).here).find(Boolean) ?? null
+  const here = c.phaseFilter ? linked.filter((t) => t.phase_id === c.phaseFilter!.id) : linked
+  // A new task for the view goes under its sheet: the copy in the working phase, else the latest one.
+  const hostRows = sheets.flatMap((s) => rowsFor(c, s.id).all)
+  const host = hostRows.find((t) => t.phase_id === c.phase.id) ?? hostRows[hostRows.length - 1] ?? null
   return (
     <section className="rv-view">
       <div className="rv-view-head"><span className="rv-kicker">View</span> <strong>{view.name}</strong>
@@ -269,7 +309,7 @@ function ViewTasks({ c, view, sheets }: { c: Ctx; view: RevitActive; sheets: Rev
       {here.length === 0 && host && (
         <button className="btn small" onClick={() => void addViewTask(c, host, view)}>+ Task for this view</button>
       )}
-      {here.length === 0 && linked.length > 0 && <p className="muted small">Has a task in {linked.map((t) => phaseName(c, t.phase_id)).join(', ')}.</p>}
+      {here.length === 0 && linked.length > 0 && <p className="muted small">Has a task in {linked.map((t) => phaseFull(c, t.phase_id)).join(', ')}.</p>}
     </section>
   )
 }
@@ -283,16 +323,26 @@ async function addViewTask(c: Ctx, sheetRow: Task, view: { id: string; name: str
 }
 
 const phaseName = (c: Pick<Ctx, 'phases'>, id: string | null | undefined) => { const p = c.phases.find((x) => x.id === id); return p ? phaseShort(p) : '' }
+const phaseFull = (c: Pick<Ctx, 'phases'>, id: string | null | undefined) => c.phases.find((x) => x.id === id)?.name ?? 'no phase'
 
 // ---------- one sheet ----------
 
 function SheetCard({ c, sheet, addTask, viewId }: { c: Ctx; sheet: RevitSheet; addTask: boolean; viewId: string | null }) {
-  const { all, here } = rowsFor(c, sheet.id)
-  if (here) return <SheetTasks c={c} sheet={sheet} row={here} addTask={addTask} viewId={viewId} />
+  const { all, shown } = rowsFor(c, sheet.id)
+  if (shown.length) {
+    // One block per phase the sheet has work in; the working phase's block takes a right-click "Add a task".
+    const focusRow = shown.find((t) => t.phase_id === c.phase.id) ?? shown[shown.length - 1]
+    return <>{shown.map((row) => <SheetTasks key={row.id} c={c} sheet={sheet} row={row} rows={all} addTask={addTask && row.id === focusRow.id} viewId={viewId} />)}</>
+  }
   return (
     <section className="rv-card">
       <SheetTitle number={sheet.number} name={sheet.name} />
-      {all.length > 0 ? <CarryHere c={c} rows={all} /> : <Unlinked c={c} sheet={sheet} />}
+      {all.length > 0 ? (
+        <div className="rv-pad">
+          <p className="muted small">Nothing for this sheet in {c.phaseFilter?.name}. It has work in {all.map((t) => phaseFull(c, t.phase_id)).join(', ')}.</p>
+          <CarryInto c={c} rows={all} />
+        </div>
+      ) : <Unlinked c={c} sheet={sheet} />}
     </section>
   )
 }
@@ -301,25 +351,22 @@ function SheetTitle({ number, name, right }: { number: string | null | undefined
   return <div className="rv-title"><span className="mono rv-no">{number || '—'}</span><span className="rv-name" title={name}>{name}</span>{right}</div>
 }
 
-/** In archMGMT in other phases, not yet in the one being worked on. */
-function CarryHere({ c, rows }: { c: Ctx; rows: Task[] }) {
+/** Give the sheet a copy in the working phase (with its type's standard subtasks), from its latest copy. */
+function CarryInto({ c, rows, quiet = false, onDone }: { c: Ctx; rows: Task[]; quiet?: boolean; onDone?: () => void }) {
   const [busy, setBusy] = useState(false)
-  const rank = new Map(c.phases.map((p, i) => [p.id, i]))
-  const latest = [...rows].sort((a, b) => (rank.get(b.phase_id ?? '') ?? 0) - (rank.get(a.phase_id ?? '') ?? 0))[0]
+  if (rows.some((t) => t.phase_id === c.phase.id)) return null
+  const latest = rows[rows.length - 1]
   return (
-    <div className="rv-pad">
-      <p className="muted small">In archMGMT for {rows.map((t) => phaseName(c, t.phase_id)).join(', ')}, not yet in {c.phase.name}.</p>
-      <button className="btn primary small" disabled={busy} onClick={async () => {
-        setBusy(true)
-        try {
-          const top = childrenOf(c.tree, null).filter((t) => t.phase_id === c.phase.id)
-          const r = carryRows(latest, c.phase, { sortOrder: nextOrder(top), withSubtasks: true })
-          if (r.linkSource) void c.plan.tasks.patch(latest.id, { sheet_link: r.linkSource })
-          await insertMany<Task>('tasks', [r.sheet, ...r.items])
-          await c.plan.tasks.reload()
-        } catch (e) { c.say(`Couldn’t carry it: ${e instanceof Error ? e.message : String(e)}`) } finally { setBusy(false) }
-      }}>Carry into {c.phase.name}</button>
-    </div>
+    <button className={quiet ? 'pm-item' : 'btn primary small'} disabled={busy} onClick={async () => {
+      setBusy(true)
+      try {
+        const top = childrenOf(c.tree, null).filter((t) => t.phase_id === c.phase.id)
+        const r = carryRows(latest, c.phase, { sortOrder: nextOrder(top), withSubtasks: true })
+        if (r.linkSource) void c.plan.tasks.patch(latest.id, { sheet_link: r.linkSource })
+        await insertMany<Task>('tasks', [r.sheet, ...r.items])
+        await c.plan.tasks.reload()
+      } catch (e) { c.say(`Couldn’t carry it: ${e instanceof Error ? e.message : String(e)}`) } finally { setBusy(false); onDone?.() }
+    }}>Carry into {c.phase.name}</button>
   )
 }
 
@@ -344,8 +391,8 @@ function linkRow(c: Pick<Ctx, 'plan'>, row: Task, sheet: RevitSheet) {
 }
 
 /** New rows that add a Revit sheet to the phase: the sheet and its type's standard subtasks. */
-function newSheetRows(c: Pick<Ctx, 'project' | 'phase'>, sheet: RevitSheet, typeId: string, sortOrder: number): Partial<Task>[] {
-  const r = sheetRows({ projectId: c.project.id, phaseId: c.phase.id, number: sheet.number, name: sheet.name, typeId, start: c.phase.start_date, due: c.phase.end_date, assigneeId: null, sortOrder })
+function newSheetRows(c: Pick<Ctx, 'project'>, phase: Phase, sheet: RevitSheet, typeId: string, sortOrder: number): Partial<Task>[] {
+  const r = sheetRows({ projectId: c.project.id, phaseId: phase.id, number: sheet.number, name: sheet.name, typeId, start: phase.start_date, due: phase.end_date, assigneeId: null, sortOrder })
   return [{ ...r.sheet, revit_id: sheet.id, sheet_link: crypto.randomUUID() }, ...r.items.map((i) => ({ ...i, assignee_ids: [] }))]
 }
 
@@ -353,7 +400,7 @@ function newSheetRows(c: Pick<Ctx, 'project' | 'phase'>, sheet: RevitSheet, type
  * Bring Revit sheets into the phase: ones whose number matches an app sheet are linked to it; the rest are added
  * with their type's standard subtasks. Returns a line saying what happened.
  */
-async function addSheets(c: Pick<Ctx, 'plan' | 'tree' | 'project' | 'phase' | 'model'>, sheets: RevitSheet[]): Promise<string> {
+async function addSheets(c: Pick<Ctx, 'plan' | 'tree' | 'project' | 'phase' | 'phases' | 'model'>, sheets: RevitSheet[]): Promise<string> {
   const free = linkable(c)
   let linked = 0
   const rows: Partial<Task>[] = []
@@ -363,7 +410,7 @@ async function addSheets(c: Pick<Ctx, 'plan' | 'tree' | 'project' | 'phase' | 'm
     if (c.plan.tasks.rows.some((t) => t.kind === 'sheet' && t.revit_id === s.id)) { skipped++; continue }
     const m = free.find((t) => sameNumber(t.sheet_number, s.number))
     if (m) { free.splice(free.indexOf(m), 1); linkRow(c, m, s); linked++; continue }
-    rows.push(...newSheetRows(c, s, guessSheetType(s.number, s.name), order++))
+    rows.push(...newSheetRows(c, c.phase, s, guessSheetType(s.number, s.name), order++))
   }
   const added = rows.filter((r) => r.kind === 'sheet').length
   try {
@@ -377,6 +424,8 @@ function Unlinked({ c, sheet }: { c: Ctx; sheet: RevitSheet }) {
   const free = linkable(c)
   const matches = free.filter((t) => sameNumber(t.sheet_number, sheet.number))
   const [typeId, setTypeId] = useState(() => guessSheetType(sheet.number, sheet.name))
+  const [phaseId, setPhaseId] = useState(c.phase.id)
+  const into = c.phases.find((p) => p.id === phaseId) ?? c.phase
   const [busy, setBusy] = useState(false)
   const type = sheetTypeById(typeId)
   return (
@@ -384,7 +433,7 @@ function Unlinked({ c, sheet }: { c: Ctx; sheet: RevitSheet }) {
       <p className="muted small">Not in archMGMT yet.</p>
       {matches.map((m) => (
         <button key={m.id} className="btn primary small rv-wide" onClick={() => linkRow(c, m, sheet)}>
-          Link to {m.sheet_number} {m.title} <span className="rv-dim">({phaseName(c, m.phase_id)})</span>
+          Link to {m.sheet_number} {m.title} <span className="rv-dim">({phaseFull(c, m.phase_id)})</span>
         </button>
       ))}
       <div className="rv-addrow">
@@ -394,23 +443,28 @@ function Unlinked({ c, sheet }: { c: Ctx; sheet: RevitSheet }) {
         <button className={`btn small${matches.length ? '' : ' primary'}`} disabled={busy} onClick={async () => {
           setBusy(true)
           try {
-            await insertMany<Task>('tasks', newSheetRows(c, sheet, typeId, nextOrder(childrenOf(c.tree, null).filter((t) => t.phase_id === c.phase.id))))
+            await insertMany<Task>('tasks', newSheetRows(c, into, sheet, typeId, nextOrder(childrenOf(c.tree, null).filter((t) => t.phase_id === into.id))))
             await c.plan.tasks.reload()
           } catch (e) { c.say(`Couldn’t add it: ${e instanceof Error ? e.message : String(e)}`) } finally { setBusy(false) }
-        }}>Add to {phaseShort(c.phase)}</button>
+        }}>Add</button>
       </div>
+      <label className="rv-into muted small">to phase
+        <select className="field boxed" value={into.id} onChange={(e) => setPhaseId(e.target.value)} aria-label="Phase to add it to">
+          {c.phases.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </label>
       <p className="muted small">{type?.checklist.length ? `Adds ${type.checklist.length} standard subtasks for this type.` : 'No standard subtasks for this type.'}</p>
       {free.length > matches.length && (
         <select className="field boxed rv-wide" value="" onChange={(e) => { const m = free.find((t) => t.id === e.target.value); if (m) linkRow(c, m, sheet) }} aria-label="Link to another sheet">
           <option value="">Link to a sheet already in archMGMT…</option>
-          {free.map((t) => <option key={t.id} value={t.id}>{t.sheet_number ?? '—'} {t.title} ({phaseName(c, t.phase_id)})</option>)}
+          {free.map((t) => <option key={t.id} value={t.id}>{t.sheet_number ?? '—'} {t.title} ({phaseFull(c, t.phase_id)})</option>)}
         </select>
       )}
     </div>
   )
 }
 
-function SheetTasks({ c, sheet, row, addTask, viewId }: { c: Ctx; sheet: RevitSheet; row: Task; addTask: boolean; viewId: string | null }) {
+function SheetTasks({ c, sheet, row, rows, addTask, viewId }: { c: Ctx; sheet: RevitSheet; row: Task; rows: Task[]; addTask: boolean; viewId: string | null }) {
   const { plan, tree } = c
   const patch = (t: Task, ch: Partial<Task>) => void plan.tasks.patch(t.id, ch)
   const kids = childrenOf(tree, row.id)
@@ -418,9 +472,10 @@ function SheetTasks({ c, sheet, row, addTask, viewId }: { c: Ctx; sheet: RevitSh
   const r = rolledDates(tree, row)
   const differs = !sameNumber(row.sheet_number, sheet.number) || (row.title ?? '').trim().toLowerCase() !== sheet.name.trim().toLowerCase()
   const [showViews, setShowViews] = useState(false)
-  const viewTask = (v: RevitView) => plan.tasks.rows.find((t) => t.kind === 'task' && t.revit_id === v.id && t.phase_id === c.phase.id) ?? null
-  const shown = (t: Task): boolean => !c.onlyMine || isMine(c, t) || childrenOf(tree, t.id).some(shown)
+  const viewTask = (v: RevitView) => plan.tasks.rows.find((t) => t.kind === 'task' && t.revit_id === v.id && t.phase_id === row.phase_id) ?? null
+  const shown = (t: Task): boolean => passes(c, t)
   const list = kids.filter(shown)
+  const latest = rows[rows.length - 1]?.id === row.id
 
   return (
     <section className={`rv-card${isMine(c, row) ? ' mine' : ''}`}>
@@ -432,6 +487,7 @@ function SheetTasks({ c, sheet, row, addTask, viewId }: { c: Ctx; sheet: RevitSh
             {(close) => (
               <div className="pm-list">
                 <button className="pm-item" onClick={() => { void ask('openUrl', { url: `${SITE}#/overview?find=${row.id}` }); close() }}>Open in archMGMT ↗</button>
+                {latest && <CarryInto c={c} rows={rows} quiet onDone={close} />}
                 <button className="pm-item" onClick={() => {
                   for (const o of plan.tasks.rows) if (o.kind === 'sheet' && o.revit_id === sheet.id && o.id !== row.id) void plan.tasks.patch(o.id, { revit_id: null })
                   patch(row, { revit_id: null }); close()
@@ -442,7 +498,7 @@ function SheetTasks({ c, sheet, row, addTask, viewId }: { c: Ctx; sheet: RevitSh
         </span>
       } />
       <div className="rv-meta">
-        <span className="chip">{sheetTypeById(row.sheet_type)?.name ?? 'Sheet'}</span>
+        <span className="chip rv-phasechip" title={`This sheet's work in ${phaseFull(c, row.phase_id)}`}>{phaseFull(c, row.phase_id)}</span>
         <DateChip task={{ ...row, start_date: r.start, due_date: r.due }} onPatch={(x) => patch(row, x)} locked={r.rolled} />
         <div className="rv-progbar" aria-hidden="true"><i style={{ width: prog.total ? `${(100 * prog.done) / prog.total}%` : 0 }} /></div>
       </div>
@@ -452,7 +508,7 @@ function SheetTasks({ c, sheet, row, addTask, viewId }: { c: Ctx; sheet: RevitSh
       )}
       <ul className="rv-list">
         {list.map((t) => <Row key={t.id} c={c} t={t} depth={0} shown={shown} viewId={viewId} />)}
-        {list.length === 0 && <li className="rv-none muted small">{kids.length ? 'Nothing here is assigned to you.' : 'No tasks or subtasks yet.'}</li>}
+        {list.length === 0 && <li className="rv-none muted small">{kids.length ? `Nothing ${filterWords(c)} here (${kids.length} hidden by the filters).` : 'No tasks or subtasks yet.'}</li>}
       </ul>
       <AddLine c={c} parent={row} focus={addTask} allowTask />
       {sheet.views.length > 0 && (
@@ -547,14 +603,14 @@ function AllSheets({ c }: { c: Ctx }) {
   const sheets = [...c.model.sheets].sort(byNumber)
   const free = linkable(c)
   const state = (s: RevitSheet) => {
-    const { all, here } = rowsFor(c, s.id)
-    if (here) return { kind: 'here' as const, row: here }
-    if (all.length) return { kind: 'other' as const, rows: all }
+    const { all, shown } = rowsFor(c, s.id)
+    if (all.length) return { kind: 'linked' as const, all, shown }
     return free.some((t) => sameNumber(t.sheet_number, s.number)) ? { kind: 'match' as const } : { kind: 'new' as const }
   }
-  const todo = sheets.filter((s) => { const k = state(s).kind; return k === 'match' || k === 'new' })
+  const todo = sheets.filter((s) => state(s).kind !== 'linked')
   const ids = new Set(c.model.sheets.map((s) => s.id))
-  const appOnly = c.plan.tasks.rows.filter((t) => t.kind === 'sheet' && t.phase_id === c.phase.id && (!t.revit_id || !ids.has(t.revit_id)))
+  const appOnly = [...free, ...c.plan.tasks.rows.filter((t) => t.kind === 'sheet' && t.revit_id && !ids.has(t.revit_id))]
+    .filter((t) => !c.phaseFilter || t.phase_id === c.phaseFilter.id)
   const open = (id: string) => void ask('open', { id }).catch((e: Error) => c.say(e.message))
   return (
     <>
@@ -562,16 +618,20 @@ function AllSheets({ c }: { c: Ctx }) {
         <div className="rv-pad rv-bulk">
           <span className="muted small">{todo.length} Revit sheet{todo.length === 1 ? ' isn’t' : 's aren’t'} in archMGMT.</span>
           <button className="btn primary small" disabled={busy} onClick={async () => { setBusy(true); const r = await addSheets(c, todo); setBusy(false); if (r) c.say(r) }}>
-            Add all to {phaseShort(c.phase)}
+            Add all to {c.phase.name}
           </button>
         </div>
       )}
       <ul className="rv-sheets">
         {sheets.map((s) => {
           const st = state(s)
-          const row = st.kind === 'here' ? st.row : null
-          if (c.onlyMine && !(row && (isMine(c, row) || childrenOf(c.tree, row.id).some((k) => isMine(c, k) && k.status !== 'done')))) return null
-          const prog = row ? progressOf(c.tree, row) : null
+          const rows = st.kind === 'linked' ? st.shown : []
+          const row = rows[rows.length - 1] ?? null
+          const work = rows.flatMap((r) => flat(c.tree, r.id))
+          if (c.onlyMine && !rows.some((r) => isMine(c, r)) && !work.some((k) => isMine(c, k) && k.status !== 'done')) return null
+          const leaves = work.filter((t) => isItem(t) || !childrenOf(c.tree, t.id).some((k) => !isItem(k)))
+          const prog = rows.length ? { done: leaves.filter((t) => t.status === 'done').length, total: leaves.length } : null
+          if (c.openOnly && prog && prog.total > 0 && prog.done === prog.total) return null
           const crew = row ? assigneesOf(row).map((id) => c.people.find((p) => p.id === id)).filter((p): p is Person => Boolean(p)) : []
           return (
             <li key={s.id} className={`${s.id === c.model.active?.id ? 'current' : ''}${row && isMine(c, row) ? ' mine' : ''}`}>
@@ -580,7 +640,7 @@ function AllSheets({ c }: { c: Ctx }) {
               </button>
               {prog && <span className={`rv-prog${prog.total && prog.done === prog.total ? ' all' : ''}`}>{prog.done}/{prog.total}</span>}
               {crew.length > 0 && <span className="rv-who">{crew.map((p) => initialsOf(p)).join(' ')}</span>}
-              {st.kind === 'other' && <span className="muted small">{st.rows.map((t) => phaseName(c, t.phase_id)).join(', ')}</span>}
+              {st.kind === 'linked' && <span className="muted small" title="Phases this sheet has work in">{st.all.map((t) => phaseName(c, t.phase_id)).join(' ')}</span>}
               {(st.kind === 'match' || st.kind === 'new') && (
                 <button className="linkbtn small" onClick={async () => { const r = await addSheets(c, [s]); if (r) c.say(r) }}>{st.kind === 'match' ? 'Link' : '+ Add'}</button>
               )}
@@ -603,15 +663,19 @@ function AllSheets({ c }: { c: Ctx }) {
 /** Your open work on this model's sheets in this phase: click a sheet to open it in Revit. */
 function MyWork({ c }: { c: Ctx }) {
   if (!c.me) return null
-  const mine = c.plan.tasks.rows
-    .filter((t) => t.kind === 'sheet' && t.phase_id === c.phase.id && t.revit_id)
-    .map((row) => ({ row, open: [row, ...flat(c.tree, row.id)].filter((t) => t.id !== row.id && t.status !== 'done' && isMine(c, t)).length }))
-    .filter((x) => x.open > 0)
+  const sheetRowsHere = c.plan.tasks.rows.filter((t) => t.kind === 'sheet' && t.revit_id && (!c.phaseFilter || t.phase_id === c.phaseFilter.id))
+  const byRevit = new Map<string, { row: Task; open: number }>()
+  for (const row of sheetRowsHere) {
+    const open = flat(c.tree, row.id).filter((t) => t.status !== 'done' && isMine(c, t)).length
+    const prev = byRevit.get(row.revit_id!)
+    byRevit.set(row.revit_id!, { row, open: (prev?.open ?? 0) + open })
+  }
+  const mine = [...byRevit.values()].filter((x) => x.open > 0)
     .sort((a, b) => (a.row.sheet_number ?? '').localeCompare(b.row.sheet_number ?? '', undefined, { numeric: true }))
   if (!mine.length) return null
   return (
     <>
-      <div className="rv-kicker rv-pad">Yours in {c.phase.name}</div>
+      <div className="rv-kicker rv-pad">Your open work{c.phaseFilter ? ` in ${c.phaseFilter.name}` : ''}</div>
       <ul className="rv-sheets">
         {mine.map(({ row, open }) => (
           <li key={row.id} className="mine">
@@ -629,43 +693,73 @@ const flat = (tree: Tree, id: string): Task[] => childrenOf(tree, id).flatMap((k
 
 // ---------- the floating checklist on the sheet ----------
 
-function Overlay({ c, target, folded, onFold, onMine }: { c: Ctx; target: Target | null; folded: boolean; onFold: () => void; onMine: () => void }) {
+function Overlay({ c, target, folded, onFold, onMine, onOpen, onPhase }: {
+  c: Ctx; target: Target | null; folded: boolean; onFold: () => void; onMine: () => void; onOpen: () => void; onPhase: (id: string) => void
+}) {
   const sheet = target?.sheets[0] ?? null
-  const row = sheet ? rowsFor(c, sheet.id).here : null
-  const prog = row ? progressOf(c.tree, row) : null
-  const shown = (t: Task): boolean => !c.onlyMine || isMine(c, t) || childrenOf(c.tree, t.id).some(shown)
-  const lines = row ? flatShown(c.tree, row.id, shown, 0) : []
+  const { all, shown } = sheet ? rowsFor(c, sheet.id) : { all: [], shown: [] }
+  const head = shown[shown.length - 1] ?? all[all.length - 1] ?? null
+  const work = shown.flatMap((r) => flat(c.tree, r.id))
+  const leaves = work.filter((t) => isItem(t) || !childrenOf(c.tree, t.id).some((k) => !isItem(k)))
+  const prog = shown.length ? { done: leaves.filter((t) => t.status === 'done').length, total: leaves.length } : null
+  const pass = (t: Task) => passes(c, t)
+  const blocks = shown.map((row) => ({ row, lines: flatShown(c.tree, row.id, pass, 0) }))
+  const count = blocks.reduce((n, b) => n + b.lines.length, 0)
   return (
     <>
       <div className="rv-ov-head">
         <button className="rv-ov-fold" onClick={onFold} title={folded ? 'Show the checklist' : 'Hide the checklist'}>{folded ? '▸' : '▾'}</button>
         <span className="rv-ov-title" title="Open the archMGMT pane" onClick={() => void ask('showPane')}>
-          {sheet ? <><span className="mono">{row?.sheet_number ?? sheet.number}</span> {row?.title ?? sheet.name}</> : <span className="muted">No sheet open</span>}
+          {sheet ? <><span className="mono">{head?.sheet_number ?? sheet.number}</span> {head?.title ?? sheet.name}</> : <span className="muted">No sheet open</span>}
         </span>
         {prog && <span className={`rv-prog${prog.total && prog.done === prog.total ? ' all' : ''}`}>{prog.done}/{prog.total}</span>}
-        {row && c.me && <button className={`rv-ov-mine${c.onlyMine ? ' on' : ''}`} onClick={onMine} title="Only what's assigned to you">Mine</button>}
       </div>
-      {!folded && sheet && !row && (
-        <p className="rv-ov-note">Not in archMGMT for {phaseShort(c.phase)}. <button className="linkbtn" onClick={() => void ask('showPane')}>Open the pane</button> to add or link it.</p>
+      {!folded && sheet && all.length > 0 && (
+        <div className="rv-ov-filters">
+          {c.me && <button className={c.onlyMine ? 'on' : ''} onClick={onMine} title="Only what's assigned to you">Mine</button>}
+          <button className={c.openOnly ? 'on' : ''} onClick={onOpen} title="Hide what's already done">Open</button>
+          <select value={c.phaseFilter?.id ?? ''} onChange={(e) => onPhase(e.target.value)} aria-label="Phase" title="Every phase's work on this sheet, or one phase's">
+            <option value="">All phases</option>
+            {c.phases.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
       )}
-      {!folded && row && (
+      {!folded && sheet && all.length === 0 && (
+        <p className="rv-ov-note">This sheet isn’t in archMGMT yet. <button className="linkbtn" onClick={() => void ask('showPane')}>Open the pane</button> to add it or link it to one that is.</p>
+      )}
+      {!folded && all.length > 0 && (
         <ul className="rv-ov-list">
-          {lines.map(({ t, depth }) => {
-            const done = t.status === 'done'
-            const who = crewOf(c.tree, t).map((id) => initialsOf(c.people.find((p) => p.id === id))).filter(Boolean).join(' ')
-            return (
-              <li key={t.id} className={`${done ? 'done' : ''}${isMine(c, t) ? ' mine' : ''}${isItem(t) ? '' : ' task'}`} style={{ paddingLeft: 6 + depth * 14 }}>
-                <label>
-                  <input type="checkbox" checked={done} onChange={(e) => void c.plan.tasks.patch(t.id, { status: e.target.checked ? 'done' : 'todo' })} />
-                  <span>{t.title || 'Untitled'}</span>
-                </label>
-                {who && <span className="rv-who">{who}</span>}
-              </li>
-            )
-          })}
-          {lines.length === 0 && <li className="muted">{c.onlyMine ? 'Nothing here is assigned to you.' : 'No tasks yet.'}</li>}
+          {blocks.map(({ row, lines }) => (
+            <OverlayBlock key={row.id} c={c} label={shown.length > 1 ? phaseFull(c, row.phase_id) : null} lines={lines} />
+          ))}
+          {count === 0 && (
+            <li className="muted">{shown.length === 0 ? `Nothing for this sheet in ${c.phaseFilter?.name}.`
+              : work.length ? `Nothing ${filterWords(c)} here (${work.length} hidden by the filters).` : 'No tasks on this sheet yet.'}</li>
+          )}
         </ul>
       )}
+    </>
+  )
+}
+
+function OverlayBlock({ c, label, lines }: { c: Ctx; label: string | null; lines: { t: Task; depth: number }[] }) {
+  if (!lines.length) return null
+  return (
+    <>
+      {label && <li className="rv-ov-phase">{label}</li>}
+      {lines.map(({ t, depth }) => {
+        const done = t.status === 'done'
+        const who = crewOf(c.tree, t).map((id) => initialsOf(c.people.find((p) => p.id === id))).filter(Boolean).join(' ')
+        return (
+          <li key={t.id} className={`${done ? 'done' : ''}${isMine(c, t) ? ' mine' : ''}${isItem(t) ? '' : ' task'}`} style={{ paddingLeft: 6 + depth * 14 }}>
+            <label>
+              <input type="checkbox" checked={done} onChange={(e) => void c.plan.tasks.patch(t.id, { status: e.target.checked ? 'done' : 'todo' })} />
+              <span>{t.title || 'Untitled'}</span>
+            </label>
+            {who && <span className="rv-who">{who}</span>}
+          </li>
+        )
+      })}
     </>
   )
 }
